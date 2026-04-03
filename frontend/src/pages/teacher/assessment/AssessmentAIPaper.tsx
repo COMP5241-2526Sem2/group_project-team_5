@@ -1,0 +1,1162 @@
+import { useState } from 'react';
+import {
+  ChevronRight, ChevronLeft, Check, Sparkles, Loader2,
+  FileText, Clock, Award, BookOpen, Target, Layers,
+  Download, Printer, Save, RotateCcw, ChevronDown,
+  Plus, Minus, GripVertical, Trash2, Edit3, Send,
+  FilePen, AlertCircle,
+} from 'lucide-react';
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+type ExamType = 'midterm' | 'final' | 'unit' | 'special' | 'review' | 'contest';
+type Difficulty = 'easy' | 'medium' | 'hard' | 'mixed';
+type PageView = 'wizard' | 'drafts';
+
+interface SectionCfg {
+  key: string;
+  label: string;
+  type: string;
+  count: number;
+  scoreEach: number;
+}
+
+interface GeneratedSection {
+  title: string;
+  description: string;
+  questions: GeneratedQ[];
+}
+
+interface GeneratedQ {
+  id: string;
+  prompt: string;
+  options?: { key: string; text: string; correct: boolean }[];
+  answer?: string;
+  score: number;
+  difficulty: 'easy' | 'medium' | 'hard';
+}
+
+interface DraftPaper {
+  id: string;
+  title: string;
+  grade: string;
+  subject: string;
+  examType: ExamType;
+  totalScore: number;
+  duration: number;
+  questionCount: number;
+  savedAt: string;          // ISO string
+  sections: GeneratedSection[];
+  note?: string;
+}
+
+// ── Config ────────────────────────────────────────────────────────────────────
+const EXAM_TYPES: { id: ExamType; icon: string; label: string; desc: string; color: string; bg: string }[] = [
+  { id: 'midterm',  icon: '📋', label: 'Midterm Exam',      desc: 'Mid-semester comprehensive test',         color: '#1d4ed8', bg: '#dbeafe' },
+  { id: 'final',    icon: '🏆', label: 'Final Exam',        desc: 'End-of-semester comprehensive test',      color: '#7c3aed', bg: '#ede9fe' },
+  { id: 'unit',     icon: '📖', label: 'Unit Test',         desc: 'Targeted chapter/unit assessment',        color: '#0369a1', bg: '#e0f2fe' },
+  { id: 'special',  icon: '🎯', label: 'Special Practice',  desc: 'Focused knowledge point drills',          color: '#15803d', bg: '#dcfce7' },
+  { id: 'review',   icon: '🔄', label: 'Review Test',       desc: 'Multi-chapter comprehensive review',      color: '#b45309', bg: '#fef3c7' },
+  { id: 'contest',  icon: '🥇', label: 'Contest Mock',      desc: 'Competition-level simulation exam',       color: '#9f1239', bg: '#ffe4e6' },
+];
+
+const GRADES = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'];
+const SUBJECTS = ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'English', 'History', 'Geography', 'Political Science'];
+const PUBLISHERS = ["PEP (People's Education Press)", 'Beijing Normal University Press', 'Oxford University Press', 'Jiangsu Education Press'];
+
+const CHAPTERS_BY_SUBJECT: Record<string, string[]> = {
+  Biology:     ['Ch.1 Cell Structure', 'Ch.2 Cell Function', 'Ch.3 Photosynthesis', 'Ch.4 Cellular Respiration', 'Ch.5 Genetics'],
+  Physics:     ["Ch.1 Kinematics", "Ch.2 Newton's Laws", 'Ch.3 Work & Energy', 'Ch.4 Momentum', 'Ch.5 Waves'],
+  Chemistry:   ['Ch.1 Atoms & Molecules', 'Ch.2 Chemical Reactions', 'Ch.3 Acids & Bases', 'Ch.4 Electrochemistry', 'Ch.5 Organic Chemistry'],
+  Mathematics: ['Ch.1 Functions', 'Ch.2 Trigonometry', 'Ch.3 Sequences', 'Ch.4 Derivatives', 'Ch.5 Statistics'],
+  English:     ['Unit 1 Reading', 'Unit 2 Grammar', 'Unit 3 Writing', 'Unit 4 Listening', 'Unit 5 Speaking'],
+  default:     ['Chapter 1', 'Chapter 2', 'Chapter 3', 'Chapter 4', 'Chapter 5'],
+};
+
+const DEFAULT_SECTIONS: SectionCfg[] = [
+  { key: 'mcq',    label: 'Section I  — Multiple Choice',  type: 'MCQ',          count: 15, scoreEach: 3 },
+  { key: 'tf',     label: 'Section II — True / False',     type: 'True/False',   count: 5,  scoreEach: 2 },
+  { key: 'fill',   label: 'Section III — Fill in Blank',   type: 'Fill-blank',   count: 5,  scoreEach: 3 },
+  { key: 'sa',     label: 'Section IV — Short Answer',     type: 'Short Answer', count: 3,  scoreEach: 6 },
+  { key: 'essay',  label: 'Section V  — Essay',            type: 'Essay',        count: 1,  scoreEach: 15 },
+];
+
+// ── Mock paper ────────────────────────────────────────────────────────────────
+const MOCK_PAPER: GeneratedSection[] = [
+  {
+    title: 'Section I — Multiple Choice',
+    description: '15 questions, 3 points each, 45 points total. Choose the single best answer.',
+    questions: [
+      { id: 'p1', score: 3, difficulty: 'easy',   prompt: 'Which organelle is the site of photosynthesis in plant cells?',                              options: [{ key: 'A', text: 'Mitochondria', correct: false }, { key: 'B', text: 'Chloroplast', correct: true }, { key: 'C', text: 'Ribosome', correct: false }, { key: 'D', text: 'Vacuole', correct: false }] },
+      { id: 'p2', score: 3, difficulty: 'medium', prompt: 'In the Calvin cycle, which molecule acts as the first acceptor of CO₂?',                    options: [{ key: 'A', text: 'RuBP', correct: true }, { key: 'B', text: 'G3P', correct: false }, { key: 'C', text: 'ATP', correct: false }, { key: 'D', text: 'NADPH', correct: false }] },
+      { id: 'p3', score: 3, difficulty: 'medium', prompt: 'Which of the following is NOT a product of the light-dependent reactions?',                  options: [{ key: 'A', text: 'ATP', correct: false }, { key: 'B', text: 'NADPH', correct: false }, { key: 'C', text: 'O₂', correct: false }, { key: 'D', text: 'Glucose', correct: true }] },
+      { id: 'p4', score: 3, difficulty: 'hard',   prompt: 'In the Z-scheme of electron flow, electrons ultimately reduce NADP⁺ to NADPH after passing through:', options: [{ key: 'A', text: 'Cytochrome b6f', correct: false }, { key: 'B', text: 'Plastocyanin', correct: false }, { key: 'C', text: 'Ferredoxin', correct: true }, { key: 'D', text: 'Plastoquinone', correct: false }] },
+    ],
+  },
+  {
+    title: 'Section II — True / False',
+    description: '5 questions, 2 points each, 10 points total. Write T (True) or F (False).',
+    questions: [
+      { id: 'p5', score: 2, difficulty: 'easy',   prompt: 'The Calvin cycle is also called the "dark reactions" because it cannot occur in light.',   answer: 'F' },
+      { id: 'p6', score: 2, difficulty: 'easy',   prompt: 'Oxygen is released as a by-product of the light-dependent reactions via photolysis.',      answer: 'T' },
+      { id: 'p7', score: 2, difficulty: 'medium', prompt: 'Chlorophyll a absorbs light most strongly in the green region of the visible spectrum.',    answer: 'F' },
+    ],
+  },
+  {
+    title: 'Section III — Fill in the Blank',
+    description: '5 questions, 3 points each, 15 points total.',
+    questions: [
+      { id: 'p8',  score: 3, difficulty: 'medium', prompt: 'The splitting of water molecules during the light reactions is called _______.', answer: 'Photolysis' },
+      { id: 'p9',  score: 3, difficulty: 'hard',   prompt: 'In Photosystem I, the primary electron acceptor that passes electrons to NADP⁺ is _______.', answer: 'Ferredoxin' },
+    ],
+  },
+  {
+    title: 'Section IV — Short Answer',
+    description: '3 questions, 6 points each, 18 points total.',
+    questions: [
+      { id: 'p10', score: 6, difficulty: 'medium', prompt: 'Explain why leaves appear green. What happens to the wavelengths of light that are absorbed rather than reflected?' },
+      { id: 'p11', score: 6, difficulty: 'hard',   prompt: 'Compare the roles of Photosystem I and Photosystem II in the light-dependent reactions of photosynthesis.' },
+    ],
+  },
+  {
+    title: 'Section V — Essay',
+    description: '1 question, 15 points.',
+    questions: [
+      { id: 'p12', score: 15, difficulty: 'hard', prompt: 'Describe the complete process of photosynthesis, covering both the light-dependent and light-independent reactions. Include the key molecules produced and consumed at each stage, and explain how the two stages are interconnected.' },
+    ],
+  },
+];
+
+// ── Pre-populated mock drafts ─────────────────────────────────────────────────
+const INITIAL_DRAFTS: DraftPaper[] = [
+  {
+    id: 'd1',
+    title: 'Grade 10 Physics Midterm — Spring 2026',
+    grade: 'Grade 10',
+    subject: 'Physics',
+    examType: 'midterm',
+    totalScore: 120,
+    duration: 90,
+    questionCount: 29,
+    savedAt: '2026-03-28T14:22:00Z',
+    sections: [],
+    note: 'Need to review Section III difficulty balance before publishing.',
+  },
+  {
+    id: 'd2',
+    title: 'Grade 9 Chemistry Unit Test — Ch.3 Acids & Bases',
+    grade: 'Grade 9',
+    subject: 'Chemistry',
+    examType: 'unit',
+    totalScore: 80,
+    duration: 60,
+    questionCount: 22,
+    savedAt: '2026-03-31T09:05:00Z',
+    sections: [],
+    note: '',
+  },
+  {
+    id: 'd3',
+    title: 'Grade 11 Math Review — Sequences & Derivatives',
+    grade: 'Grade 11',
+    subject: 'Mathematics',
+    examType: 'review',
+    totalScore: 150,
+    duration: 120,
+    questionCount: 35,
+    savedAt: '2026-04-01T17:40:00Z',
+    sections: [],
+  },
+];
+
+const DIFF_CFG = {
+  easy:   { bg: '#dcfce7', color: '#15803d' },
+  medium: { bg: '#fef9c3', color: '#a16207' },
+  hard:   { bg: '#fee2e2', color: '#b91c1c' },
+};
+
+function fmtDate(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
+    ' · ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
+// ── Step indicator ─────────────────────────────────────────────────────────────
+function StepDot({ n, label, active, done }: { n: number; label: string; active: boolean; done: boolean }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{
+        width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: done ? '#3b5bdb' : active ? '#3b5bdb' : '#e8eaed',
+        color: done || active ? '#fff' : '#9ca3af',
+        fontSize: '12px', fontWeight: 700, transition: 'all 0.2s',
+      }}>
+        {done ? <Check size={13} /> : n}
+      </div>
+      <span style={{ fontSize: '13px', fontWeight: active ? 600 : 400, color: active ? '#0f0f23' : done ? '#374151' : '#9ca3af' }}>
+        {label}
+      </span>
+    </div>
+  );
+}
+
+// ── Custom select ─────────────────────────────────────────────────────────────
+function SimpleSelect({ label, options, value, onChange, placeholder, required }: {
+  label: string; options: string[]; value: string; onChange: (v: string) => void;
+  placeholder?: string; required?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ position: 'relative' }}>
+      <div style={{ fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>
+        {label}{required && <span style={{ color: '#ef4444', marginLeft: '2px' }}>*</span>}
+      </div>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '9px 12px', borderRadius: '8px', cursor: 'pointer',
+          border: `1.5px solid ${open ? '#3b5bdb' : '#e8eaed'}`,
+          background: '#fff', outline: 'none', transition: 'border-color 0.15s',
+        }}
+      >
+        <span style={{ fontSize: '13px', color: value ? '#0f0f23' : '#9ca3af', fontWeight: value ? 500 : 400 }}>
+          {value || placeholder || 'Select…'}
+        </span>
+        <ChevronDown size={13} style={{ color: open ? '#3b5bdb' : '#9ca3af', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s' }} />
+      </button>
+      {open && (
+        <div
+          style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 50, background: '#fff', border: '1.5px solid #e8eaed', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.10)', padding: '4px' }}
+          onMouseLeave={() => setOpen(false)}
+        >
+          {options.map(opt => (
+            <button key={opt} onClick={() => { onChange(opt); setOpen(false); }}
+              style={{
+                width: '100%', padding: '8px 10px', borderRadius: '7px',
+                borderTop: 'none', borderRight: 'none', borderBottom: 'none', borderLeft: 'none',
+                cursor: 'pointer',
+                background: value === opt ? '#eff6ff' : 'transparent',
+                color: value === opt ? '#3b5bdb' : '#374151',
+                fontSize: '13px', fontWeight: value === opt ? 600 : 400, textAlign: 'left',
+              }}
+              onMouseEnter={e => { if (value !== opt) (e.currentTarget as HTMLElement).style.background = '#f9fafb'; }}
+              onMouseLeave={e => { if (value !== opt) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+            >
+              {opt}
+              {value === opt && <Check size={11} style={{ float: 'right', color: '#3b5bdb', marginTop: '2px' }} />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CountStepper({ value, onChange, min = 0, max = 30 }: { value: number; onChange: (v: number) => void; min?: number; max?: number }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #e8eaed', borderRadius: '8px', overflow: 'hidden' }}>
+      <button onClick={() => onChange(Math.max(min, value - 1))}
+        style={{ width: '32px', height: '32px', borderTop: 'none', borderRight: 'none', borderBottom: 'none', borderLeft: 'none', background: '#f9fafb', color: '#374151', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Minus size={12} />
+      </button>
+      <div style={{ width: '40px', textAlign: 'center', fontSize: '13px', fontWeight: 600, color: '#0f0f23', borderLeft: '1px solid #e8eaed', borderRight: '1px solid #e8eaed', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {value}
+      </div>
+      <button onClick={() => onChange(Math.min(max, value + 1))}
+        style={{ width: '32px', height: '32px', borderTop: 'none', borderRight: 'none', borderBottom: 'none', borderLeft: 'none', background: '#f9fafb', color: '#374151', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Plus size={12} />
+      </button>
+    </div>
+  );
+}
+
+// ── Draft Card ────────────────────────────────────────────────────────────────
+function DraftCard({
+  draft,
+  onDelete,
+  onPublish,
+}: {
+  draft: DraftPaper;
+  onDelete: (id: string) => void;
+  onPublish: (id: string) => void;
+}) {
+  const examCfg = EXAM_TYPES.find(e => e.id === draft.examType);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  return (
+    <div style={{
+      background: '#fff',
+      border: '1px solid #e8eaed',
+      borderRadius: '14px',
+      padding: '20px 22px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '12px',
+      transition: 'box-shadow 0.15s, border-color 0.15s',
+      position: 'relative',
+      overflow: 'hidden',
+    }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(59,91,219,0.10)';
+        (e.currentTarget as HTMLElement).style.borderColor = '#c7d2fe';
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+        (e.currentTarget as HTMLElement).style.borderColor = '#e8eaed';
+      }}
+    >
+      {/* Watermark stripe */}
+      <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: examCfg?.color ?? '#3b5bdb', borderRadius: '14px 0 0 14px' }} />
+
+      {/* Top row */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', paddingLeft: '8px' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px', background: examCfg?.bg ?? '#eef2ff', color: examCfg?.color ?? '#3b5bdb', letterSpacing: '0.03em' }}>
+              {examCfg?.icon} {examCfg?.label}
+            </span>
+            <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', background: '#fef9c3', color: '#a16207' }}>
+              DRAFT
+            </span>
+          </div>
+          <div style={{ fontSize: '15px', fontWeight: 700, color: '#0f0f23', lineHeight: 1.4, marginBottom: '2px' }}>
+            {draft.title}
+          </div>
+          <div style={{ fontSize: '12px', color: '#6b7280' }}>
+            {draft.grade} · {draft.subject}
+          </div>
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div style={{ display: 'flex', gap: '16px', paddingLeft: '8px' }}>
+        {[
+          { icon: <FileText size={11} />, label: `${draft.questionCount} questions` },
+          { icon: <Award size={11} />,    label: `${draft.totalScore} pts` },
+          { icon: <Clock size={11} />,    label: `${draft.duration} min` },
+        ].map(item => (
+          <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: '#6b7280' }}>
+            <span style={{ color: '#9ca3af' }}>{item.icon}</span>
+            {item.label}
+          </div>
+        ))}
+      </div>
+
+      {/* Note */}
+      {draft.note && (
+        <div style={{ paddingLeft: '8px', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+          <AlertCircle size={12} style={{ color: '#f59e0b', flexShrink: 0, marginTop: '1px' }} />
+          <span style={{ fontSize: '12px', color: '#92400e', lineHeight: 1.5 }}>{draft.note}</span>
+        </div>
+      )}
+
+      {/* Footer row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: '8px', paddingTop: '4px', borderTop: '1px solid #f3f4f6' }}>
+        <span style={{ fontSize: '11px', color: '#9ca3af' }}>
+          Saved {fmtDate(draft.savedAt)}
+        </span>
+
+        <div style={{ display: 'flex', gap: '6px' }}>
+          {confirmDelete ? (
+            <>
+              <span style={{ fontSize: '12px', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px', marginRight: '4px' }}>
+                Delete?
+              </span>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                style={{ padding: '5px 12px', borderRadius: '7px', border: '1px solid #e8eaed', background: '#fff', color: '#374151', fontSize: '12px', cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button
+                onClick={() => onDelete(draft.id)}
+                style={{ padding: '5px 12px', borderRadius: '7px', border: 'none', background: '#fee2e2', color: '#b91c1c', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                Confirm
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => setConfirmDelete(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '7px', border: '1px solid #fecaca', background: '#fff', color: '#ef4444', fontSize: '12px', cursor: 'pointer' }}>
+                <Trash2 size={11} /> Delete
+              </button>
+              <button
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 12px', borderRadius: '7px', border: '1px solid #e8eaed', background: '#fff', color: '#374151', fontSize: '12px', cursor: 'pointer' }}>
+                <Edit3 size={11} /> Edit
+              </button>
+              <button
+                onClick={() => onPublish(draft.id)}
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 14px', borderRadius: '7px', border: 'none', background: '#3b5bdb', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                <Send size={11} /> Publish
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Drafts view ───────────────────────────────────────────────────────────────
+function DraftsView({
+  drafts,
+  onDelete,
+  onPublish,
+}: {
+  drafts: DraftPaper[];
+  onDelete: (id: string) => void;
+  onPublish: (id: string) => void;
+}) {
+  return (
+    <div style={{ maxWidth: '800px' }}>
+      {/* Header */}
+      <div style={{ marginBottom: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f0f23', margin: '0 0 4px' }}>
+              Draft Papers
+            </h2>
+            <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
+              {drafts.length} paper{drafts.length !== 1 ? 's' : ''} waiting to be reviewed and published
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {drafts.length === 0 ? (
+        /* Empty state */
+        <div style={{
+          textAlign: 'center', padding: '72px 40px',
+          background: '#fafafa', border: '1.5px dashed #d1d5db',
+          borderRadius: '16px',
+        }}>
+          <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+            <FilePen size={26} style={{ color: '#3b5bdb' }} />
+          </div>
+          <div style={{ fontSize: '16px', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>No drafts yet</div>
+          <div style={{ fontSize: '13px', color: '#9ca3af' }}>
+            Generated papers saved as drafts will appear here for further editing before publishing.
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {drafts.map(d => (
+            <DraftCard key={d.id} draft={d} onDelete={onDelete} onPublish={onPublish} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+export default function AssessmentAIPaper() {
+  const [pageView, setPageView] = useState<PageView>('wizard');
+  const [drafts, setDrafts] = useState<DraftPaper[]>(INITIAL_DRAFTS);
+  const [publishedIds, setPublishedIds] = useState<string[]>([]);
+
+  const [step, setStep] = useState(1);
+
+  // Step 1
+  const [examType, setExamType] = useState<ExamType | null>(null);
+
+  // Step 2
+  const [grade,     setGrade]     = useState('');
+  const [subject,   setSubject]   = useState('');
+  const [semester,  setSemester]  = useState<'Vol.1' | 'Vol.2'>('Vol.1');
+  const [publisher, setPublisher] = useState('');
+  const [title,     setTitle]     = useState('');
+  const [totalScore, setTotalScore] = useState(120);
+  const [duration,  setDuration]  = useState(90);
+
+  // Step 3
+  const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
+  const [difficulty, setDifficulty] = useState<Difficulty>('mixed');
+  const [sections, setSections] = useState<SectionCfg[]>(DEFAULT_SECTIONS);
+
+  // Step 4
+  const [generating, setGenerating]   = useState(false);
+  const [genProgress, setGenProgress] = useState(0);
+  const [genDone,    setGenDone]      = useState(false);
+  const [paper,      setPaper]        = useState<GeneratedSection[]>([]);
+  const [draftSaved, setDraftSaved]   = useState(false);
+
+  const chapters = CHAPTERS_BY_SUBJECT[subject] || CHAPTERS_BY_SUBJECT['default'];
+
+  function toggleChapter(ch: string) {
+    setSelectedChapters(prev =>
+      prev.includes(ch) ? prev.filter(c => c !== ch) : [...prev, ch]
+    );
+  }
+
+  function totalQ() { return sections.reduce((s, t) => s + t.count, 0); }
+  function calcTotal() { return sections.reduce((s, t) => s + t.count * t.scoreEach, 0); }
+
+  function setSectionCount(key: string, val: number) {
+    setSections(prev => prev.map(s => s.key === key ? { ...s, count: val } : s));
+  }
+  function setSectionScore(key: string, val: number) {
+    setSections(prev => prev.map(s => s.key === key ? { ...s, scoreEach: val } : s));
+  }
+
+  async function handleGenerate() {
+    setGenerating(true); setGenProgress(0); setGenDone(false); setPaper([]); setDraftSaved(false);
+    const steps = [8, 20, 35, 52, 68, 82, 93, 100];
+    for (const p of steps) {
+      await new Promise(r => setTimeout(r, 380));
+      setGenProgress(p);
+    }
+    await new Promise(r => setTimeout(r, 300));
+    setPaper(MOCK_PAPER);
+    setGenerating(false); setGenDone(true);
+  }
+
+  function handleSaveDraft() {
+    if (!paper.length) return;
+    const newDraft: DraftPaper = {
+      id: `d${Date.now()}`,
+      title: title || `${grade} ${subject} ${EXAM_TYPES.find(e => e.id === examType)?.label ?? 'Exam'}`,
+      grade,
+      subject,
+      examType: examType!,
+      totalScore,
+      duration,
+      questionCount: paper.reduce((n, s) => n + s.questions.length, 0),
+      savedAt: new Date().toISOString(),
+      sections: paper,
+    };
+    setDrafts(prev => [newDraft, ...prev]);
+    setDraftSaved(true);
+  }
+
+  function handleDeleteDraft(id: string) {
+    setDrafts(prev => prev.filter(d => d.id !== id));
+  }
+
+  function handlePublishDraft(id: string) {
+    setPublishedIds(prev => [...prev, id]);
+    setTimeout(() => setDrafts(prev => prev.filter(d => d.id !== id)), 900);
+  }
+
+  const examTypeCfg = EXAM_TYPES.find(e => e.id === examType);
+
+  return (
+    <div style={{ display: 'flex', height: 'calc(100vh - 48px)', overflow: 'hidden' }}>
+
+      {/* ── Left panel ─────────────────────────────────────── */}
+      <div style={{
+        width: '220px', borderRight: '1px solid #e8eaed', padding: '28px 20px',
+        flexShrink: 0, background: '#fafafa', display: 'flex', flexDirection: 'column', gap: '6px',
+      }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '16px' }}>
+          Paper Generator
+        </div>
+        {[
+          { n: 1, label: 'Exam Type' },
+          { n: 2, label: 'Basic Info' },
+          { n: 3, label: 'Content & Structure' },
+          { n: 4, label: 'Generate & Preview' },
+        ].map(s => (
+          <div key={s.n} style={{ opacity: pageView === 'drafts' ? 0.45 : 1, transition: 'opacity 0.2s' }}>
+            <StepDot n={s.n} label={s.label} active={pageView === 'wizard' && step === s.n} done={pageView === 'wizard' && step > s.n} />
+            {s.n < 4 && <div style={{ width: '1px', height: '20px', background: step > s.n ? '#3b5bdb' : '#e8eaed', margin: '4px 0 4px 14px' }} />}
+          </div>
+        ))}
+
+        {/* Divider */}
+        <div style={{ height: '1px', background: '#e8eaed', margin: '12px 0' }} />
+
+        {/* Drafts shortcut */}
+        <button
+          onClick={() => setPageView(v => v === 'drafts' ? 'wizard' : 'drafts')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            padding: '9px 12px', borderRadius: '9px', cursor: 'pointer',
+            border: `1.5px solid ${pageView === 'drafts' ? '#3b5bdb' : '#e8eaed'}`,
+            background: pageView === 'drafts' ? '#eef2ff' : '#fff',
+            color: pageView === 'drafts' ? '#3b5bdb' : '#374151',
+            transition: 'all 0.15s', textAlign: 'left', width: '100%',
+          }}>
+          <FilePen size={14} style={{ color: pageView === 'drafts' ? '#3b5bdb' : '#9ca3af', flexShrink: 0 }} />
+          <span style={{ fontSize: '13px', fontWeight: pageView === 'drafts' ? 700 : 500, flex: 1 }}>
+            Drafts
+          </span>
+          {drafts.length > 0 && (
+            <span style={{
+              fontSize: '10px', fontWeight: 700, minWidth: '18px', height: '18px',
+              borderRadius: '9px', background: pageView === 'drafts' ? '#3b5bdb' : '#e8eaed',
+              color: pageView === 'drafts' ? '#fff' : '#6b7280',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px',
+            }}>
+              {drafts.length}
+            </span>
+          )}
+        </button>
+
+        {/* Summary cards (only in wizard) */}
+        {pageView === 'wizard' && (
+          <>
+            {step >= 2 && examTypeCfg && (
+              <div style={{ marginTop: '8px', padding: '11px 12px', background: examTypeCfg.bg, borderRadius: '10px', border: `1px solid ${examTypeCfg.bg}` }}>
+                <div style={{ fontSize: '10px', fontWeight: 600, color: examTypeCfg.color, textTransform: 'uppercase', marginBottom: '4px' }}>Exam Type</div>
+                <div style={{ fontSize: '12px', color: examTypeCfg.color, fontWeight: 600 }}>{examTypeCfg.icon} {examTypeCfg.label}</div>
+              </div>
+            )}
+            {step >= 3 && grade && subject && (
+              <div style={{ padding: '11px 12px', background: '#fff', border: '1px solid #e8eaed', borderRadius: '10px' }}>
+                <div style={{ fontSize: '10px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', marginBottom: '5px' }}>Config</div>
+                <div style={{ fontSize: '11px', color: '#374151', lineHeight: 1.8 }}>
+                  {grade}<br />{subject} · {semester}
+                  {totalScore > 0 && <><br />{totalScore} pts · {duration} min</>}
+                </div>
+              </div>
+            )}
+            {step >= 4 && (
+              <div style={{ padding: '11px 12px', background: '#fff', border: '1px solid #e8eaed', borderRadius: '10px' }}>
+                <div style={{ fontSize: '10px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', marginBottom: '5px' }}>Structure</div>
+                <div style={{ fontSize: '11px', color: '#374151', lineHeight: 1.8 }}>
+                  {sections.filter(s => s.count > 0).map(s => (
+                    <div key={s.key}>{s.count} × {s.type}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ── Right content ───────────────────────────────────── */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '28px 36px' }}>
+
+        {/* ── Tab bar ── */}
+        <div style={{ display: 'flex', gap: '4px', marginBottom: '28px', borderBottom: '1px solid #e8eaed', paddingBottom: '0' }}>
+          {([
+            { id: 'wizard' as PageView, label: 'New Paper', icon: <Sparkles size={13} /> },
+            { id: 'drafts' as PageView, label: `Drafts${drafts.length > 0 ? ` (${drafts.length})` : ''}`, icon: <FilePen size={13} /> },
+          ]).map(tab => {
+            const active = pageView === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setPageView(tab.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '8px 16px', cursor: 'pointer',
+                  borderTop: 'none', borderRight: 'none', borderLeft: 'none',
+                  borderBottom: `2px solid ${active ? '#3b5bdb' : 'transparent'}`,
+                  background: 'transparent',
+                  color: active ? '#3b5bdb' : '#6b7280',
+                  fontSize: '13px', fontWeight: active ? 700 : 500,
+                  transition: 'all 0.15s',
+                  marginBottom: '-1px',
+                }}>
+                {tab.icon}
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ── Drafts view ── */}
+        {pageView === 'drafts' && (
+          <DraftsView
+            drafts={drafts}
+            onDelete={handleDeleteDraft}
+            onPublish={handlePublishDraft}
+          />
+        )}
+
+        {/* ── Wizard ── */}
+        {pageView === 'wizard' && (
+          <>
+            {/* ══ STEP 1: Exam Type ══ */}
+            {step === 1 && (
+              <div style={{ maxWidth: '720px' }}>
+                <div style={{ marginBottom: '24px' }}>
+                  <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f0f23', margin: '0 0 6px' }}>Select Exam Type</h2>
+                  <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
+                    Choose the type and purpose of the exam paper you want to generate.
+                  </p>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '32px' }}>
+                  {EXAM_TYPES.map(et => {
+                    const isSelected = examType === et.id;
+                    return (
+                      <button
+                        key={et.id}
+                        onClick={() => setExamType(et.id)}
+                        style={{
+                          display: 'flex', alignItems: 'flex-start', gap: '14px',
+                          padding: '18px 20px', borderRadius: '14px', cursor: 'pointer', textAlign: 'left',
+                          border: `2px solid ${isSelected ? et.color : '#e8eaed'}`,
+                          background: isSelected ? et.bg : '#fff',
+                          transition: 'all 0.15s',
+                          position: 'relative', overflow: 'hidden',
+                        }}
+                        onMouseEnter={e => { if (!isSelected) { (e.currentTarget as HTMLElement).style.border = `2px solid ${et.color}40`; (e.currentTarget as HTMLElement).style.background = `${et.bg}60`; } }}
+                        onMouseLeave={e => { if (!isSelected) { (e.currentTarget as HTMLElement).style.border = '2px solid #e8eaed'; (e.currentTarget as HTMLElement).style.background = '#fff'; } }}
+                      >
+                        <div style={{ position: 'absolute', right: '-4px', top: '-8px', fontSize: '52px', opacity: 0.08, lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>
+                          {et.icon}
+                        </div>
+                        <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: isSelected ? et.color : et.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0, transition: 'background 0.15s' }}>
+                          {et.icon}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '15px', fontWeight: 700, color: isSelected ? et.color : '#0f0f23', marginBottom: '4px' }}>
+                            {et.label}
+                          </div>
+                          <div style={{ fontSize: '12px', color: isSelected ? et.color : '#6b7280', lineHeight: 1.5, opacity: isSelected ? 0.9 : 1 }}>
+                            {et.desc}
+                          </div>
+                        </div>
+                        {isSelected && (
+                          <div style={{ position: 'absolute', top: '12px', right: '12px', width: '20px', height: '20px', borderRadius: '50%', background: et.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Check size={11} style={{ color: '#fff' }} />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => setStep(2)}
+                    disabled={!examType}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 24px', borderRadius: '9px', border: 'none', background: examType ? '#3b5bdb' : '#e8eaed', color: examType ? '#fff' : '#9ca3af', fontSize: '14px', fontWeight: 600, cursor: examType ? 'pointer' : 'not-allowed' }}
+                  >
+                    Next <ChevronRight size={15} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ══ STEP 2: Basic Info ══ */}
+            {step === 2 && (
+              <div style={{ maxWidth: '680px' }}>
+                <div style={{ marginBottom: '24px' }}>
+                  <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f0f23', margin: '0 0 6px' }}>Basic Information</h2>
+                  <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
+                    Set the grade, subject, and exam parameters.
+                  </p>
+                </div>
+
+                <div style={{ background: '#fff', border: '1px solid #e8eaed', borderRadius: '14px', padding: '22px 24px', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <BookOpen size={14} style={{ color: '#3b5bdb' }} /> Scope
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                    <SimpleSelect label="Grade" options={GRADES} value={grade} onChange={setGrade} placeholder="Select grade" required />
+                    <SimpleSelect label="Subject" options={SUBJECTS} value={subject} onChange={setSubject} placeholder="Select subject" required />
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '14px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>Semester</span>
+                    {(['Vol.1', 'Vol.2'] as const).map(s => (
+                      <button key={s} onClick={() => setSemester(s)}
+                        style={{ padding: '5px 16px', borderRadius: '7px', border: `1.5px solid ${semester === s ? '#3b5bdb' : '#e8eaed'}`, background: semester === s ? '#eff6ff' : '#fff', color: semester === s ? '#3b5bdb' : '#6b7280', fontSize: '12px', fontWeight: semester === s ? 600 : 400, cursor: 'pointer', transition: 'all 0.12s' }}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                  <SimpleSelect label="Textbook Publisher" options={PUBLISHERS} value={publisher} onChange={setPublisher} placeholder="Select publisher (optional)" />
+                </div>
+
+                <div style={{ background: '#fff', border: '1px solid #e8eaed', borderRadius: '14px', padding: '22px 24px', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <FileText size={14} style={{ color: '#3b5bdb' }} /> Paper Details
+                  </div>
+                  <div style={{ marginBottom: '14px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>
+                      Exam Title <span style={{ color: '#ef4444' }}>*</span>
+                    </div>
+                    <input
+                      value={title}
+                      onChange={e => setTitle(e.target.value)}
+                      placeholder={grade && subject ? `${grade} ${subject} ${examTypeCfg?.label ?? 'Exam'} — Spring 2026` : 'Enter exam title…'}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '9px 13px', border: '1.5px solid #e8eaed', borderRadius: '9px', fontSize: '13px', color: '#374151', outline: 'none', fontFamily: 'inherit' }}
+                      onFocus={e => { e.currentTarget.style.borderColor = '#3b5bdb'; }}
+                      onBlur={e =>  { e.currentTarget.style.borderColor = '#e8eaed'; }}
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <Award size={12} style={{ color: '#9ca3af' }} /> Total Score <span style={{ color: '#ef4444' }}>*</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="number" value={totalScore} onChange={e => setTotalScore(Number(e.target.value))}
+                          style={{ width: '80px', padding: '9px 12px', border: '1.5px solid #e8eaed', borderRadius: '9px', fontSize: '13px', color: '#374151', outline: 'none', textAlign: 'center', fontFamily: 'inherit' }}
+                          onFocus={e => { e.currentTarget.style.borderColor = '#3b5bdb'; }}
+                          onBlur={e =>  { e.currentTarget.style.borderColor = '#e8eaed'; }}
+                        />
+                        <span style={{ fontSize: '13px', color: '#6b7280' }}>points</span>
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <Clock size={12} style={{ color: '#9ca3af' }} /> Duration <span style={{ color: '#ef4444' }}>*</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="number" value={duration} onChange={e => setDuration(Number(e.target.value))}
+                          style={{ width: '80px', padding: '9px 12px', border: '1.5px solid #e8eaed', borderRadius: '9px', fontSize: '13px', color: '#374151', outline: 'none', textAlign: 'center', fontFamily: 'inherit' }}
+                          onFocus={e => { e.currentTarget.style.borderColor = '#3b5bdb'; }}
+                          onBlur={e =>  { e.currentTarget.style.borderColor = '#e8eaed'; }}
+                        />
+                        <span style={{ fontSize: '13px', color: '#6b7280' }}>minutes</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <button onClick={() => setStep(1)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 22px', borderRadius: '9px', border: '1px solid #e8eaed', background: '#fff', color: '#374151', fontSize: '14px', cursor: 'pointer' }}>
+                    <ChevronLeft size={15} /> Back
+                  </button>
+                  <button
+                    onClick={() => setStep(3)}
+                    disabled={!grade || !subject || !title}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 24px', borderRadius: '9px', border: 'none', background: (grade && subject && title) ? '#3b5bdb' : '#e8eaed', color: (grade && subject && title) ? '#fff' : '#9ca3af', fontSize: '14px', fontWeight: 600, cursor: (grade && subject && title) ? 'pointer' : 'not-allowed' }}>
+                    Next <ChevronRight size={15} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ══ STEP 3: Content & Structure ══ */}
+            {step === 3 && (
+              <div style={{ maxWidth: '720px' }}>
+                <div style={{ marginBottom: '24px' }}>
+                  <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f0f23', margin: '0 0 6px' }}>Content & Structure</h2>
+                  <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
+                    Choose the chapters covered and define the section structure.
+                  </p>
+                </div>
+
+                {/* Chapter selection */}
+                <div style={{ background: '#fff', border: '1px solid #e8eaed', borderRadius: '14px', padding: '22px 24px', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Layers size={14} style={{ color: '#3b5bdb' }} /> Chapter Coverage
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '14px' }}>
+                    {selectedChapters.length === 0 ? 'All chapters will be included if none selected' : `${selectedChapters.length} chapter(s) selected`}
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {chapters.map(ch => {
+                      const sel = selectedChapters.includes(ch);
+                      return (
+                        <button key={ch} onClick={() => toggleChapter(ch)}
+                          style={{
+                            padding: '6px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px',
+                            border: `1.5px solid ${sel ? '#3b5bdb' : '#e8eaed'}`,
+                            background: sel ? '#eff6ff' : '#fff',
+                            color: sel ? '#3b5bdb' : '#374151',
+                            fontWeight: sel ? 600 : 400, transition: 'all 0.12s',
+                          }}>
+                          {sel && <Check size={10} style={{ marginRight: '4px', verticalAlign: 'middle' }} />}
+                          {ch}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Difficulty */}
+                <div style={{ background: '#fff', border: '1px solid #e8eaed', borderRadius: '14px', padding: '22px 24px', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Target size={14} style={{ color: '#3b5bdb' }} /> Overall Difficulty
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    {([
+                      { id: 'easy',   label: 'Easy',   emoji: '😊', bg: '#dcfce7', color: '#15803d', border: '#86efac' },
+                      { id: 'medium', label: 'Medium', emoji: '😐', bg: '#fef9c3', color: '#a16207', border: '#fde047' },
+                      { id: 'hard',   label: 'Hard',   emoji: '😤', bg: '#fee2e2', color: '#b91c1c', border: '#fca5a5' },
+                      { id: 'mixed',  label: 'Mixed',  emoji: '🎲', bg: '#ede9fe', color: '#7c3aed', border: '#c4b5fd' },
+                    ] as const).map(d => (
+                      <button key={d.id} onClick={() => setDifficulty(d.id as Difficulty)}
+                        style={{
+                          flex: 1, padding: '12px 8px', borderRadius: '10px', cursor: 'pointer',
+                          border: `2px solid ${difficulty === d.id ? d.border : '#e8eaed'}`,
+                          background: difficulty === d.id ? d.bg : '#fff',
+                          color: difficulty === d.id ? d.color : '#9ca3af',
+                          fontSize: '12px', fontWeight: difficulty === d.id ? 700 : 400,
+                          transition: 'all 0.12s', display: 'flex', flexDirection: 'column',
+                          alignItems: 'center', gap: '4px',
+                        }}>
+                        <span style={{ fontSize: '18px' }}>{d.emoji}</span>
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Section structure */}
+                <div style={{ background: '#fff', border: '1px solid #e8eaed', borderRadius: '14px', padding: '22px 24px', marginBottom: '28px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#374151', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <FileText size={14} style={{ color: '#3b5bdb' }} /> Section Structure
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                      Total: <span style={{ color: calcTotal() === totalScore ? '#16a34a' : '#ef4444', fontWeight: 600 }}>{calcTotal()}</span>
+                      <span style={{ color: '#9ca3af' }}> / {totalScore} pts</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 100px 80px', gap: '8px', padding: '6px 8px', marginBottom: '4px' }}>
+                    {['Section', 'Questions', 'Pts / Q', 'Subtotal'].map(h => (
+                      <div key={h} style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</div>
+                    ))}
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {sections.map(sec => (
+                      <div key={sec.key} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 100px 80px', gap: '8px', alignItems: 'center', padding: '10px 8px', borderRadius: '8px', background: '#f9fafb', border: '1px solid #f0f2f5' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <GripVertical size={12} style={{ color: '#d1d5db' }} />
+                          <span style={{ fontSize: '12px', color: '#374151' }}>{sec.type}</span>
+                        </div>
+                        <CountStepper value={sec.count} onChange={v => setSectionCount(sec.key, v)} max={30} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <input
+                            type="number" value={sec.scoreEach}
+                            onChange={e => setSectionScore(sec.key, Math.max(1, Number(e.target.value)))}
+                            style={{ width: '52px', padding: '4px 8px', border: '1px solid #e8eaed', borderRadius: '6px', fontSize: '12px', textAlign: 'center', fontFamily: 'inherit', outline: 'none' }}
+                            onFocus={e => { e.currentTarget.style.borderColor = '#3b5bdb'; }}
+                            onBlur={e  => { e.currentTarget.style.borderColor = '#e8eaed'; }}
+                          />
+                          <span style={{ fontSize: '11px', color: '#9ca3af' }}>pts</span>
+                        </div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#0f0f23' }}>
+                          {sec.count * sec.scoreEach} pts
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <button onClick={() => setStep(2)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 22px', borderRadius: '9px', border: '1px solid #e8eaed', background: '#fff', color: '#374151', fontSize: '14px', cursor: 'pointer' }}>
+                    <ChevronLeft size={15} /> Back
+                  </button>
+                  <button onClick={() => { setStep(4); handleGenerate(); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 24px', borderRadius: '9px', border: 'none', background: '#3b5bdb', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
+                    <Sparkles size={15} /> Generate Paper
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ══ STEP 4: Generate & Preview ══ */}
+            {step === 4 && (
+              <div style={{ maxWidth: '800px' }}>
+
+                {/* Generating state */}
+                {generating && (
+                  <div style={{ textAlign: 'center', padding: '80px 40px' }}>
+                    <div style={{ width: '64px', height: '64px', borderRadius: '20px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                      <Sparkles size={30} style={{ color: '#3b5bdb' }} />
+                    </div>
+                    <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f0f23', marginBottom: '6px' }}>
+                      Generating Your Exam Paper…
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '32px' }}>
+                      AI is structuring questions based on your configuration
+                    </div>
+                    <div style={{ width: '360px', margin: '0 auto', background: '#e8eaed', borderRadius: '999px', height: '8px', overflow: 'hidden' }}>
+                      <div style={{ width: `${genProgress}%`, height: '100%', background: 'linear-gradient(90deg, #3b5bdb, #7c3aed)', borderRadius: '999px', transition: 'width 0.35s ease' }} />
+                    </div>
+                    <div style={{ marginTop: '10px', fontSize: '13px', color: '#9ca3af' }}>{genProgress}%</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '28px', maxWidth: '320px', margin: '28px auto 0' }}>
+                      {[
+                        { threshold: 20,  label: 'Analysing exam configuration' },
+                        { threshold: 45,  label: 'Selecting questions from pool' },
+                        { threshold: 70,  label: 'Balancing difficulty distribution' },
+                        { threshold: 90,  label: 'Formatting paper structure' },
+                        { threshold: 100, label: 'Finalising & proofreading' },
+                      ].map(item => (
+                        <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: genProgress >= item.threshold ? 1 : 0.35, transition: 'opacity 0.3s' }}>
+                          {genProgress >= item.threshold
+                            ? <Check size={13} style={{ color: '#3b5bdb', flexShrink: 0 }} />
+                            : <Loader2 size={13} style={{ color: '#3b5bdb', flexShrink: 0, animation: genProgress >= item.threshold - 20 ? 'spin 1s linear infinite' : 'none' }} />
+                          }
+                          <span style={{ fontSize: '12px', color: genProgress >= item.threshold ? '#374151' : '#9ca3af' }}>{item.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Done — paper preview */}
+                {genDone && (
+                  <div>
+                    {/* Toolbar */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                      <div>
+                        <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f0f23', margin: '0 0 4px' }}>Preview Generated Paper</h2>
+                        <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>{paper.reduce((n, s) => n + s.questions.length, 0)} questions · {calcTotal()} points · {duration} min</p>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        <button
+                          onClick={() => { setStep(3); setGenDone(false); setPaper([]); setDraftSaved(false); }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', border: '1px solid #e8eaed', background: '#fff', color: '#374151', fontSize: '12px', cursor: 'pointer' }}>
+                          <RotateCcw size={12} /> Regenerate
+                        </button>
+                        <button style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', border: '1px solid #e8eaed', background: '#fff', color: '#374151', fontSize: '12px', cursor: 'pointer' }}>
+                          <Printer size={12} /> Print
+                        </button>
+                        <button style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', border: '1px solid #e8eaed', background: '#fff', color: '#374151', fontSize: '12px', cursor: 'pointer' }}>
+                          <Download size={12} /> Export
+                        </button>
+                        {/* Save to Drafts */}
+                        <button
+                          onClick={handleSaveDraft}
+                          disabled={draftSaved}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px',
+                            border: `1px solid ${draftSaved ? '#86efac' : '#fde68a'}`,
+                            background: draftSaved ? '#f0fdf4' : '#fffbeb',
+                            color: draftSaved ? '#16a34a' : '#b45309',
+                            fontSize: '12px', fontWeight: 600, cursor: draftSaved ? 'default' : 'pointer',
+                            transition: 'all 0.2s',
+                          }}>
+                          {draftSaved ? <Check size={12} /> : <FilePen size={12} />}
+                          {draftSaved ? 'Saved to Drafts' : 'Save to Drafts'}
+                        </button>
+                        <button style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#3b5bdb', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                          <Save size={12} /> Save to Library
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Draft saved banner */}
+                    {draftSaved && (
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: '10px',
+                        padding: '12px 16px', borderRadius: '10px', marginBottom: '16px',
+                        background: '#f0fdf4', border: '1px solid #bbf7d0',
+                      }}>
+                        <Check size={15} style={{ color: '#16a34a', flexShrink: 0 }} />
+                        <span style={{ fontSize: '13px', color: '#15803d' }}>
+                          Paper saved to Drafts. You can review and publish it from the{' '}
+                          <button
+                            onClick={() => setPageView('drafts')}
+                            style={{ color: '#15803d', fontWeight: 700, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '13px' }}>
+                            Drafts tab
+                          </button>.
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Paper document */}
+                    <div style={{ background: '#fff', border: '1px solid #e8eaed', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
+                      {/* Paper header */}
+                      <div style={{ padding: '28px 32px', borderBottom: '2px solid #0f0f23', textAlign: 'center', background: '#fafafa' }}>
+                        {examTypeCfg && (
+                          <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{examTypeCfg.label}</div>
+                        )}
+                        <div style={{ fontSize: '22px', fontWeight: 700, color: '#0f0f23', marginBottom: '8px' }}>
+                          {title || `${grade} ${subject} Examination`}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '24px', fontSize: '12px', color: '#6b7280' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Award size={12} style={{ color: '#3b5bdb' }} /> Total: {totalScore} points
+                          </span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Clock size={12} style={{ color: '#3b5bdb' }} /> Duration: {duration} minutes
+                          </span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <BookOpen size={12} style={{ color: '#3b5bdb' }} /> {grade} · {subject}
+                          </span>
+                        </div>
+                        <div style={{ marginTop: '14px', display: 'flex', gap: '20px', justifyContent: 'center', fontSize: '12px', color: '#374151' }}>
+                          <span>Name: __________________________</span>
+                          <span>Class: __________________________</span>
+                          <span>Score: __________</span>
+                        </div>
+                      </div>
+
+                      {/* Sections */}
+                      <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: '28px' }}>
+                        {paper.map((sec, si) => (
+                          <div key={si}>
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '6px' }}>
+                              <div style={{ fontSize: '15px', fontWeight: 700, color: '#0f0f23' }}>{sec.title}</div>
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '14px', paddingLeft: '2px' }}>{sec.description}</div>
+                            <div style={{ height: '1px', background: '#e8eaed', marginBottom: '16px' }} />
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                              {sec.questions.map((q, qi) => {
+                                const dc = DIFF_CFG[q.difficulty];
+                                return (
+                                  <div key={q.id} style={{ display: 'flex', gap: '12px' }}>
+                                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#f3f4f6', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: '#374151', marginTop: '1px' }}>
+                                      {qi + 1}
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }}>
+                                        <p style={{ margin: 0, fontSize: '14px', color: '#1f2937', lineHeight: 1.7 }}>{q.prompt}</p>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                          <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', background: dc.bg, color: dc.color }}>{q.difficulty}</span>
+                                          <span style={{ fontSize: '10px', color: '#9ca3af' }}>{q.score} pts</span>
+                                        </div>
+                                      </div>
+                                      {q.options && (
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                                          {q.options.map(opt => (
+                                            <div key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', borderRadius: '7px', background: opt.correct ? '#f0fdf4' : '#f9fafb', border: `1px solid ${opt.correct ? '#bbf7d0' : '#e8eaed'}` }}>
+                                              <span style={{ width: '18px', height: '18px', borderRadius: '50%', background: opt.correct ? '#16a34a' : '#e8eaed', color: opt.correct ? '#fff' : '#6b7280', fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                {opt.key}
+                                              </span>
+                                              <span style={{ fontSize: '12px', color: opt.correct ? '#15803d' : '#374151', fontWeight: opt.correct ? 500 : 400 }}>{opt.text}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {!q.options && q.answer && (
+                                        <div style={{ padding: '7px 12px', borderRadius: '7px', background: '#f0fdf4', border: '1px solid #bbf7d0', fontSize: '12px', color: '#15803d' }}>
+                                          <span style={{ fontWeight: 600 }}>Answer: </span>{q.answer}
+                                        </div>
+                                      )}
+                                      {!q.options && !q.answer && (
+                                        <div style={{ height: '48px', borderBottom: '1px dashed #e8eaed', marginTop: '4px' }} />
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                      <button onClick={() => { setStep(1); setGenDone(false); setPaper([]); setDraftSaved(false); setExamType(null); setGrade(''); setSubject(''); setTitle(''); }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 20px', borderRadius: '9px', border: '1px solid #e8eaed', background: '#fff', color: '#374151', fontSize: '13px', cursor: 'pointer' }}>
+                        Start Over
+                      </button>
+                      <button style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 22px', borderRadius: '9px', border: 'none', background: '#3b5bdb', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                        <Send size={14} /> Publish Now
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
+    </div>
+  );
+}

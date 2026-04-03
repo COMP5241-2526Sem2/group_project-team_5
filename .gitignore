@@ -1,0 +1,31 @@
+# ============ General ============
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.swp
+*~
+
+# ============ Node (Frontend) ============
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.env
+frontend/.env.local
+frontend/.env.production
+frontend/.env.*.local
+
+# ============ Backend ============
+backend/node_modules/
+backend/dist/
+backend/build/
+backend/.env
+backend/.env.local
+
+# ============ IDE / OS ============
+.idea/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
