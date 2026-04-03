@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Filter, Search, ChevronDown, Check, Plus, Eye, X, FileText } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -28,12 +28,12 @@ interface QuestionSet {
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const TYPE_CONFIG: Record<QType, { bg: string; iconBg: string; emoji: string; label: string }> = {
-  'MCQ':          { bg: '#dbeafe', iconBg: '#bfdbfe', emoji: '📋', label: 'Multiple Choice'   },
-  'True/False':   { bg: '#ede9fe', iconBg: '#ddd6fe', emoji: '✅', label: 'True / False'      },
-  'Fill-blank':   { bg: '#fed7aa', iconBg: '#fdba74', emoji: '✏️', label: 'Fill in the Blank' },
-  'Short Answer': { bg: '#d1fae5', iconBg: '#a7f3d0', emoji: '📝', label: 'Short Answer'      },
-  'Essay':        { bg: '#fce7f3', iconBg: '#fbcfe8', emoji: '✍️', label: 'Essay'             },
+const TYPE_CONFIG: Record<QType, { bg: string; iconBg: string; label: string }> = {
+  'MCQ':          { bg: '#dbeafe', iconBg: '#bfdbfe', label: 'Multiple Choice'   },
+  'True/False':   { bg: '#ede9fe', iconBg: '#ddd6fe', label: 'True / False'      },
+  'Fill-blank':   { bg: '#fed7aa', iconBg: '#fdba74', label: 'Fill in the Blank' },
+  'Short Answer': { bg: '#d1fae5', iconBg: '#a7f3d0', label: 'Short Answer'      },
+  'Essay':        { bg: '#fce7f3', iconBg: '#fbcfe8', label: 'Essay'             },
 };
 
 const DIFF_CONFIG: Record<Difficulty, { bg: string; color: string; label: string }> = {
@@ -42,13 +42,14 @@ const DIFF_CONFIG: Record<Difficulty, { bg: string; color: string; label: string
   hard:   { bg: '#ff6b35', color: '#ffffff', label: 'Hard'   },
 };
 
-const SUBJECT_CONFIG: Record<string, { emoji: string; bg: string; color: string }> = {
-  Biology:   { emoji: '🔬', bg: '#dcfce7', color: '#15803d' },
-  Physics:   { emoji: '⚡', bg: '#fef9c3', color: '#a16207' },
-  Math:      { emoji: '📐', bg: '#dbeafe', color: '#1d4ed8' },
-  Chemistry: { emoji: '⚗️', bg: '#f3e8ff', color: '#7e22ce' },
-  English:   { emoji: '📖', bg: '#fff7ed', color: '#c2410c' },
-  History:   { emoji: '🏛️', bg: '#f1f5f9', color: '#475569' },
+/** Subtle accent for subject text — kept minimal for a cleaner layout */
+const SUBJECT_CONFIG: Record<string, { color: string }> = {
+  Biology:   { color: '#15803d' },
+  Physics:   { color: '#a16207' },
+  Math:      { color: '#1d4ed8' },
+  Chemistry: { color: '#7e22ce' },
+  English:   { color: '#c2410c' },
+  History:   { color: '#475569' },
 };
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
@@ -178,37 +179,33 @@ export default function AssessmentLibrary() {
     !isDefault(filterType)    || search !== '';
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 48px)', overflow: 'hidden', position: 'relative' }}>
+    <div style={{ display: 'flex', height: 'calc(100vh - 48px)', overflow: 'hidden', position: 'relative', background: '#fafafa' }}>
 
       {/* ── Filter sidebar ───────────────────────────────────── */}
-      <div style={{
-        width: '232px', flexShrink: 0, borderRight: '1px solid #e8eaed',
-        background: '#fff', overflowY: 'auto', padding: '22px 16px',
-        display: 'flex', flexDirection: 'column', gap: '18px',
+      <aside style={{
+        width: '200px', flexShrink: 0, borderRight: '1px solid #e5e7eb',
+        background: '#fff', overflowY: 'auto', padding: '16px 14px',
+        display: 'flex', flexDirection: 'column', gap: '14px',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-          <Filter size={14} style={{ color: '#374151' }} />
-          <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f0f23' }}>Filters</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Filter size={14} style={{ color: '#6b7280' }} />
+          <span style={{ fontSize: '13px', fontWeight: 600, color: '#111827' }}>Filter</span>
         </div>
 
-        <p style={{ margin: 0, fontSize: '12px', color: '#6b7280', lineHeight: 1.65, padding: '10px 12px', background: '#f9fafb', borderRadius: '8px', border: '1px solid #f3f4f6' }}>
-          Found{' '}
-          <span style={{ color: '#3b5bdb', fontWeight: 700 }}>{totalQuestions}</span>
-          {' '}questions, containing{' '}
-          <span style={{ color: '#3b5bdb', fontWeight: 700 }}>{uniqueTypes}</span>
-          {' '}question types
+        <p style={{ margin: 0, fontSize: '11px', color: '#9ca3af', lineHeight: 1.5 }}>
+          {totalQuestions} questions · {uniqueTypes} types
         </p>
 
         <div>
-          <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '7px' }}>Search</div>
+          <div style={{ fontSize: '11px', fontWeight: 500, color: '#6b7280', marginBottom: '6px' }}>Search</div>
           <div style={{ position: 'relative' }}>
-            <Search size={12} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', pointerEvents: 'none' }} />
+            <Search size={12} style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', pointerEvents: 'none' }} />
             <input
               value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Enter keyword…"
-              style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px 8px 28px', border: '1.5px solid #e8eaed', borderRadius: '8px', fontSize: '12px', color: '#374151', outline: 'none', background: '#fff' }}
-              onFocus={e => { e.currentTarget.style.borderColor = '#3b5bdb'; }}
-              onBlur={e =>  { e.currentTarget.style.borderColor = '#e8eaed'; }}
+              placeholder="Keyword…"
+              style={{ width: '100%', boxSizing: 'border-box', padding: '7px 9px 7px 26px', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', color: '#374151', outline: 'none', background: '#fff' }}
+              onFocus={e => { e.currentTarget.style.borderColor = '#d1d5db'; }}
+              onBlur={e =>  { e.currentTarget.style.borderColor = '#e5e7eb'; }}
             />
           </div>
         </div>
@@ -221,39 +218,42 @@ export default function AssessmentLibrary() {
 
         {hasActiveFilters && (
           <button
+            type="button"
             onClick={() => { setSearch(''); setFilterSubject('All Subjects'); setFilterGrade('All Grades'); setFilterSem('All Semesters'); setFilterDiff('All Difficulties'); setFilterType('All Types'); }}
-            style={{ padding: '8px', borderRadius: '8px', border: '1px solid #e8eaed', background: '#fff', color: '#6b7280', fontSize: '12px', cursor: 'pointer' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f3f4f6'; }}
+            style={{ padding: '7px 10px', borderRadius: '6px', border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280', fontSize: '11px', cursor: 'pointer' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f9fafb'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff'; }}
           >
-            Clear all filters
+            Reset
           </button>
         )}
-      </div>
+      </aside>
 
       {/* ── Card Grid ────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#f2f5fb' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         {/* Top bar */}
-        <div style={{ padding: '12px 20px', borderBottom: '1px solid #e2e6f0', background: '#fff', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '13px', color: '#6b7280' }}>
-            {filtered.length} question sets · {totalQuestions} questions total
+        <div style={{ padding: '10px 14px', borderBottom: '1px solid #e5e7eb', background: '#fff', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '12px', color: '#6b7280' }}>
+            {filtered.length} sets · {totalQuestions} questions
           </span>
-          <button style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 16px', borderRadius: '8px', border: 'none', background: '#3b5bdb', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', marginLeft: 'auto' }}>
-            <Plus size={13} /> Add Question
+          <button type="button" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '6px', border: '1px solid #e5e7eb', background: '#111827', color: '#fff', fontSize: '12px', fontWeight: 500, cursor: 'pointer', marginLeft: 'auto' }}>
+            <Plus size={13} /> Add
           </button>
         </div>
 
         {/* Grid */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '14px' }}>
           {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '80px 20px', color: '#9ca3af' }}>
-              <Search size={36} style={{ opacity: 0.25, display: 'block', margin: '0 auto 14px' }} />
-              <div style={{ fontSize: '14px' }}>No question sets match your filters</div>
+            <div style={{ textAlign: 'center', padding: '64px 16px', color: '#9ca3af' }}>
+              <Search size={28} style={{ opacity: 0.35, display: 'block', margin: '0 auto 10px' }} />
+              <div style={{ fontSize: '13px' }}>No matches</div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
               {filtered.map(set => (
-                <QuestionSetCard key={set.id} set={set} onView={() => setActiveSet(set)} />
+                <React.Fragment key={set.id}>
+                  <QuestionSetCard set={set} onView={() => setActiveSet(set)} />
+                </React.Fragment>
               ))}
             </div>
           )}
@@ -272,130 +272,63 @@ export default function AssessmentLibrary() {
 function QuestionSetCard({ set, onView }: { set: QuestionSet; onView: () => void }) {
   const tc  = TYPE_CONFIG[set.type];
   const dc  = DIFF_CONFIG[set.difficulty];
-  const sc  = SUBJECT_CONFIG[set.subject] ?? { emoji: '📚', bg: '#f3f4f6', color: '#374151' };
+  const sc  = SUBJECT_CONFIG[set.subject] ?? { color: '#374151' };
   const [hovered, setHovered] = useState(false);
 
   return (
     <div
       style={{
-        background: '#ffffff', borderRadius: '16px', overflow: 'hidden', position: 'relative',
-        boxShadow: hovered
-          ? '0 8px 32px rgba(59,91,219,0.12), 0 2px 8px rgba(0,0,0,0.06)'
-          : '0 2px 12px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04)',
-        transition: 'box-shadow 0.2s, transform 0.2s',
-        transform: hovered ? 'translateY(-2px)' : 'none',
+        background: '#fff', borderRadius: '8px', overflow: 'hidden',
+        border: '1px solid #e5e7eb',
+        boxShadow: hovered ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+        transition: 'box-shadow 0.15s',
         cursor: 'default',
-        border: '1px solid rgba(0,0,0,0.04)',
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* Decorative watermark */}
-      <div style={{
-        position: 'absolute', top: '-10px', right: '-10px',
-        width: '100px', height: '100px', borderRadius: '50%',
-        background: tc.bg, opacity: 0.45, pointerEvents: 'none',
-      }} />
-      <div style={{
-        position: 'absolute', top: '20px', right: '20px',
-        fontSize: '52px', opacity: 0.07, pointerEvents: 'none',
-        lineHeight: 1, userSelect: 'none',
-      }}>
-        {tc.emoji}
-      </div>
-
-      {/* Card body */}
-      <div style={{ padding: '20px 20px 0' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '16px' }}>
-          {/* Icon block */}
-          <div style={{
-            width: '54px', height: '54px', borderRadius: '12px',
-            background: tc.bg, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', fontSize: '26px', flexShrink: 0,
-            boxShadow: `0 2px 8px ${tc.bg}`,
-          }}>
-            {tc.emoji}
-          </div>
-          {/* Title + subtitle */}
-          <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
-            <div style={{ fontSize: '17px', fontWeight: 700, color: '#0f0f23', marginBottom: '4px', lineHeight: 1.2 }}>
+      <div style={{ padding: '14px 14px 12px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', marginBottom: '8px' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827', lineHeight: 1.35, marginBottom: '4px' }}>
               {tc.label}
             </div>
-            <div style={{ fontSize: '12px', color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {set.grade} · {set.subject} · {set.semester}
+            <div style={{ fontSize: '11px', color: '#9ca3af', lineHeight: 1.45 }}>
+              <span style={{ color: sc.color, fontWeight: 500 }}>{set.subject}</span>
+              {' · '}{set.grade} · {set.semester}
+              {' · '}{dc.label}
+              {set.aiGenerated && (
+                <>
+                  {' · '}
+                  <span style={{ color: '#6b7280' }}>AI</span>
+                </>
+              )}
             </div>
           </div>
-          {/* Question count badge */}
-          <div style={{
-            flexShrink: 0, fontSize: '11px', fontWeight: 600, color: '#3b5bdb',
-            background: '#eff6ff', borderRadius: '20px', padding: '3px 9px',
-            whiteSpace: 'nowrap', marginTop: '2px',
-          }}>
-            {set.questions.length} Qs
-          </div>
+          <span style={{ flexShrink: 0, fontSize: '11px', color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>
+            {set.questions.length} Q
+          </span>
         </div>
 
-        {/* Divider */}
-        <div style={{ height: '1px', background: '#f0f2f7', marginBottom: '14px' }} />
-
-        {/* Chips */}
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
-          {/* Subject chip */}
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: '4px',
-            fontSize: '11px', padding: '4px 10px', borderRadius: '20px',
-            background: sc.bg, color: sc.color, fontWeight: 500,
-            border: `1px solid ${sc.bg}`,
-          }}>
-            <span>{sc.emoji}</span> {set.subject}
-          </span>
-          {/* Grade chip */}
-          <span style={{
-            fontSize: '11px', padding: '4px 10px', borderRadius: '20px',
-            border: '1px solid #d1d5db', color: '#374151', background: '#fff', fontWeight: 500,
-          }}>
-            {set.grade} ({set.semester})
-          </span>
-          {/* Difficulty chip */}
-          <span style={{
-            fontSize: '11px', padding: '4px 10px', borderRadius: '20px',
-            background: dc.bg, color: dc.color, fontWeight: 600,
-          }}>
-            {dc.label}
-          </span>
-          {/* AI badge */}
-          {set.aiGenerated && (
-            <span style={{
-              fontSize: '11px', padding: '4px 10px', borderRadius: '20px',
-              background: '#f5f3ff', color: '#7c3aed', fontWeight: 500,
-            }}>
-              ✨ AI
-            </span>
-          )}
-        </div>
-
-        {/* Chapter */}
-        <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '16px' }}>
-          <span style={{ color: '#9ca3af', marginRight: '6px' }}>Chapter:</span>
-          <span style={{ color: '#374151' }}>{set.chapter}</span>
+        <div style={{ fontSize: '12px', color: '#6b7280', lineHeight: 1.5 }}>
+          {set.chapter}
         </div>
       </div>
 
-      {/* View button */}
       <button
+        type="button"
         onClick={onView}
         style={{
-          width: '100%', padding: '13px 20px',
-          border: 'none', borderTop: '1px solid #f0f2f7',
+          width: '100%', padding: '9px 14px',
+          border: 'none', borderTop: '1px solid #f3f4f6',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-          background: hovered ? '#f7f9ff' : '#fafbff',
-          color: '#3b5bdb', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-          transition: 'background 0.15s',
+          background: hovered ? '#f9fafb' : '#fff',
+          color: '#374151', fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+          transition: 'background 0.12s',
         }}
       >
-        <Eye size={14} />
-        View Questions
+        <Eye size={13} style={{ color: '#9ca3af' }} />
+        View
       </button>
     </div>
   );
@@ -415,36 +348,38 @@ function DetailModal({ set, onClose }: { set: QuestionSet; onClose: () => void }
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 200,
-      background: 'rgba(15,15,35,0.45)', backdropFilter: 'blur(3px)',
+      background: 'rgba(17,24,39,0.35)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: '32px',
+      padding: '24px',
     }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={{
-        background: '#fff', borderRadius: '18px', width: '100%', maxWidth: '740px',
+        background: '#fff', borderRadius: '8px', width: '100%', maxWidth: '560px',
         maxHeight: '85vh', display: 'flex', flexDirection: 'column',
-        boxShadow: '0 24px 80px rgba(0,0,0,0.18)',
+        border: '1px solid #e5e7eb',
+        boxShadow: '0 10px 40px rgba(0,0,0,0.08)',
         overflow: 'hidden',
       }}>
         {/* Modal header */}
-        <div style={{ padding: '24px 28px 0', flexShrink: 0 }}>
+        <div style={{ padding: '16px 18px 0', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '20px' }}>
             <div>
-              <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '4px' }}>
                 {set.grade} · {set.subject} · {set.semester}
               </div>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: '#0f0f23' }}>
+              <div style={{ fontSize: '16px', fontWeight: 600, color: '#111827' }}>
                 {tc.label}
               </div>
             </div>
             <button
+              type="button"
               onClick={onClose}
               style={{
-                width: '32px', height: '32px', borderRadius: '8px',
-                border: '1.5px solid #e8eaed', background: '#fff',
+                width: '30px', height: '30px', borderRadius: '6px',
+                border: '1px solid #e5e7eb', background: '#fff',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: 'pointer', color: '#6b7280', flexShrink: 0,
               }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f3f4f6'; }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f9fafb'; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff'; }}
             >
               <X size={15} />
@@ -452,80 +387,54 @@ function DetailModal({ set, onClose }: { set: QuestionSet; onClose: () => void }
           </div>
 
           {/* Basic Info */}
-          <div style={{ marginBottom: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '14px' }}>
-              <FileText size={14} style={{ color: '#374151' }} />
-              <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f0f23' }}>Basic Info</span>
+          <div style={{ marginBottom: '16px', paddingBottom: '14px', borderBottom: '1px solid #f3f4f6' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+              <FileText size={13} style={{ color: '#9ca3af' }} />
+              <span style={{ fontSize: '12px', fontWeight: 600, color: '#374151' }}>Details</span>
             </div>
-            <div style={{
-              display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0',
-              background: '#f9fafb', borderRadius: '10px', border: '1px solid #f0f2f5',
-              overflow: 'hidden', marginBottom: '0',
-            }}>
-              {[
-                { label: 'Grade',     value: set.grade },
-                { label: 'Semester',  value: set.semester },
-                { label: 'Difficulty', valueEl: (
-                  <span style={{ display: 'inline-block', fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '20px', background: dc.bg, color: dc.color }}>
-                    {dc.label}
-                  </span>
-                )},
-              ].map((item, i) => (
-                <div key={i} style={{ padding: '12px 16px', borderRight: i < 2 ? '1px solid #f0f2f5' : 'none' }}>
-                  <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '4px' }}>{item.label}</div>
-                  {item.valueEl
-                    ? item.valueEl
-                    : <div style={{ fontSize: '13px', fontWeight: 600, color: '#0f0f23' }}>{item.value}</div>
-                  }
-                </div>
-              ))}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0', background: '#f9fafb', borderRadius: '10px', border: '1px solid #f0f2f5', overflow: 'hidden', marginTop: '6px' }}>
-              <div style={{ padding: '12px 16px', borderRight: '1px solid #f0f2f5' }}>
-                <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '4px' }}>Chapter</div>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: '#0f0f23' }}>{set.chapter}</div>
-              </div>
-              <div style={{ padding: '12px 16px' }}>
-                <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '4px' }}>Question Type</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '15px' }}>{tc.emoji}</span>
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f0f23' }}>{tc.label}</span>
-                  <span style={{ fontSize: '11px', color: '#6b7280' }}>({set.questions.length} questions)</span>
-                </div>
+            <div style={{ fontSize: '12px', color: '#6b7280', lineHeight: 1.6 }}>
+              <div><span style={{ color: '#9ca3af' }}>Chapter:</span> {set.chapter}</div>
+              <div style={{ marginTop: '4px' }}>
+                <span style={{ color: '#9ca3af' }}>Difficulty:</span>{' '}
+                <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '4px', background: dc.bg, color: dc.color }}>
+                  {dc.label}
+                </span>
+                {' · '}
+                <span style={{ color: '#9ca3af' }}>Count:</span> {set.questions.length}
               </div>
             </div>
           </div>
 
           {/* Section title */}
-          <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f0f23', paddingBottom: '14px', borderBottom: '1px solid #f0f2f5' }}>
-            Question Content
+          <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', paddingBottom: '10px' }}>
+            Questions
           </div>
         </div>
 
         {/* Scrollable questions */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 28px 24px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 18px 18px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {set.questions.map((q, idx) => {
               const qdc = DIFF_CONFIG[q.difficulty];
               const qtc = TYPE_CONFIG[q.type];
               return (
                 <div key={q.id} style={{
-                  background: '#f8f9fb', borderRadius: '12px',
-                  border: '1px solid #eef0f5', overflow: 'hidden',
+                  background: '#fafafa', borderRadius: '6px',
+                  border: '1px solid #e5e7eb', overflow: 'hidden',
                 }}>
                   {/* Q header */}
                   <div style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '11px 16px', borderBottom: '1px solid #eef0f5',
+                    padding: '8px 12px', borderBottom: '1px solid #f3f4f6',
                     background: '#fff',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#3b5bdb' }}>Q{idx + 1}</span>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: '#111827' }}>Q{idx + 1}</span>
                       <span style={{ fontSize: '11px', color: '#9ca3af' }}>·</span>
-                      <span style={{ fontSize: '12px', color: '#3b5bdb', fontWeight: 500 }}>{qtc.label}</span>
+                      <span style={{ fontSize: '11px', color: '#6b7280' }}>{qtc.label}</span>
                     </div>
                     <span style={{
-                      fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '20px',
+                      fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '4px',
                       background: qdc.bg, color: qdc.color,
                     }}>
                       {qdc.label}
@@ -533,8 +442,8 @@ function DetailModal({ set, onClose }: { set: QuestionSet; onClose: () => void }
                   </div>
 
                   {/* Q body */}
-                  <div style={{ padding: '14px 16px' }}>
-                    <p style={{ margin: '0 0 12px', fontSize: '14px', color: '#1f2937', lineHeight: 1.7 }}>
+                  <div style={{ padding: '12px' }}>
+                    <p style={{ margin: '0 0 10px', fontSize: '13px', color: '#374151', lineHeight: 1.65 }}>
                       {q.prompt}
                     </p>
                     {/* MCQ options */}
@@ -546,7 +455,7 @@ function DetailModal({ set, onClose }: { set: QuestionSet; onClose: () => void }
                           return (
                             <div key={opt} style={{
                               display: 'flex', alignItems: 'center', gap: '10px',
-                              padding: '8px 12px', borderRadius: '8px',
+                              padding: '6px 10px', borderRadius: '8px',
                               background: isCorrect ? '#f0fdf4' : '#fff',
                               border: `1px solid ${isCorrect ? '#bbf7d0' : '#e8eaed'}`,
                             }}>
@@ -609,47 +518,49 @@ function CustomSelect({ label, value, onChange, options }: {
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
-      <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '7px' }}>{label}</div>
+      <div style={{ fontSize: '11px', fontWeight: 500, color: '#6b7280', marginBottom: '5px' }}>{label}</div>
       <button
+        type="button"
         onClick={() => setOpen(o => !o)}
         style={{
           width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', textAlign: 'left',
-          border: `1.5px solid ${open ? '#3b5bdb' : '#e8eaed'}`,
-          background: open ? '#fafbff' : '#fff', outline: 'none', transition: 'border-color 0.15s',
+          padding: '6px 9px', borderRadius: '6px', cursor: 'pointer', textAlign: 'left',
+          border: `1px solid ${open ? '#d1d5db' : '#e5e7eb'}`,
+          background: '#fff', outline: 'none', transition: 'border-color 0.12s',
         }}
       >
-        <span style={{ fontSize: '13px', color: isPlaceholder ? '#9ca3af' : '#0f0f23', fontWeight: isPlaceholder ? 400 : 500 }}>
+        <span style={{ fontSize: '12px', color: isPlaceholder ? '#9ca3af' : '#111827', fontWeight: isPlaceholder ? 400 : 500 }}>
           {value}
         </span>
-        <ChevronDown size={13} style={{ color: open ? '#3b5bdb' : '#9ca3af', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s', flexShrink: 0 }} />
+        <ChevronDown size={12} style={{ color: '#9ca3af', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }} />
       </button>
 
       {open && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 5px)', left: 0, right: 0, zIndex: 100,
-          background: '#fff', border: '1.5px solid #e8eaed', borderRadius: '10px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06)',
-          overflow: 'hidden', padding: '4px',
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 100,
+          background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+          overflow: 'hidden', padding: '3px',
         }}>
           {options.map((opt, i) => {
             const isSel = opt === value;
             return (
               <button
+                type="button"
                 key={opt}
                 onClick={() => { onChange(opt); setOpen(false); }}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '8px 10px', borderRadius: '7px', border: 'none', cursor: 'pointer',
-                  background: isSel ? '#f0f4ff' : 'transparent',
-                  color: isSel ? '#3b5bdb' : i === 0 ? '#6b7280' : '#374151',
-                  fontSize: '13px', fontWeight: isSel ? 600 : 400, textAlign: 'left', transition: 'background 0.1s',
+                  padding: '6px 8px', borderRadius: '4px', border: 'none', cursor: 'pointer',
+                  background: isSel ? '#f3f4f6' : 'transparent',
+                  color: i === 0 ? '#9ca3af' : '#374151',
+                  fontSize: '12px', fontWeight: isSel ? 500 : 400, textAlign: 'left', transition: 'background 0.1s',
                 }}
                 onMouseEnter={e => { if (!isSel) (e.currentTarget as HTMLElement).style.background = '#f9fafb'; }}
                 onMouseLeave={e => { if (!isSel) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
               >
                 <span>{opt}</span>
-                {isSel && <Check size={12} style={{ color: '#3b5bdb', flexShrink: 0 }} />}
+                {isSel && <Check size={11} style={{ color: '#6b7280', flexShrink: 0 }} />}
               </button>
             );
           })}

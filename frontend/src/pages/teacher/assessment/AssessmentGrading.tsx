@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Search, Plus, X, Check, ChevronDown, ChevronLeft, ChevronRight,
   FileText, Clock, Award, AlertCircle, CheckCircle2,
@@ -648,7 +648,7 @@ function AssembleView({ onSave }: { onSave:(p:Paper)=>void }) {
   const [editingId,     setEditingId]     = useState<string|null>(null);
   const [replaceTarget, setReplaceTarget] = useState<{ secId:string; uid:string; type:QType }|null>(null);
 
-  const addedIds = new Set(sections.flatMap(s=>s.qs.map(q=>q.libId)));
+  const addedIds = new Set<string>(sections.flatMap(s => s.qs.map(q => q.libId)));
   const canvasHasContent = sections.some(s=>s.qs.length>0);
 
   // Load an entire exam paper into canvas
@@ -828,16 +828,18 @@ function AssembleView({ onSave }: { onSave:(p:Paper)=>void }) {
                     ) : sec.qs.map((q,qi)=>{
                       const globalIdx=sections.slice(0,si).reduce((n,s)=>n+s.qs.length,0)+qi+1;
                       return (
-                        <CanvasQCard
-                          key={q.uid} q={q} globalIdx={globalIdx} secId={sec.id}
-                          isEditing={editingId===q.uid}
-                          isReplaceTarget={replaceTarget?.uid===q.uid}
-                          onEdit={()=>{ setReplaceTarget(null); setEditingId(q.uid); }}
-                          onCancelEdit={()=>setEditingId(null)}
-                          onSaveEdit={(p)=>saveEdit(sec.id,q.uid,p)}
-                          onReplace={()=>{ setEditingId(null); setMode('bank'); setReplaceTarget(rt=>rt?.uid===q.uid?null:{secId:sec.id,uid:q.uid,type:q.type}); }}
-                          onRemove={()=>removeQ(sec.id,q.uid)}
-                        />
+                        <React.Fragment key={q.uid}>
+                          <CanvasQCard
+                            q={q} globalIdx={globalIdx} secId={sec.id}
+                            isEditing={editingId===q.uid}
+                            isReplaceTarget={replaceTarget?.uid===q.uid}
+                            onEdit={()=>{ setReplaceTarget(null); setEditingId(q.uid); }}
+                            onCancelEdit={()=>setEditingId(null)}
+                            onSaveEdit={(p)=>saveEdit(sec.id,q.uid,p)}
+                            onReplace={()=>{ setEditingId(null); setMode('bank'); setReplaceTarget(rt=>rt?.uid===q.uid?null:{secId:sec.id,uid:q.uid,type:q.type}); }}
+                            onRemove={()=>removeQ(sec.id,q.uid)}
+                          />
+                        </React.Fragment>
                       );
                     })}
                   </div>
@@ -1066,7 +1068,9 @@ function PublishView({ papers, onDelete, onPublish, onNewPaper }: { papers:Paper
         <div style={{ padding:'12px 20px', borderBottom:'1px solid #e8eaed', display:'flex', alignItems:'center', gap:'10px', flexShrink:0, background:'#fafafa' }}>
           <div style={{ display:'flex', background:'#f3f4f6', borderRadius:'8px', padding:'2px' }}>
             {([['all',`All (${cnt.all})`],['draft',`Drafts (${cnt.draft})`],['published',`Published (${cnt.published})`],['closed',`Closed (${cnt.closed})`]] as [string,string][]).map(([k,l])=>(
-              <Pill key={k} label={l} active={filter===k} onClick={()=>setFilter(k as typeof filter)}/>
+              <React.Fragment key={k}>
+                <Pill label={l} active={filter===k} onClick={()=>setFilter(k as typeof filter)}/>
+              </React.Fragment>
             ))}
           </div>
           <button onClick={onNewPaper} style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:'5px', padding:'7px 15px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#3b5bdb', color:'#fff', fontSize:'12px', fontWeight:600 }}>
@@ -1080,7 +1084,9 @@ function PublishView({ papers, onDelete, onPublish, onNewPaper }: { papers:Paper
               <div style={{ fontSize:'13px' }}>No papers in this category</div>
             </div>
           ) : displayed.map(paper=>(
-            <PublishCard key={paper.id} paper={paper} isSelected={selPaper?.id===paper.id} onDelete={onDelete} onSelectPublish={()=>setSelPaper(p=>p?.id===paper.id?null:paper)}/>
+            <React.Fragment key={paper.id}>
+              <PublishCard paper={paper} isSelected={selPaper?.id===paper.id} onDelete={onDelete} onSelectPublish={()=>setSelPaper(p=>p?.id===paper.id?null:paper)}/>
+            </React.Fragment>
           ))}
         </div>
       </div>

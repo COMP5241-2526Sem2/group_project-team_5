@@ -426,25 +426,23 @@ export default function AssessmentPapers() {
   }, [search, subject, grade, semester, type]);
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 48px)', overflow: 'hidden', background: '#f5f6fa' }}>
+    <div style={{ display: 'flex', height: 'calc(100vh - 48px)', overflow: 'hidden', background: '#fafafa' }}>
 
       {/* ── Left Filter Panel ───────────────────────────────────── */}
       <div style={{
-        width: '236px', flexShrink: 0, background: '#fff',
-        borderRight: '1px solid #e8eaed', overflowY: 'auto',
-        padding: '22px 18px',
+        width: '200px', flexShrink: 0, background: '#fff',
+        borderRight: '1px solid #e5e7eb', overflowY: 'auto',
+        padding: '16px 14px',
       }}>
         {/* Panel title */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '12px' }}>
-          <Filter size={15} style={{ color: '#374151' }} />
-          <span style={{ fontSize: '15px', fontWeight: 700, color: '#0f0f23' }}>Filter</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+          <Filter size={14} style={{ color: '#6b7280' }} />
+          <span style={{ fontSize: '13px', fontWeight: 600, color: '#111827' }}>Filter</span>
         </div>
 
         {/* Found count */}
-        <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px' }}>
-          Found&nbsp;
-          <span style={{ color: '#3b5bdb', fontWeight: 700 }}>{filtered.length}</span>
-          &nbsp;papers
+        <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '14px' }}>
+          {filtered.length} papers
         </div>
 
         {/* Search */}
@@ -487,7 +485,7 @@ export default function AssessmentPapers() {
       </div>
 
       {/* ── Right Content ────────────────────────────────────────── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '22px 24px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '14px' }}>
         {filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '80px 0' }}>
             <FileText size={40} style={{ color: '#d1d5db', marginBottom: '12px' }} />
@@ -496,8 +494,8 @@ export default function AssessmentPapers() {
         ) : (
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: '16px',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: '12px',
           }}>
             {filtered.map(paper => (
               <PaperCard key={paper.id} paper={paper} onView={() => setPreviewPaper(paper)} />
@@ -527,25 +525,25 @@ function PaperCard({ paper, onView }: { paper: Paper; onView: () => void }) {
   return (
     <div
       style={{
-        background: '#fff', border: '1px solid #e8eaed', borderRadius: '12px',
+        background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px',
         overflow: 'hidden', display: 'flex', flexDirection: 'column',
         transition: 'box-shadow 0.15s',
       }}
-      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 20px rgba(0,0,0,0.09)'; }}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)'; }}
       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}
     >
       {/* Card body */}
-      <div style={{ padding: '20px 22px 16px' }}>
+      <div style={{ padding: '14px' }}>
         {/* Title + status badge */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', marginBottom: '6px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#0f0f23', margin: 0, lineHeight: 1.4 }}>{paper.title}</h3>
+          <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#111827', margin: 0, lineHeight: 1.4 }}>{paper.title}</h3>
           {paper.status === 'published' && (
-            <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', background: '#eff6ff', color: '#1d4ed8', flexShrink: 0, marginTop: '2px' }}>Published</span>
+            <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '12px', background: '#f3f4f6', color: '#6b7280', flexShrink: 0, marginTop: '2px' }}>Published</span>
           )}
         </div>
 
         {/* Subtitle breadcrumb */}
-        <div style={{ fontSize: '12px', color: '#3b5bdb', marginBottom: '16px', lineHeight: 1.5 }}>
+        <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '12px', lineHeight: 1.5 }}>
           {paper.publisher}&nbsp;·&nbsp;{paper.grade}&nbsp;{paper.subject}&nbsp;·&nbsp;{paper.type}
         </div>
 
@@ -555,16 +553,16 @@ function PaperCard({ paper, onView }: { paper: Paper; onView: () => void }) {
             <div key={i} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '7px 0',
-              borderTop: i === 0 ? '1px solid #f0f2f5' : 'none',
-              borderBottom: '1px solid #f0f2f5',
+              borderTop: i === 0 ? '1px solid #f3f4f6' : 'none',
+              borderBottom: '1px solid #f3f4f6',
             }}>
-              <span style={{ fontSize: '13px', color: '#6b7280' }}>{row.label}:</span>
+              <span style={{ fontSize: '12px', color: '#9ca3af' }}>{row.label}:</span>
               {row.label === 'Quality' ? (
                 <div style={{ width: '140px' }}>
                   <QualityBar score={paper.quality} />
                 </div>
               ) : (
-                <span style={{ fontSize: '13px', fontWeight: 500, color: '#0f0f23' }}>{row.value}</span>
+                <span style={{ fontSize: '12px', fontWeight: 500, color: '#111827' }}>{row.value}</span>
               )}
             </div>
           ))}
@@ -572,7 +570,7 @@ function PaperCard({ paper, onView }: { paper: Paper; onView: () => void }) {
       </div>
 
       {/* Action buttons */}
-      <div style={{ display: 'flex', borderTop: '1px solid #f0f2f5' }}>
+      <div style={{ display: 'flex', borderTop: '1px solid #f3f4f6' }}>
         <button
           onClick={onView}
           style={{
