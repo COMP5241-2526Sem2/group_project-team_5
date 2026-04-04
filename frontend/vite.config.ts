@@ -58,5 +58,20 @@
     server: {
       port: 3000,
       open: true,
+      proxy: {
+        '/api': {
+          target: 'http://localhost:8000',
+          changeOrigin: true,
+          /** 避免 SSE 被中间层缓冲导致 EventSource 超时/断连 */
+          configure: (proxy) => {
+            proxy.on('proxyRes', (proxyRes, req) => {
+              if (req.url?.includes('/stream')) {
+                proxyRes.headers['x-accel-buffering'] = 'no';
+                delete proxyRes.headers['content-length'];
+              }
+            });
+          },
+        },
+      },
     },
   });

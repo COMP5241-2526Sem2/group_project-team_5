@@ -17,6 +17,7 @@ import TeacherLessons from "./pages/teacher/TeacherLessons";
 import LessonEditor from "./pages/teacher/LessonEditor";
 import PresentationMode from "./pages/teacher/PresentationMode";
 import LabsManagement from "./pages/teacher/LabsManagement";
+import LabsDrafts from "./pages/teacher/LabsDrafts";
 
 export const router = createBrowserRouter([
   // Auth
@@ -45,6 +46,7 @@ export const router = createBrowserRouter([
   { path: "/teacher/test/:testId",                 element: <TestDetail /> },
   { path: "/teacher/lessons",                      element: <TeacherLessons /> },
   { path: "/teacher/labs",                         element: <LabsManagement /> },
+  { path: "/teacher/labs/drafts",                 element: <LabsDrafts /> },
   { path: "/teacher/lesson-editor/:id",            element: <LessonEditor /> },
   { path: "/teacher/lesson-present/:id",           element: <PresentationMode /> },
 ]);

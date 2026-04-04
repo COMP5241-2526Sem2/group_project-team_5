@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Integer, Numeric, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -125,7 +125,7 @@ class PaperQuestionOption(Base):
     question_id: Mapped[int] = mapped_column(
         ForeignKey("paper_questions.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    option_key: Mapped[str] = mapped_column(Text, nullable=False)
+    option_key: Mapped[str] = mapped_column(String(10), nullable=False)
     option_text: Mapped[str] = mapped_column(Text, nullable=False)
     is_correct: Mapped[bool | None] = mapped_column(nullable=True)
 

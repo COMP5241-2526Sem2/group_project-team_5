@@ -1,14 +1,16 @@
-import { useState, useTransition, useCallback } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import TeacherLayout from '../../components/teacher/TeacherLayout';
 import LabHost, { STATIC_WIDGETS } from '../../components/labs/LabHost';
-import AIChatPanel from '../../components/labs/AIChatPanel';
-import { MOCK_DYNAMIC_DEFS, WidgetRegistry } from '../../components/labs/LabRegistry';
+import AIChatPanel, { type LabGeneratedOptions } from '../../components/labs/AIChatPanel';
+import { useLabs } from '../../components/labs/LabsContext';
+import { useChat } from '../../components/labs/ChatContext';
+import type { LabEntry } from '../../components/labs/LabsContext';
 import type { LabComponentDefinition } from '../../components/labs/types';
 import {
   Search, Sparkles, FlaskConical, Eye, Trash2,
   CheckCircle2, Tag, Cpu, BookOpen, ChevronRight,
-  X, Layers, Box,
+  X, Layers, Box, FileJson,
 } from 'lucide-react';
 import { CustomSelect } from '../../components/teacher/CustomSelect';
 
@@ -18,7 +20,7 @@ const SUBJ: Record<string, { bg: string; color: string; dot: string; emoji: stri
   Physics:   { bg: '#fef3c7', color: '#92400e', dot: '#f59e0b', emoji: '⚡' },
   Chemistry: { bg: '#fdf4ff', color: '#6b21a8', dot: '#a855f7', emoji: '⚗️' },
   Biology:   { bg: '#f0fdf4', color: '#166534', dot: '#22c55e', emoji: '🔬' },
-  Dynamic:   { bg: '#f3f4f6', color: '#374151', dot: '#6b7280', emoji: '���' },
+  Dynamic:   { bg: '#f3f4f6', color: '#374151', dot: '#6b7280', emoji: '⚙️' },
 };
 function ss(subj: string) { return SUBJ[subj] ?? SUBJ.Dynamic; }
 
@@ -28,45 +30,65 @@ const STATIC_DIMENSION: Record<string, '2d' | '3d'> = {
   'math.geometry_3d':    '3d',
   'physics.circuit':     '2d',
   'physics.mechanics':   '3d',
-  'chem.molecule':       '3d',
-  'bio.cell':            '3d',
+  'chem.molecule':      '3d',
+  'bio.cell':           '3d',
 };
 
-function dynSubject(lab: LabComponentDefinition) {
+function dynSubject(def: LabComponentDefinition) {
   const m: Record<string, string> = {
     math: 'Math', physics: 'Physics', chemistry: 'Chemistry', biology: 'Biology',
   };
-  return m[lab.subjectLab] ?? 'Dynamic';
+  return m[def.subjectLab] ?? 'Dynamic';
 }
 
-function dynDimension(lab: LabComponentDefinition): '2d' | '3d' {
-  const t = (lab.title + ' ' + (lab.description ?? '')).toLowerCase();
+function dynDimension(def: LabComponentDefinition): '2d' | '3d' {
+  const t = (def.title + ' ' + (def.description ?? '')).toLowerCase();
   return t.includes('3d') || t.includes('three') || t.includes('surface') ? '3d' : '2d';
 }
 
 // ── Unified lab descriptor ───────────────────────────────────────────────────
 interface LabItem {
-  id: string; label: string; subject: string; emoji: string;
-  type: 'builtin' | 'dynamic'; widgetType: string; description?: string;
+  id: string;
+  label: string;
+  subject: string;
+  emoji: string;
+  type: 'builtin' | 'uploaded' | 'ai';
+  widgetType: string;
+  description?: string;
   status: 'published' | 'draft' | 'deprecated';
-  grade?: string; topic?: string;
+  grade?: string;
+  topic?: string;
   dimension: '2d' | '3d';
 }
 
-function buildCatalog(dynDefs: LabComponentDefinition[]): LabItem[] {
+function buildCatalog(allEntries: LabEntry[]): LabItem[] {
   const builtin: LabItem[] = STATIC_WIDGETS.map(w => ({
-    id: w.widgetType, label: w.label, subject: w.subject, emoji: w.emoji,
-    type: 'builtin', widgetType: w.widgetType,
+    id: w.widgetType,
+    label: w.label,
+    subject: w.subject,
+    emoji: w.emoji,
+    type: 'builtin' as const,
+    widgetType: w.widgetType,
     description: `Built-in ${w.subject} interactive lab component.`,
-    status: 'published', dimension: STATIC_DIMENSION[w.widgetType] ?? '3d',
+    status: 'published' as const,
+    dimension: STATIC_DIMENSION[w.widgetType] ?? '3d',
   }));
-  const dynamic: LabItem[] = dynDefs.map(d => ({
-    id: d.registryKey, label: d.title, subject: dynSubject(d), emoji: '✨',
-    type: 'dynamic', widgetType: d.registryKey, description: d.description,
-    status: d.status, grade: d.metadata?.grade, topic: d.metadata?.topic,
-    dimension: dynDimension(d),
+
+  const external: LabItem[] = allEntries.map(e => ({
+    id: e.def.registryKey,
+    label: e.def.title,
+    subject: dynSubject(e.def),
+    emoji: e.source === 'uploaded' ? '📤' : '✨',
+    type: e.source as 'uploaded' | 'ai',
+    widgetType: e.def.registryKey,
+    description: e.def.description,
+    status: e.def.status,
+    grade: e.def.metadata?.grade,
+    topic: e.def.metadata?.topic,
+    dimension: dynDimension(e.def),
   }));
-  return [...builtin, ...dynamic];
+
+  return [...builtin, ...external];
 }
 
 // ── Delete confirm modal ─────────────────────────────────────────────────────
@@ -85,7 +107,7 @@ function DeleteModal({ lab, onConfirm, onCancel }: {
         </div>
         <div style={{ fontSize: '16px', fontWeight: 700, color: '#0f0f23', marginBottom: '8px' }}>Delete Lab?</div>
         <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '22px', lineHeight: 1.6 }}>
-          <strong style={{ color: '#374151' }}>{lab.label}</strong> will be permanently removed from the registry.
+          <strong style={{ color: '#374151' }}>{lab.label}</strong> will be permanently removed from the catalog.
           Any slides using this lab will need to be updated.
         </div>
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
@@ -105,55 +127,99 @@ function DeleteModal({ lab, onConfirm, onCancel }: {
 export default function LabsManagement() {
   const navigate = useNavigate();
   const [, startTransition] = useTransition();
+  const { allLabs, deleteLab, saveDraft, publishLab } = useLabs();
+  const { setWidgetType, setMode, pendingCommands, consumeCommands, setGenerateBaseRegistryKey } = useChat();
 
-  const [dynDefs, setDynDefs] = useState<LabComponentDefinition[]>(MOCK_DYNAMIC_DEFS);
   const [search, setSearch] = useState('');
   const [filterSubject, setFilterSubject] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'builtin' | 'dynamic'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'builtin' | 'uploaded' | 'ai'>('all');
   const [filterDimension, setFilterDimension] = useState<'' | '2d' | '3d'>('');
   const [selectedId, setSelectedId] = useState<string>(STATIC_WIDGETS[0]?.widgetType ?? '');
   const [deleteTarget, setDeleteTarget] = useState<LabItem | null>(null);
   const [showChat, setShowChat] = useState(true);
 
-  const catalog = buildCatalog(dynDefs);
+  const allEntries = Array.from(allLabs.values());
+  const catalog = buildCatalog(allEntries);
 
-  const filtered = catalog.filter(lab =>
-    (!search || lab.label.toLowerCase().includes(search.toLowerCase()) ||
+  // Catalog page: only published labs; drafts live under Drafts
+  const publishedCatalog = catalog.filter(l => l.status === 'published');
+  const visibleCatalog =
+    filterType === 'all'
+      ? publishedCatalog
+      : publishedCatalog.filter(l => {
+          if (filterType === 'builtin') return l.type === 'builtin';
+          if (filterType === 'uploaded') return l.type === 'uploaded';
+          if (filterType === 'ai') return l.type === 'ai';
+          return true;
+        });
+
+  const filtered = visibleCatalog.filter(lab =>
+    (!search ||
+      lab.label.toLowerCase().includes(search.toLowerCase()) ||
       (lab.description ?? '').toLowerCase().includes(search.toLowerCase())) &&
     (!filterSubject || lab.subject === filterSubject) &&
-    (!filterDimension || lab.dimension === filterDimension) &&
-    (filterType === 'all' || lab.type === filterType)
+    (!filterDimension || lab.dimension === filterDimension)
   );
 
-  const selected = catalog.find(l => l.id === selectedId) ?? catalog[0];
+  const selected = filtered.find(l => l.id === selectedId) ?? filtered[0];
   const selectedSty = selected ? ss(selected.subject) : ss('Dynamic');
+
+  /** Generate 模式：当前目录选中的实验作为迭代基准（与 Drive 的 widgetType 对齐） */
+  useEffect(() => {
+    setGenerateBaseRegistryKey(selected?.widgetType);
+    return () => setGenerateBaseRegistryKey(undefined);
+  }, [selected?.widgetType, setGenerateBaseRegistryKey]);
 
   function selectLab(id: string) {
     startTransition(() => setSelectedId(id));
+    setWidgetType(id);
+    setMode('drive_lab');
   }
 
-  function handleLabGenerated(def: LabComponentDefinition) {
-    setDynDefs(prev =>
-      prev.some(d => d.registryKey === def.registryKey) ? prev : [...prev, def]
-    );
-    WidgetRegistry.registerDynamic(def);
-    startTransition(() => setSelectedId(def.registryKey));
-  }
-
-  function handleDelete(lab: LabItem) {
-    setDynDefs(prev => prev.filter(d => d.registryKey !== lab.widgetType));
+  async function handleDelete(lab: LabItem) {
+    if (lab.type === 'builtin') return;
+    await deleteLab(lab.widgetType);
     if (selectedId === lab.id) {
       startTransition(() => setSelectedId(STATIC_WIDGETS[0]?.widgetType ?? ''));
     }
     setDeleteTarget(null);
   }
 
-  const subjects = Array.from(new Set(catalog.map(l => l.subject)));
-  const builtinCount = catalog.filter(l => l.type === 'builtin').length;
-  const dynamicCount = catalog.filter(l => l.type === 'dynamic').length;
-  const publishedCount = catalog.filter(l => l.status === 'published').length;
+  async function handleLabCommit(def: LabComponentDefinition, options?: LabGeneratedOptions) {
+    saveDraft(def, 'ai');
+    if (options?.status === 'published') {
+      await publishLab(def.registryKey);
+    }
+  }
+
+  const publishedCount = publishedCatalog.length;
+  const builtinCount   = publishedCatalog.filter(l => l.type === 'builtin').length;
+  const uploadedCount  = publishedCatalog.filter(l => l.type === 'uploaded').length;
+  const aiCount        = publishedCatalog.filter(l => l.type === 'ai').length;
+  const draftCount     = allLabs.size - catalog.filter(l => l.status === 'published').length;
 
   const ALL_SUBJECTS = ['Math', 'Physics', 'Chemistry', 'Biology'];
+
+  const SOURCE_FILTER_LABEL: Record<typeof filterType, string> = {
+    all: 'All sources',
+    builtin: 'Built-in',
+    uploaded: 'Uploaded',
+    ai: 'AI generated',
+  };
+
+  const SOURCE_FILTER_OPTIONS = [
+    SOURCE_FILTER_LABEL.all,
+    SOURCE_FILTER_LABEL.builtin,
+    SOURCE_FILTER_LABEL.uploaded,
+    SOURCE_FILTER_LABEL.ai,
+  ] as const;
+
+  function sourceLabelToFilter(label: string): typeof filterType {
+    const entry = (Object.entries(SOURCE_FILTER_LABEL) as [typeof filterType, string][]).find(
+      ([, v]) => v === label
+    );
+    return entry?.[0] ?? 'all';
+  }
 
   return (
     <TeacherLayout>
@@ -172,7 +238,7 @@ export default function LabsManagement() {
                 <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f0f23' }}>Lab Catalog</span>
               </div>
               <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '5px', background: '#eff6ff', color: '#3b5bdb', fontWeight: 600 }}>
-                {filtered.length} / {catalog.length}
+                {filtered.length} / {visibleCatalog.length}
               </span>
             </div>
 
@@ -184,19 +250,42 @@ export default function LabsManagement() {
                 style={{ width: '100%', padding: '7px 8px 7px 28px', border: '1px solid #e8eaed', borderRadius: '7px', fontSize: '12px', outline: 'none', boxSizing: 'border-box', background: '#fff' }} />
             </div>
 
-            {/* ── Source tabs: All | User Uploaded | AI Generated ── */}
-            <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: '8px', padding: '2px', gap: '1px', marginBottom: '12px' }}>
-              {([
-                ['all',     'All'],
-                ['builtin', 'Uploaded'],
-                ['dynamic', 'AI Generated'],
-              ] as const).map(([val, label]) => (
-                <button key={val} onClick={() => setFilterType(val)}
-                  style={{ flex: 1, padding: '5px 0', borderRadius: '6px', border: 'none', background: filterType === val ? '#fff' : 'transparent', color: filterType === val ? '#0f0f23' : '#6b7280', fontSize: '10px', cursor: 'pointer', fontWeight: filterType === val ? 700 : 400, boxShadow: filterType === val ? '0 1px 3px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.12s', whiteSpace: 'nowrap' }}>
-                  {label}
-                </button>
-              ))}
+            {/* ── Source filter (dropdown) — catalog is published-only ── */}
+            <div style={{ marginBottom: '10px' }}>
+              <div style={{ fontSize: '10px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>
+                Source
+              </div>
+              <CustomSelect
+                options={[...SOURCE_FILTER_OPTIONS]}
+                value={SOURCE_FILTER_LABEL[filterType]}
+                onChange={v => setFilterType(sourceLabelToFilter(v))}
+                minWidth={0}
+                width="100%"
+              />
+              <div style={{ marginTop: '6px', fontSize: '10px', color: '#9ca3af', lineHeight: 1.4 }}>
+                All {publishedCount} · Built-in {builtinCount} · Upload {uploadedCount} · AI {aiCount}
+              </div>
             </div>
+
+            {/* Go to Drafts */}
+            {draftCount > 0 && (
+              <button
+                onClick={() => navigate('/teacher/labs/drafts')}
+                style={{
+                  width: '100%', marginBottom: '10px', padding: '8px 10px',
+                  borderRadius: '8px', border: '1.5px dashed #fbbf24',
+                  background: '#fffbea', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                  fontSize: '11px', fontWeight: 600, color: '#92400e',
+                }}
+              >
+                <FileJson size={13} style={{ color: '#f59e0b' }} />
+                Drafts
+                <span style={{ background: '#fef3c7', color: '#92400e', padding: '1px 6px', borderRadius: '5px', fontWeight: 700 }}>
+                  {draftCount}
+                </span>
+              </button>
+            )}
 
             {/* ── Dimension filter ── */}
             <div style={{ marginBottom: '10px' }}>
@@ -235,9 +324,9 @@ export default function LabsManagement() {
                 Subject
               </div>
               <CustomSelect
-                options={['All Subjects', ...ALL_SUBJECTS]}
-                value={filterSubject === '' ? 'All Subjects' : filterSubject}
-                onChange={v => setFilterSubject(v === 'All Subjects' ? '' : v)}
+                options={['All subjects', ...ALL_SUBJECTS]}
+                value={filterSubject === '' ? 'All subjects' : filterSubject}
+                onChange={v => setFilterSubject(v === 'All subjects' ? '' : v)}
                 minWidth={0}
                 width="100%"
               />
@@ -261,7 +350,6 @@ export default function LabsManagement() {
                     onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = '#f3f4f6'; }}
                     onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
 
-                    {/* Subject dot + emoji */}
                     <div style={{ width: '34px', height: '34px', borderRadius: '9px', background: sty.bg, border: `1.5px solid ${isActive ? sty.dot : 'transparent'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '17px', flexShrink: 0 }}>
                       {lab.emoji}
                     </div>
@@ -274,14 +362,14 @@ export default function LabsManagement() {
                         <span style={{ fontSize: '10px', color: sty.color, background: sty.bg, padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>
                           {lab.subject}
                         </span>
-                        {lab.type === 'dynamic' && (
-                          <span style={{ fontSize: '9px', color: '#7c3aed', background: '#fdf4ff', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>
-                            AI
+                        {lab.type === 'uploaded' && (
+                          <span style={{ fontSize: '9px', color: '#0369a1', background: '#e0f2fe', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>
+                            Upload
                           </span>
                         )}
-                        {lab.status === 'draft' && (
-                          <span style={{ fontSize: '9px', color: '#92400e', background: '#fffbeb', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>
-                            Draft
+                        {lab.type === 'ai' && (
+                          <span style={{ fontSize: '9px', color: '#7c3aed', background: '#fdf4ff', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>
+                            AI
                           </span>
                         )}
                       </div>
@@ -296,15 +384,24 @@ export default function LabsManagement() {
 
           {/* Bottom: stats */}
           <div style={{ padding: '10px 14px', borderTop: '1px solid #e8eaed', flexShrink: 0, background: '#fff' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#9ca3af' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 8px', fontSize: '10px', color: '#9ca3af' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Cpu size={11} /> {builtinCount} built-in
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Sparkles size={11} /> {dynamicCount} AI
+                <Sparkles size={11} /> {aiCount} AI
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <CheckCircle2 size={11} style={{ color: '#059669' }} /> {publishedCount} published
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <FileJson size={11} style={{ color: '#f59e0b' }} />
+                <button
+                  onClick={() => navigate('/teacher/labs/drafts')}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '10px', color: '#f59e0b', fontWeight: 600, padding: 0 }}
+                >
+                  {draftCount} drafts
+                </button>
               </span>
             </div>
           </div>
@@ -317,13 +414,13 @@ export default function LabsManagement() {
           <div style={{ height: '48px', borderBottom: '1px solid #e8eaed', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 18px', flexShrink: 0, background: '#fff' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <FlaskConical size={15} style={{ color: '#3b5bdb' }} />
-              <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f0f23' }}>Lab Management</span>
+              <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f0f23' }}>Lab Catalog</span>
             </div>
             <div style={{ display: 'flex', gap: '7px', alignItems: 'center' }}>
               {selected && (
                 <button onClick={() => navigate(`/teacher/lesson-editor/new`)}
                   style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 12px', border: '1px solid #e8eaed', borderRadius: '7px', background: '#fff', color: '#374151', fontSize: '12px', cursor: 'pointer' }}>
-                  <BookOpen size={13} /> Use in Lesson
+                  <BookOpen size={13} /> Use in lesson
                 </button>
               )}
               <button onClick={() => setShowChat(v => !v)}
@@ -337,7 +434,6 @@ export default function LabsManagement() {
           <div style={{ flex: 1, overflowY: 'auto', padding: '24px', background: '#f8fafc' }}>
             {selected ? (
               <>
-                {/* Lab info header */}
                 <div style={{ background: '#fff', border: '1px solid #e8eaed', borderRadius: '12px', padding: '18px 20px', marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px' }}>
                   <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', flex: 1, minWidth: 0 }}>
                     <div style={{ width: '50px', height: '50px', borderRadius: '13px', background: selectedSty.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', flexShrink: 0 }}>
@@ -349,9 +445,14 @@ export default function LabsManagement() {
                         <span style={{ fontSize: '11px', fontWeight: 600, color: selectedSty.color, background: selectedSty.bg, padding: '2px 8px', borderRadius: '5px' }}>
                           {selected.subject}
                         </span>
-                        {selected.type === 'dynamic' && (
+                        {selected.type === 'uploaded' && (
+                          <span style={{ fontSize: '10px', fontWeight: 600, color: '#0369a1', background: '#e0f2fe', padding: '2px 8px', borderRadius: '5px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <FileJson size={9} /> Uploaded
+                          </span>
+                        )}
+                        {selected.type === 'ai' && (
                           <span style={{ fontSize: '10px', fontWeight: 600, color: '#7c3aed', background: '#fdf4ff', padding: '2px 8px', borderRadius: '5px', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                            <Sparkles size={9} /> AI Generated
+                            <Sparkles size={9} /> AI generated
                           </span>
                         )}
                         <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '5px', background: selected.status === 'published' ? '#d1fae5' : '#fef3c7', color: selected.status === 'published' ? '#065f46' : '#92400e' }}>
@@ -381,7 +482,7 @@ export default function LabsManagement() {
 
                   {/* Actions */}
                   <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                    {selected.type === 'dynamic' && (
+                    {(selected.type === 'ai' || selected.type === 'uploaded') && (
                       <button onClick={() => setDeleteTarget(selected)}
                         style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', border: '1px solid #fecaca', borderRadius: '7px', background: '#fff', color: '#ef4444', fontSize: '12px', cursor: 'pointer' }}
                         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#fef2f2'; }}
@@ -396,10 +497,15 @@ export default function LabsManagement() {
                 <div style={{ marginBottom: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '10px' }}>
                     <Eye size={13} style={{ color: '#6b7280' }} />
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Live Preview</span>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Live preview</span>
                     <div style={{ flex: 1, height: '1px', background: '#e8eaed' }} />
                   </div>
-                  <LabHost widgetType={selected.widgetType} readonly={false} />
+                  <LabHost
+                    widgetType={selected.widgetType}
+                    readonly={false}
+                    pendingCommands={pendingCommands}
+                    onConsumeCommands={consumeCommands}
+                  />
                 </div>
               </>
             ) : (
@@ -414,7 +520,6 @@ export default function LabsManagement() {
         {/* ── Right: AI Chat ── */}
         {showChat && (
           <div style={{ width: '360px', borderLeft: '1px solid #e8eaed', display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'relative' }}>
-            {/* Chat panel header override */}
             <div style={{ padding: '10px 14px', borderBottom: '1px solid #e8eaed', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ width: '26px', height: '26px', borderRadius: '7px', background: 'linear-gradient(135deg,#3b5bdb,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -422,7 +527,7 @@ export default function LabsManagement() {
                 </div>
                 <div>
                   <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f0f23', lineHeight: 1 }}>AI Lab Builder</div>
-                  <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '1px' }}>Describe a lab to generate it</div>
+                  <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '1px' }}>Drive catalog lab or generate → Drafts</div>
                 </div>
               </div>
               <button onClick={() => setShowChat(false)}
@@ -433,15 +538,16 @@ export default function LabsManagement() {
               </button>
             </div>
 
-            {/* AI Chat panel (generate mode only) */}
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              <AIChatPanelGenerateOnly onLabGenerated={handleLabGenerated} />
+              <AIChatPanel
+                variant="full"
+                onLabGenerated={handleLabCommit}
+              />
             </div>
           </div>
         )}
       </div>
 
-      {/* Delete modal */}
       {deleteTarget && (
         <DeleteModal
           lab={deleteTarget}
@@ -450,18 +556,5 @@ export default function LabsManagement() {
         />
       )}
     </TeacherLayout>
-  );
-}
-
-// ── AIChatPanel locked to generate mode ─────────────────────────────────────
-// We wrap the existing AIChatPanel but force it into generate mode
-// by rendering it without a widgetType (which defaults to generate mode).
-function AIChatPanelGenerateOnly({ onLabGenerated }: { onLabGenerated: (def: LabComponentDefinition) => void }) {
-  return (
-    <AIChatPanel
-      onLabGenerated={onLabGenerated}
-      onApplyCommands={() => {}}
-      compact
-    />
   );
 }

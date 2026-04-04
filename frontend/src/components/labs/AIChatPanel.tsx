@@ -1,126 +1,21 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Sparkles, Bot, User, Zap, Plus, ChevronDown, ChevronUp, RefreshCw, Terminal, X, ArrowUp } from 'lucide-react';
+/**
+ * AIChatPanel — reads chat state from ChatContext and sends messages through it.
+ * Two render modes:
+ *   full  — show the full panel (LabsManagement right panel)
+ *   locked — locked to generate_lab mode, compact (LabsDrafts sidebar)
+ */
+import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
+import {
+  Send, Sparkles, Bot, User, Zap, Plus, ChevronDown, ChevronUp,
+  RefreshCw, Terminal, X, ArrowUp,
+} from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { ChatMessage, LabCommand, LabComponentDefinition } from './types';
-import { MOCK_DYNAMIC_DEFS, WidgetRegistry } from './LabRegistry';
+import { fromBackend, labsApi } from '@/api/labs';
+import { parseLabDefinitionJson, tryParseLabDefinitionFromText } from './parseLabDefinition';
+import { useChat, type ChatMode, type LabGeneratedOptions } from './ChatContext';
 
-// ── Mock AI response engine ───────────────────────────────────────────────────
-// In production, replace with SSE/WebSocket to actual LLM backend.
-
-interface MockResponse {
-  text: string;
-  commands?: LabCommand[];
-  definition?: LabComponentDefinition;
-  delay?: number; // simulated streaming delay ms per char
-}
-
-function getMockDriveResponse(input: string, widgetType: string): MockResponse {
-  const lower = input.toLowerCase();
-
-  // Circuit
-  if (widgetType === 'physics.circuit') {
-    if (lower.includes('close') || lower.includes('on') || lower.includes('switch'))
-      return { text: 'Closing switch S₁ — circuit is now complete. Current will begin flowing through all components.', commands: [{ type: 'TOGGLE_SWITCH', payload: { id: 'sw1', closed: true }, description: 'Close switch S₁' }] };
-    if (lower.includes('open') || lower.includes('off'))
-      return { text: 'Opening switch S₁ — circuit is now interrupted. No current flows.', commands: [{ type: 'TOGGLE_SWITCH', payload: { id: 'sw1', closed: false }, description: 'Open switch S₁' }] };
-    if (lower.includes('voltage') || lower.includes('battery'))
-      return { text: 'Setting battery EMF to 12V. You can observe how this affects the current through each resistor.', commands: [{ type: 'SET_PARAM', payload: { key: 'voltage', value: 12 }, description: 'Set voltage to 12V' }] };
-    if (lower.includes('current'))
-      return { text: 'Enabling current flow animation so you can see the direction of conventional current in the circuit.', commands: [{ type: 'SET_PARAM', payload: { key: 'showCurrentFlow', value: true }, description: 'Show current animation' }] };
-    return { text: 'I can control this circuit. Try: "close the switch", "set voltage to 12V", or "show current flow".', commands: [] };
-  }
-
-  // Function graph
-  if (widgetType === 'math.function_graph') {
-    if (lower.includes('sin') || lower.includes('cosine') || lower.includes('wave'))
-      return { text: 'Displaying f(x) = 2·sin(x). The amplitude is 2, so the wave peaks at y = 2 and y = −2.', commands: [{ type: 'SET_PARAM', payload: { key: 'a', value: 2 }, description: 'Set amplitude a=2' }, { type: 'SET_PARAM', payload: { key: 'b', value: 1 }, description: 'Set frequency b=1' }] };
-    if (lower.includes('steep') || lower.includes('frequen'))
-      return { text: 'Increasing frequency (b parameter) to show the function completing more cycles over the same x range.', commands: [{ type: 'SET_PARAM', payload: { key: 'b', value: 3 }, description: 'Increase frequency b=3' }] };
-    if (lower.includes('tangent'))
-      return { text: 'Enabling the tangent line at x=0. The slope shown is the derivative f\'(x₀), a key concept in differentiation.', commands: [{ type: 'SET_PARAM', payload: { key: 'showTangent', value: true }, description: 'Show tangent line' }] };
-    return { text: 'I can modify this function graph. Try: "make it steeper", "show the tangent line", or "set amplitude to 2".', commands: [] };
-  }
-
-  // Mechanics
-  if (widgetType === 'physics.mechanics') {
-    if (lower.includes('steep') || lower.includes('angle') || lower.includes('45'))
-      return { text: 'Increasing the incline angle to 45°. Notice how the component of gravity along the slope (F∥) increases significantly.', commands: [{ type: 'SET_PARAM', payload: { key: 'angle', value: 45 }, description: 'Set angle to 45°' }] };
-    if (lower.includes('friction') || lower.includes('smooth') || lower.includes('icy'))
-      return { text: 'Reducing friction coefficient to 0.05 — approximating a nearly frictionless icy surface. The block will accelerate rapidly down the slope.', commands: [{ type: 'SET_PARAM', payload: { key: 'friction', value: 0.05 }, description: 'Reduce friction μ=0.05' }] };
-    if (lower.includes('moon'))
-      return { text: 'Switching to lunar gravity (g = 1.6 m/s²). On the Moon, everything feels about 6× lighter!', commands: [{ type: 'SET_PARAM', payload: { key: 'gravity', value: 1.6 }, description: 'Set lunar gravity g=1.6' }] };
-    return { text: 'I can adjust this mechanics scenario. Try: "make it steeper", "add ice (no friction)", or "change to moon gravity".', commands: [] };
-  }
-
-  // Molecule
-  if (widgetType === 'chem.molecule') {
-    if (lower.includes('water') || lower.includes('h2o'))
-      return { text: 'Loading water (H₂O) — a bent molecule with bond angle ~104.5°, making it polar. This polarity is key to water\'s unique properties.', commands: [{ type: 'SET_PARAM', payload: { key: 'moleculeKey', value: 'water' }, description: 'Show H₂O' }] };
-    if (lower.includes('methane') || lower.includes('ch4'))
-      return { text: 'Loading methane (CH₄) — a tetrahedral molecule. Each H-C-H angle is approximately 109.5°, the ideal tetrahedral angle.', commands: [{ type: 'SET_PARAM', payload: { key: 'moleculeKey', value: 'methane' }, description: 'Show CH₄' }] };
-    if (lower.includes('co2') || lower.includes('carbon'))
-      return { text: 'Loading CO₂ — a linear molecule with two C=O double bonds. Despite having polar bonds, the molecule is nonpolar due to its symmetry.', commands: [{ type: 'SET_PARAM', payload: { key: 'moleculeKey', value: 'co2' }, description: 'Show CO₂' }] };
-    return { text: 'I can switch molecules. Try: "show water", "load methane", or "display CO₂".', commands: [] };
-  }
-
-  // Cell
-  if (widgetType === 'bio.cell') {
-    if (lower.includes('nucleus') || lower.includes('dna'))
-      return { text: 'Highlighting the nucleus — this organelle contains the cell\'s DNA and controls all cellular activities through gene expression.', commands: [{ type: 'HIGHLIGHT_ORGANELLE', payload: { id: 'nucleus' }, description: 'Highlight nucleus' }] };
-    if (lower.includes('mitochondr') || lower.includes('atp') || lower.includes('energy'))
-      return { text: 'Highlighting the mitochondria. These are the "powerhouses" of the cell, producing ATP through cellular respiration (oxidative phosphorylation).', commands: [{ type: 'HIGHLIGHT_ORGANELLE', payload: { id: 'mitochondria1' }, description: 'Highlight mitochondria' }] };
-    return { text: 'I can highlight organelles. Try: "show the nucleus", "highlight mitochondria", or "explain the Golgi apparatus".', commands: [] };
-  }
-
-  return { text: 'I understand your request. For this lab, try asking me to adjust specific parameters or explain concepts.', commands: [] };
-}
-
-function getMockGenerateResponse(input: string): MockResponse {
-  const lower = input.toLowerCase();
-
-  if (lower.includes('ph') || lower.includes('acid') || lower.includes('base')) {
-    return {
-      text: `Great choice! I'll generate a **pH Indicator Lab** for you.
-
-This dynamic lab will feature:
-- Real-time pH scale (0–14) with color gradient
-- Interactive pH slider driving indicator color change
-- Labels for acidic, neutral, and basic regions
-
-Generating definition...`,
-      definition: MOCK_DYNAMIC_DEFS[0],
-    };
-  }
-
-  if (lower.includes('snell') || lower.includes('refract') || lower.includes('optic') || lower.includes('light')) {
-    return {
-      text: `Excellent! Generating a **Snell's Law — Refraction Lab**.
-
-This lab will visualise:
-- Incident and refracted ray diagrams
-- Real-time angle updates as you drag θ₁
-- n₁ and n₂ sliders for different media
-- Total internal reflection when the critical angle is exceeded
-
-Building component definition...`,
-      definition: MOCK_DYNAMIC_DEFS[1],
-    };
-  }
-
-  return {
-    text: `I can generate a custom lab for you! Here are some ideas:
-    
-- **pH Indicator** — "Generate a pH indicator lab"
-- **Snell's Law** — "Create a refraction lab"
-- **Ohm's Law** — "Make an Ohm's law slider"
-- **Pendulum** — "Build a simple pendulum lab"
-
-What topic would you like me to create a lab for?`,
-    definition: undefined,
-  };
-}
-
-// ── Quick Idea definitions ────────────────────────────────────────────────────
+// ── Quick Idea definitions ───────────────────────────────────────────────────
 interface QuickIdea {
   emoji: string;
   label: string;
@@ -135,7 +30,6 @@ const SUBJECT_COLORS: Record<string, { bg: string; color: string }> = {
   Math:      { bg: '#eff6ff', color: '#1e40af' },
 };
 
-// ── Drive mode Quick Ideas ────────────────────────────────────────────────────
 const DRIVE_IDEAS: QuickIdea[] = [
   { emoji: '⚡', label: 'Close Switch',     subject: 'Physics',   prompt: 'Close the switch in the circuit to complete it' },
   { emoji: '🔋', label: 'Set Voltage 12V',  subject: 'Physics',   prompt: 'Set the battery voltage to 12V' },
@@ -157,7 +51,6 @@ const DRIVE_IDEAS: QuickIdea[] = [
   { emoji: '🚀', label: 'Max Force',        subject: 'Physics',   prompt: 'Set the applied force to its maximum value' },
 ];
 
-// ── Generate mode Quick Ideas ────────────────────────────────────────────────
 const QUICK_IDEAS: QuickIdea[] = [
   { emoji: '🌡️', label: 'pH Indicator',       subject: 'Chemistry', prompt: 'Generate a pH indicator lab with a real-time color gradient scale from 0–14 and an interactive slider' },
   { emoji: '💡', label: "Snell's Law",          subject: 'Physics',   prompt: "Generate a Snell's Law refraction lab with draggable incident angle and adjustable refractive indices" },
@@ -221,7 +114,7 @@ const MODE_THEME = {
     hintBg:         '#1a1040',
     hintText:       '#7c3aed',
     chipSelBg:      '#2d1b69',
-    chipSelBdr:     '#7c3aed',
+    chipSelBdr:     '#7d28d9',
     chipSelText:    '#c4b5fd',
     sendBg:         '#5b21b6',
     sendHover:      '#6d28d9',
@@ -235,30 +128,32 @@ const MODE_THEME = {
 
 const COLLAPSED_COUNT = 6;
 
-// ── Chat Panel ────────────────────────────────────────────────────────────────
-interface AIChatPanelProps {
-  widgetType?: string;
+// ── Props ─────────────────────────────────────────────────────────────────────
+export interface AIChatPanelProps {
+  /** 'full' = LabsManagement right panel, 'locked' = LabsDrafts sidebar (generate-only, compact) */
+  variant?: 'full' | 'locked';
+  /** Called when user commits a generated lab (draft / publish) */
+  onLabGenerated?: (def: LabComponentDefinition, options?: LabGeneratedOptions) => void;
+  /** Called when AI emits commands (drive mode) — parent applies them to the active lab */
   onApplyCommands?: (cmds: LabCommand[]) => void;
-  onLabGenerated?: (def: LabComponentDefinition) => void;
-  compact?: boolean;
 }
 
 let _msgId = 0;
 function mkId() { return `msg_${++_msgId}`; }
 
-export default function AIChatPanel({ widgetType, onApplyCommands, onLabGenerated, compact }: AIChatPanelProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: mkId(), role: 'assistant',
-      content: widgetType
-        ? `Lab connected: **${widgetType}**. Ask me to adjust parameters, explain concepts, or generate a new Lab component.`
-        : `Hello! I can help you:\n• **Drive existing labs** — control parameters via natural language\n• **Generate new Labs** — create custom interactive components`,
-      timestamp: Date.now(),
-    }
-  ]);
+// ── Inner component (reads ChatContext) ───────────────────────────────────────
+function AIChatPanelInner({
+  variant = 'full',
+  onLabGenerated,
+  onApplyCommands,
+}: AIChatPanelProps) {
+  const {
+    messages, mode, loading,
+    setMode, widgetType, applyCommands, setMessages,
+    generateBaseRegistryKey,
+  } = useChat();
+
   const [input, setInput] = useState('');
-  const [mode, setMode] = useState<'drive_lab' | 'generate_lab'>(widgetType ? 'drive_lab' : 'generate_lab');
-  const [loading, setLoading] = useState(false);
   const [showGenModal, setShowGenModal] = useState(false);
   const [pendingInput, setPendingInput] = useState('');
   const [selectedIdeas, setSelectedIdeas] = useState<QuickIdea[]>([]);
@@ -266,62 +161,187 @@ export default function AIChatPanel({ widgetType, onApplyCommands, onLabGenerate
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Persist SSE session id across sends within the same chat
+  const sessionIdRef = useRef<number | null>(null);
+
+  // Locked variant forces generate_lab（仅当某页需要隐藏切换时使用）
+  const effectiveMode: ChatMode = variant === 'locked' ? 'generate_lab' : mode;
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const streamText = useCallback((text: string, msgId: string) => {
-    return new Promise<void>(resolve => {
-      let i = 0;
-      const chars = text.split('');
-      const tick = () => {
-        i += Math.floor(Math.random() * 3) + 1;
-        const slice = chars.slice(0, Math.min(i, chars.length)).join('');
-        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: slice, streaming: i < chars.length } : m));
-        if (i < chars.length) setTimeout(tick, 18);
-        else resolve();
-      };
-      setTimeout(tick, 60);
-    });
-  }, []);
+  /** Drive/Generate 或目标实验 / 迭代基准变化时重建后端会话 */
+  useEffect(() => {
+    sessionIdRef.current = null;
+  }, [effectiveMode, widgetType, generateBaseRegistryKey]);
 
-  const sendMessage = useCallback(async (text: string, isGenerate: boolean) => {
+  // ── Send ────────────────────────────────────────────────────────────────────
+  const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || loading) return;
     setInput('');
     setSelectedIdeas([]);
-    setLoading(true);
 
     const userMsg: ChatMessage = { id: mkId(), role: 'user', content: text, timestamp: Date.now() };
     const asstId = mkId();
     const asstMsg: ChatMessage = { id: asstId, role: 'assistant', content: '', timestamp: Date.now(), streaming: true };
+
     setMessages(prev => [...prev, userMsg, asstMsg]);
 
-    // Simulate network delay
-    await new Promise(r => setTimeout(r, 400));
+    try {
+      // Step 1: ensure session exists
+      if (sessionIdRef.current === null) {
+        const session = await labsApi.createSession(
+          effectiveMode === 'generate_lab' ? 'generate' : 'drive',
+          effectiveMode === 'drive_lab' ? widgetType : generateBaseRegistryKey,
+        );
+        sessionIdRef.current = session.id;
+      }
 
-    const response = isGenerate
-      ? getMockGenerateResponse(text)
-      : getMockDriveResponse(text, widgetType ?? '');
+      const sessionId = sessionIdRef.current;
+      const es = labsApi.streamChat(sessionId, text);
 
-    await streamText(response.text, asstId);
+      let accumulatedText = '';
+      let pendingDefinition: LabComponentDefinition | undefined;
+      let pendingCommands: LabCommand[] = [];
 
-    // Apply commands
-    if (response.commands && response.commands.length > 0) {
-      await new Promise(r => setTimeout(r, 200));
-      onApplyCommands?.(response.commands);
-      setMessages(prev => prev.map(m => m.id === asstId ? { ...m, commands: response.commands } : m));
+      es.addEventListener('text', (e: MessageEvent) => {
+        accumulatedText += e.data;
+        setMessages(prev =>
+          prev.map(m => m.id === asstId ? { ...m, content: accumulatedText } : m)
+        );
+      });
+
+      es.addEventListener('command', (e: MessageEvent) => {
+        try {
+          pendingCommands = JSON.parse(e.data);
+          applyCommands(pendingCommands);
+          setMessages(prev =>
+            prev.map(m => m.id === asstId ? { ...m, commands: pendingCommands } : m)
+          );
+        } catch { /* ignore */ }
+      });
+
+      es.addEventListener('definition', (e: MessageEvent) => {
+        try {
+          const raw = JSON.parse(e.data);
+          const res = parseLabDefinitionJson(raw);
+          if (res.ok) {
+            pendingDefinition = res.definition;
+          } else {
+            // Show the parse error in the message bubble so the user knows saving is unavailable
+            setMessages(prev =>
+              prev.map(m => m.id === asstId
+                ? { ...m, content: (m.content || '') + `\n[解析错误] ${res.error}` }
+                : m
+              )
+            );
+          }
+        } catch { /* ignore malformed JSON */ }
+      });
+
+      es.addEventListener('done', () => {
+        es.close();
+        setMessages(prev =>
+          prev.map(m => m.id === asstId ? { ...m, streaming: false } : m)
+        );
+        let def = pendingDefinition;
+        if (!def && effectiveMode === 'generate_lab' && accumulatedText.trim()) {
+          const fromText = tryParseLabDefinitionFromText(accumulatedText);
+          if (fromText.ok) def = fromText.definition;
+          else if (/registry_?key|initial_?state|lab_definition|```/i.test(accumulatedText)) {
+            setMessages(prev =>
+              prev.map(m =>
+                m.id === asstId && !m.content?.includes('[解析错误]')
+                  ? { ...m, content: `${m.content || ''}\n[提示] 未从回复中解析出可保存的 Lab JSON：${fromText.error}` }
+                  : m
+              )
+            );
+          }
+        }
+        if (def) {
+          onLabGenerated?.(def,
+            effectiveMode === 'generate_lab'
+              ? { status: 'draft' }
+              : undefined
+          );
+          setMessages(prev =>
+            prev.map(m => m.id === asstId ? { ...m, pendingDefinition: def } : m)
+          );
+        }
+      });
+
+      es.addEventListener('lab_error', (e: MessageEvent) => {
+        es.close();
+        const detail = typeof e.data === 'string' && e.data.trim() ? e.data : 'Unknown error';
+        setMessages(prev =>
+          prev.map(m => m.id === asstId
+            ? { ...m, content: (m.content || '') + `\n[AI 服务错误] ${detail}`, streaming: false }
+            : m
+          )
+        );
+      });
+
+      es.addEventListener('error', () => {
+        es.close();
+        setMessages(prev =>
+          prev.map(m => m.id === asstId
+            ? {
+                ...m,
+                content: (m.content || '') + '\n[连接中断] 请确认后端已启动（:8000），或稍后重试。',
+                streaming: false,
+              }
+            : m
+          )
+        );
+      });
+
+    } catch (err) {
+      setMessages(prev =>
+        prev.map(m => m.id === asstId
+          ? { ...m, content: `Error: ${err instanceof Error ? err.message : String(err)}`, streaming: false }
+          : m
+        )
+      );
     }
+  }, [loading, effectiveMode, widgetType, generateBaseRegistryKey, applyCommands, onLabGenerated, setMessages]);
 
-    // Register generated definition
-    if (response.definition) {
-      await new Promise(r => setTimeout(r, 600));
-      WidgetRegistry.registerDynamic(response.definition);
-      onLabGenerated?.(response.definition);
-      setMessages(prev => prev.map(m => m.id === asstId ? { ...m, definition: response.definition } : m));
-    }
-
-    setLoading(false);
-  }, [loading, streamText, onApplyCommands, onLabGenerated, widgetType]);
+  const commitGeneratedLab = useCallback(
+    async (msgId: string, def: LabComponentDefinition, status: 'draft' | 'published') => {
+      const action = status === 'draft' ? 'save_draft' : 'publish';
+      let contentUnchanged = false;
+      let saved: LabComponentDefinition;
+      try {
+        const { contentUnchanged: unchanged, raw } = await labsApi.saveLabDefinition(def, action);
+        contentUnchanged = unchanged;
+        const { content_unchanged: _c, ...row } = raw;
+        saved = fromBackend(row as Parameters<typeof fromBackend>[0]);
+      } catch (err) {
+        alert(err instanceof Error ? err.message : String(err));
+        return;
+      }
+      const commitNotice =
+        status === 'draft'
+          ? contentUnchanged
+            ? '已保存'
+            : '保存成功，版本更新'
+          : '发布成功';
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === msgId
+            ? {
+                ...m,
+                pendingDefinition: undefined,
+                definition: saved,
+                commitNotice,
+              }
+            : m
+        )
+      );
+      onLabGenerated?.(saved, { status });
+    },
+    [onLabGenerated, setMessages]
+  );
 
   function handleSend() {
     const ideaPrompts = selectedIdeas.map(i => i.prompt).join('. ');
@@ -330,12 +350,17 @@ export default function AIChatPanel({ widgetType, onApplyCommands, onLabGenerate
       ? `${ideaPrompts}. Additional details: ${userText}`
       : ideaPrompts || userText;
     if (!combined) return;
-    if (mode === 'generate_lab') {
+    if (effectiveMode === 'generate_lab') {
       setPendingInput(combined);
       setShowGenModal(true);
     } else {
-      sendMessage(combined, false);
+      sendMessage(combined);
     }
+  }
+
+  function handleConfirmGenerate() {
+    setShowGenModal(false);
+    sendMessage(pendingInput);
   }
 
   function handleIdeaClick(idea: QuickIdea) {
@@ -352,7 +377,6 @@ export default function AIChatPanel({ widgetType, onApplyCommands, onLabGenerate
   }
 
   function renderContent(text: string) {
-    // Simple markdown-like rendering
     return text.split('\n').map((line, i) => {
       const rendered = line
         .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#e2e8f0">$1</strong>')
@@ -365,20 +389,38 @@ export default function AIChatPanel({ widgetType, onApplyCommands, onLabGenerate
   }
 
   const visibleIdeas = (() => {
-    const pool = mode === 'drive_lab' ? DRIVE_IDEAS : QUICK_IDEAS;
+    const pool = effectiveMode === 'drive_lab' ? DRIVE_IDEAS : QUICK_IDEAS;
     return ideasExpanded ? pool : pool.slice(0, COLLAPSED_COUNT);
   })();
   const hasSelected = selectedIdeas.length > 0 || !!input.trim();
   const selectedCount = selectedIdeas.length;
-  const th = MODE_THEME[mode];
+  const th = MODE_THEME[effectiveMode];
+
+
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: th.panelBg, borderRadius: compact ? '0' : '12px', border: compact ? 'none' : `1px solid ${th.divider}`, overflow: 'hidden', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', transition: 'background 0.25s' }}>
+    <div style={{
+      display: 'flex', flexDirection: 'column', height: '100%',
+      background: th.panelBg,
+      borderRadius: variant === 'locked' ? '0' : '12px',
+      border: variant === 'locked' ? 'none' : `1px solid ${th.divider}`,
+      overflow: 'hidden',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    }}>
 
       {/* Header */}
-      <div style={{ padding: '12px 16px', background: th.headerBg, borderBottom: `1px solid ${th.divider}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, transition: 'background 0.25s' }}>
+      <div style={{
+        padding: '12px 16px', background: th.headerBg,
+        borderBottom: `1px solid ${th.divider}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        flexShrink: 0,
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ width: '26px', height: '26px', borderRadius: '7px', background: 'linear-gradient(135deg,#3b5bdb,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{
+            width: '26px', height: '26px', borderRadius: '7px',
+            background: 'linear-gradient(135deg,#3b5bdb,#7c3aed)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
             <Sparkles size={14} style={{ color: '#fff' }} />
           </div>
           <span style={{ fontSize: '14px', fontWeight: 700, color: '#e2e8f0' }}>AI Lab Assistant</span>
@@ -389,29 +431,52 @@ export default function AIChatPanel({ widgetType, onApplyCommands, onLabGenerate
           )}
         </div>
 
-        {/* Mode toggle */}
-        <div style={{ display: 'flex', background: '#0f172a', borderRadius: '7px', padding: '2px', gap: '2px' }}>
-          {(['drive_lab', 'generate_lab'] as const).map(m => (
-            <button key={m} onClick={() => { setMode(m); setSelectedIdeas([]); }}
-              style={{ padding: '4px 10px', borderRadius: '5px', border: 'none', background: mode === m ? MODE_THEME[m].activeBg : 'transparent', color: mode === m ? MODE_THEME[m].activeText : '#4b5563', fontSize: '11px', cursor: 'pointer', fontWeight: mode === m ? 600 : 400, display: 'flex', alignItems: 'center', gap: '4px', transition: 'all 0.15s' }}>
-              {m === 'drive_lab' ? <><Zap size={11} /> Drive</> : <><Plus size={11} /> Generate</>}
-            </button>
-          ))}
-        </div>
+        {/* Mode toggle — hidden in locked variant */}
+        {variant === 'full' && (
+          <div style={{ display: 'flex', background: '#0f172a', borderRadius: '7px', padding: '2px', gap: '2px' }}>
+            {(['drive_lab', 'generate_lab'] as const).map(m => (
+              <button key={m} onClick={() => setMode(m)}
+                style={{
+                  padding: '4px 10px', borderRadius: '5px', border: 'none',
+                  background: effectiveMode === m ? MODE_THEME[m].activeBg : 'transparent',
+                  color: effectiveMode === m ? MODE_THEME[m].activeText : '#4b5563',
+                  fontSize: '11px', cursor: 'pointer',
+                  fontWeight: effectiveMode === m ? 600 : 400,
+                  display: 'flex', alignItems: 'center', gap: '4px',
+                }}>
+                {m === 'drive_lab' ? <><Zap size={11} /> Drive</> : <><Plus size={11} /> Generate</>}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px', background: th.msgAreaBg, transition: 'background 0.25s' }}>
+      <div style={{
+        flex: 1, overflowY: 'auto', padding: '12px',
+        display: 'flex', flexDirection: 'column', gap: '10px',
+        background: th.msgAreaBg,
+      }}>
         {messages.map(msg => (
           <div key={msg.id} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', flexDirection: msg.role === 'user' ? 'row-reverse' : 'row' }}>
             {/* Avatar */}
-            <div style={{ width: '26px', height: '26px', borderRadius: '7px', flexShrink: 0, background: msg.role === 'user' ? th.userAvatarBg : 'linear-gradient(135deg,#3b5bdb,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{
+              width: '26px', height: '26px', borderRadius: '7px', flexShrink: 0,
+              background: msg.role === 'user' ? th.userAvatarBg : 'linear-gradient(135deg,#3b5bdb,#7c3aed)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
               {msg.role === 'user' ? <User size={13} style={{ color: th.activeText }} /> : <Bot size={13} style={{ color: '#fff' }} />}
             </div>
 
             <div style={{ maxWidth: '82%', display: 'flex', flexDirection: 'column', gap: '5px', alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
               {/* Bubble */}
-              <div style={{ padding: '9px 12px', borderRadius: msg.role === 'user' ? '12px 4px 12px 12px' : '4px 12px 12px 12px', background: msg.role === 'user' ? th.userBubbleBg : '#111827', border: `1px solid ${msg.role === 'user' ? th.userBubbleBdr : '#1f2937'}`, fontSize: '12px', color: '#d1d5db', lineHeight: 1.6 }}>
+              <div style={{
+                padding: '9px 12px',
+                borderRadius: msg.role === 'user' ? '12px 4px 12px 12px' : '4px 12px 12px 12px',
+                background: msg.role === 'user' ? th.userBubbleBg : '#111827',
+                border: `1px solid ${msg.role === 'user' ? th.userBubbleBdr : '#1f2937'}`,
+                fontSize: '12px', color: '#d1d5db', lineHeight: 1.6,
+              }}>
                 {renderContent(msg.content)}
                 {msg.streaming && <span style={{ display: 'inline-block', width: '8px', height: '12px', background: th.activeBg, marginLeft: '2px', animation: 'blink 0.7s steps(1) infinite' }} />}
                 <style>{`@keyframes blink { 50%{opacity:0} }`}</style>
@@ -425,15 +490,49 @@ export default function AIChatPanel({ widgetType, onApplyCommands, onLabGenerate
                 </div>
               )}
 
-              {/* Definition badge */}
-              {msg.definition && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '4px 10px', background: '#1a1040', border: '1px solid #3b2a80', borderRadius: '6px', fontSize: '10px', color: '#a78bfa' }}>
-                  <Sparkles size={10} />
-                  Lab registered: <strong>{msg.definition.registryKey}</strong>
+              {msg.pendingDefinition && (
+                <div style={{
+                  display: 'flex', flexDirection: 'column', gap: '8px',
+                  padding: '10px 12px', background: '#1a1040', border: '1px solid #5b21b6',
+                  borderRadius: '8px', maxWidth: '100%',
+                }}>
+                  <div style={{ fontSize: '11px', color: '#e9d5ff', lineHeight: 1.5 }}>
+                    Lab definition ready: <strong style={{ color: '#fff' }}>{msg.pendingDefinition.registryKey}</strong>
+                    <br />Choose how to save:
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    <button type="button"
+                      onClick={() => commitGeneratedLab(msg.id, msg.pendingDefinition, 'draft')}
+                      style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #fbbf24', background: 'rgba(251,191,36,0.12)', color: '#fcd34d', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                      Save as draft
+                    </button>
+                    <button type="button"
+                      onClick={() => commitGeneratedLab(msg.id, msg.pendingDefinition, 'published')}
+                      style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #34d399', background: 'rgba(52,211,153,0.15)', color: '#6ee7b7', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                      Publish now
+                    </button>
+                  </div>
                 </div>
               )}
 
-              <span style={{ fontSize: '10px', color: '#374151' }}>{new Date(msg.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+              {msg.definition && !msg.pendingDefinition && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {msg.commitNotice && (
+                    <div style={{ fontSize: '11px', fontWeight: 600, color: '#6ee7b7' }}>
+                      {msg.commitNotice}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '4px 10px', background: '#1a1040', border: '1px solid #3b2a80', borderRadius: '6px', fontSize: '10px', color: '#a78bfa' }}>
+                    <Sparkles size={10} />
+                    Saved ({msg.definition.status === 'published' ? 'published' : 'draft'}):
+                    <strong>{msg.definition.registryKey}</strong>
+                  </div>
+                </div>
+              )}
+
+              <span style={{ fontSize: '10px', color: '#374151' }}>
+                {new Date(msg.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+              </span>
             </div>
           </div>
         ))}
@@ -441,26 +540,30 @@ export default function AIChatPanel({ widgetType, onApplyCommands, onLabGenerate
       </div>
 
       {/* Mode hint */}
-      <div style={{ padding: '6px 14px', background: th.hintBg, fontSize: '10px', color: th.hintText, borderTop: `1px solid ${th.divider}`, display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
-        {mode === 'generate_lab'
-          ? <><Sparkles size={10} /> Generate mode — AI will create a new Lab component (requires confirmation)</>
+      <div style={{
+        padding: '6px 14px', background: th.hintBg,
+        fontSize: '10px', color: th.hintText,
+        borderTop: `1px solid ${th.divider}`,
+        display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0,
+      }}>
+        {effectiveMode === 'generate_lab'
+          ? generateBaseRegistryKey
+            ? <><Sparkles size={10} /> Generate (iterate) — based on selected lab <strong style={{ color: th.hintText }}>{generateBaseRegistryKey}</strong>; then Save as draft or Publish</>
+            : <><Sparkles size={10} /> Generate mode — after generation, choose Save as draft or Publish in the chat</>
           : <><Zap size={10} /> Drive mode — AI will control the current Lab's state</>}
       </div>
 
-      {/* ── Quick Ideas (expandable) ── */}
-      <div style={{ borderTop: `1px solid ${th.divider}`, background: th.quickIdeasBg, flexShrink: 0, transition: 'background 0.25s' }}>
-        {/* Header row */}
-        <button
-          onClick={() => setIdeasExpanded(v => !v)}
-          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px 6px', background: 'transparent', border: 'none', cursor: 'pointer' }}
-        >
+      {/* Quick Ideas */}
+      <div style={{ borderTop: `1px solid ${th.divider}`, background: th.quickIdeasBg, flexShrink: 0 }}>
+        <button onClick={() => setIdeasExpanded(v => !v)}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px 6px', background: 'transparent', border: 'none', cursor: 'pointer' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            {mode === 'drive_lab'
+            {effectiveMode === 'drive_lab'
               ? <Zap size={10} style={{ color: th.ideaIcon }} />
               : <Sparkles size={10} style={{ color: th.ideaIcon }} />}
             <span style={{ fontSize: '10px', fontWeight: 700, color: th.ideaIcon, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Quick Ideas</span>
             <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: '#0f172a', color: '#374151' }}>
-              {(mode === 'drive_lab' ? DRIVE_IDEAS : QUICK_IDEAS).length}
+              {(effectiveMode === 'drive_lab' ? DRIVE_IDEAS : QUICK_IDEAS).length}
             </span>
             {selectedCount > 0 && (
               <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '4px', background: th.selectedBadgeBg, color: th.selectedBadgeText, fontWeight: 700 }}>
@@ -470,25 +573,22 @@ export default function AIChatPanel({ widgetType, onApplyCommands, onLabGenerate
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             {!ideasExpanded && (
-              <span style={{ fontSize: '9px', color: '#374151' }}>+{(mode === 'drive_lab' ? DRIVE_IDEAS : QUICK_IDEAS).length - COLLAPSED_COUNT} more</span>
+              <span style={{ fontSize: '9px', color: '#374151' }}>+{(effectiveMode === 'drive_lab' ? DRIVE_IDEAS : QUICK_IDEAS).length - COLLAPSED_COUNT} more</span>
             )}
             {ideasExpanded
               ? <ChevronUp size={12} style={{ color: '#4b5563' }} />
-              : <ChevronDown size={12} style={{ color: '#374151' }} />
-            }
+              : <ChevronDown size={12} style={{ color: '#374151' }} />}
           </div>
         </button>
 
-        {/* Chips */}
         <AnimatePresence initial={false}>
           <motion.div
-            key={`${mode}-${ideasExpanded ? 'expanded' : 'collapsed'}`}
+            key={`${effectiveMode}-${ideasExpanded ? 'expanded' : 'collapsed'}`}
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2, ease: 'easeInOut' }}
-            style={{ overflow: 'hidden' }}
-          >
+            style={{ overflow: 'hidden' }}>
             <div style={{ padding: '2px 10px 10px', display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
               {visibleIdeas.map(idea => {
                 const isSelected = selectedIdeas.some(i => i.label === idea.label);
@@ -502,10 +602,7 @@ export default function AIChatPanel({ widgetType, onApplyCommands, onLabGenerate
                       color: isSelected ? th.chipSelText : '#6b7280',
                       fontSize: '11px', fontWeight: isSelected ? 700 : 400,
                       transition: 'all 0.12s',
-                    }}
-                    onMouseEnter={e => { if (!isSelected) { (e.currentTarget as HTMLElement).style.background = '#111827'; (e.currentTarget as HTMLElement).style.color = '#9ca3af'; (e.currentTarget as HTMLElement).style.borderColor = '#374151'; } }}
-                    onMouseLeave={e => { if (!isSelected) { (e.currentTarget as HTMLElement).style.background = '#0f172a'; (e.currentTarget as HTMLElement).style.color = '#6b7280'; (e.currentTarget as HTMLElement).style.borderColor = '#1e293b'; } }}
-                  >
+                    }}>
                     <span style={{ fontSize: '12px' }}>{idea.emoji}</span>
                     {idea.label}
                     {isSelected && <X size={9} style={{ marginLeft: '2px', color: th.chipSelText }} />}
@@ -517,21 +614,18 @@ export default function AIChatPanel({ widgetType, onApplyCommands, onLabGenerate
         </AnimatePresence>
       </div>
 
-      {/* ── Input area ── */}
-      <div style={{ padding: '8px 12px 10px', background: th.inputAreaBg, borderTop: `1px solid ${th.divider}`, flexShrink: 0, transition: 'background 0.25s' }}>
+      {/* Input area */}
+      <div style={{ padding: '8px 12px 10px', background: th.inputAreaBg, borderTop: `1px solid ${th.divider}`, flexShrink: 0 }}>
 
-        {/* Selected idea tags row */}
+        {/* Selected idea tags */}
         <AnimatePresence>
           {selectedIdeas.length > 0 && (
             <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.15 }}
-              style={{ overflow: 'hidden', marginBottom: '6px' }}
-            >
+              initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.15 }}
+              style={{ overflow: 'hidden', marginBottom: '6px' }}>
               <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px', padding: '6px 8px', borderRadius: '8px', background: th.selectedRowBg, border: `1px solid ${th.selectedRowBdr}` }}>
-                {mode === 'drive_lab'
+                {effectiveMode === 'drive_lab'
                   ? <Zap size={9} style={{ color: th.ideaIcon, flexShrink: 0 }} />
                   : <Sparkles size={9} style={{ color: th.ideaIcon, flexShrink: 0 }} />}
                 {selectedIdeas.map(idea => (
@@ -556,7 +650,7 @@ export default function AIChatPanel({ widgetType, onApplyCommands, onLabGenerate
           )}
         </AnimatePresence>
 
-        {/* Textarea + arrow send button */}
+        {/* Textarea + send */}
         <div style={{ position: 'relative' }}>
           <textarea
             ref={textareaRef}
@@ -566,7 +660,7 @@ export default function AIChatPanel({ widgetType, onApplyCommands, onLabGenerate
             placeholder={
               selectedIdeas.length > 0
                 ? `Add details… (or send ${selectedIdeas.length} idea${selectedIdeas.length > 1 ? 's' : ''} directly)`
-                : mode === 'generate_lab' ? 'Describe the lab you want to create…' : 'Tell the lab what to do…'
+                : effectiveMode === 'generate_lab' ? 'Describe the lab you want to create…' : 'Tell the lab what to do…'
             }
             rows={3}
             style={{
@@ -574,17 +668,14 @@ export default function AIChatPanel({ widgetType, onApplyCommands, onLabGenerate
               background: '#0f172a', border: `1px solid ${hasSelected ? th.chipSelBdr + '88' : '#1e293b'}`,
               borderRadius: '10px', padding: '9px 44px 9px 11px',
               fontSize: '12px', color: '#e2e8f0', resize: 'none', outline: 'none',
-              lineHeight: 1.5, fontFamily: 'inherit', transition: 'border-color 0.15s',
+              lineHeight: 1.5, fontFamily: 'inherit',
             }}
             onFocus={e => { e.currentTarget.style.borderColor = th.chipSelBdr; }}
             onBlur={e => { e.currentTarget.style.borderColor = hasSelected ? th.chipSelBdr + '88' : '#1e293b'; }}
           />
-
-          {/* Arrow send button — positioned inside textarea bottom-right */}
           <button
             onClick={handleSend}
             disabled={!hasSelected || loading}
-            title={loading ? 'Sending…' : hasSelected ? 'Send' : 'Type or select an idea first'}
             style={{
               position: 'absolute', right: '8px', bottom: '8px',
               width: '28px', height: '28px', borderRadius: '8px', border: 'none',
@@ -593,27 +684,23 @@ export default function AIChatPanel({ widgetType, onApplyCommands, onLabGenerate
               cursor: hasSelected && !loading ? 'pointer' : 'not-allowed',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all 0.15s', flexShrink: 0,
-              boxShadow: hasSelected && !loading ? `0 2px 8px ${th.chipSelBg}88` : 'none',
-            }}
-          >
+            }}>
             {loading
               ? <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} />
-              : <ArrowUp size={13} />
-            }
+              : <ArrowUp size={13} />}
           </button>
         </div>
 
-        {/* Keyboard hint */}
         <div style={{ marginTop: '4px', fontSize: '9px', color: '#1f2937', textAlign: 'right' }}>
           Enter to send · Shift+Enter for new line
         </div>
       </div>
 
-      {/* Generate Lab confirmation modal */}
+      {/* Generate confirm modal */}
       <AnimatePresence>
         {showGenModal && (
           <GenerateLabModalInline
-            onConfirm={() => { setShowGenModal(false); sendMessage(pendingInput, true); }}
+            onConfirm={handleConfirmGenerate}
             onCancel={() => { setShowGenModal(false); setPendingInput(''); }}
           />
         )}
@@ -622,19 +709,29 @@ export default function AIChatPanel({ widgetType, onApplyCommands, onLabGenerate
   );
 }
 
-// ── Inline confirmation (avoids portal issues inside panels) ──────────────────
+// ── Public export: thin wrapper that provides ChatContext-backed panel ─────────
+export default function AIChatPanel(props: AIChatPanelProps) {
+  return <AIChatPanelInner {...props} />;
+}
+
+// ── Re-export types for consumers ─────────────────────────────────────────────
+export type { LabGeneratedOptions };
+
+// ── Inline confirmation modal ──────────────────────────────────────────────────
 function GenerateLabModalInline({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', borderRadius: '12px' }}>
-      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
         style={{ background: '#0f1117', border: '1px solid #1e293b', borderRadius: '12px', padding: '20px', maxWidth: '340px', width: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
           <Sparkles size={16} style={{ color: '#818cf8' }} />
           <span style={{ fontSize: '14px', fontWeight: 700, color: '#e2e8f0' }}>Generate New Lab?</span>
         </div>
         <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '14px', lineHeight: 1.6 }}>
-          This will call the AI API to create a new Lab component definition. The result will be saved as a draft and registered locally. <strong style={{ color: '#d1d5db' }}>Quota will be consumed.</strong>
+          The AI will build an interactive lab definition. When it finishes, pick <strong style={{ color: '#d1d5db' }}>Save as draft</strong> or <strong style={{ color: '#d1d5db' }}>Publish now</strong> in the chat to add it to your catalog.
         </p>
         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
           <button onClick={onCancel} style={{ padding: '7px 16px', border: '1px solid #1e293b', borderRadius: '7px', background: 'transparent', color: '#6b7280', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>

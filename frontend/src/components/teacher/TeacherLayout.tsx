@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router';
 import {
   ClipboardList, BookOpen, LogOut, Settings,
   ChevronDown, PanelLeftClose, PanelLeftOpen, FlaskConical,
-  Wand2, FileText, CheckSquare, ScrollText,
+  Wand2, FileText, CheckSquare, ScrollText, FileJson,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
@@ -27,6 +27,11 @@ const ASSESSMENT_SUB_ITEMS: SubNavItem[] = [
   { id: 'library',   icon: BookOpen,     label: 'Question Bank',    path: '/teacher/assessment/library'   },
   { id: 'papers',    icon: FileText,     label: 'Exam Papers',      path: '/teacher/assessment/papers'    },
   { id: 'grading',   icon: CheckSquare,  label: 'Grading',          path: '/teacher/assessment/grading'   },
+];
+
+const LABS_SUB_ITEMS: SubNavItem[] = [
+  { id: 'catalog', icon: FlaskConical, label: 'Lab Catalog', path: '/teacher/labs'        },
+  { id: 'drafts',  icon: FileJson,     label: 'Drafts',    path: '/teacher/labs/drafts' },
 ];
 
 export default function TeacherLayout({ children }: { children: ReactNode }) {
@@ -59,7 +64,12 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
       if (found) setActiveSub(found.id);
       return;
     }
-    if (p.startsWith('/teacher/labs')) { setActiveMenu('labs'); return; }
+    if (p.startsWith('/teacher/labs')) {
+      setActiveMenu('labs');
+      if (p.includes('/drafts')) setActiveSub('drafts');
+      else setActiveSub('catalog');
+      return;
+    }
     if (p.startsWith('/teacher/lessons') || p.startsWith('/teacher/lesson-')) { setActiveMenu('lessons'); return; }
     setActiveMenu('lessons');
   }, [location.pathname]);
@@ -131,6 +141,7 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
                   const Icon = item.icon;
                   const isActive = activeMenu === item.id;
                   const isAssessment = item.id === 'assessment';
+                  const isLabs = item.id === 'labs';
                   return (
                     <div key={item.id}>
                       {/* Main nav item */}
@@ -144,7 +155,7 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
                           padding: '7px 10px', borderRadius: '7px', border: 'none', cursor: 'pointer',
                           marginBottom: '2px', fontSize: '15px',
                           fontWeight: isActive ? 600 : 400,
-                          background: isActive && !isAssessment ? '#f3f4f6' : isActive && isAssessment ? '#f3f4f6' : 'transparent',
+                          background: isActive && !isLabs ? '#f3f4f6' : 'transparent',
                           color: isActive ? '#0f0f23' : '#6b7280',
                           transition: 'background 0.15s, color 0.15s', textAlign: 'left',
                         }}
@@ -154,6 +165,53 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
                         <Icon size={16} style={{ flexShrink: 0, color: isActive ? '#374151' : '#9ca3af' }} />
                         <span>{item.label}</span>
                       </button>
+
+                      {/* Labs sub-nav */}
+                      {isLabs && (
+                        <AnimatePresence initial={false}>
+                          {isActive && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.18, ease: 'easeInOut' }}
+                              style={{ overflow: 'hidden', marginBottom: '2px' }}
+                            >
+                              <div style={{ display: 'flex' }}>
+                                <div style={{ width: '18px', flexShrink: 0, display: 'flex', justifyContent: 'center', paddingLeft: '10px' }}>
+                                  <div style={{ width: '1px', background: '#e8eaed', borderRadius: '1px' }} />
+                                </div>
+                                <div style={{ flex: 1, padding: '2px 0 4px' }}>
+                                  {LABS_SUB_ITEMS.map(sub => {
+                                    const SubIcon = sub.icon;
+                                    const isSubActive = activeSub === sub.id && activeMenu === 'labs';
+                                    return (
+                                      <button
+                                        key={sub.id}
+                                        onClick={() => { setActiveSub(sub.id); navigate(sub.path); }}
+                                        style={{
+                                          width: '100%', display: 'flex', alignItems: 'center', gap: '7px',
+                                          padding: '6px 10px', borderRadius: '7px', border: 'none', cursor: 'pointer',
+                                          marginBottom: '1px', fontSize: '13px',
+                                          fontWeight: isSubActive ? 600 : 400,
+                                          background: isSubActive ? '#eff6ff' : 'transparent',
+                                          color: isSubActive ? '#3b5bdb' : '#6b7280',
+                                          transition: 'background 0.12s, color 0.12s', textAlign: 'left',
+                                        }}
+                                        onMouseEnter={e => { if (!isSubActive) { (e.currentTarget as HTMLElement).style.background = '#f9fafb'; (e.currentTarget as HTMLElement).style.color = '#374151'; } }}
+                                        onMouseLeave={e => { if (!isSubActive) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#6b7280'; } }}
+                                      >
+                                        <SubIcon size={13} style={{ flexShrink: 0, color: isSubActive ? '#3b5bdb' : '#9ca3af' }} />
+                                        <span>{sub.label}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      )}
 
                       {/* Assessment sub-nav — slides open when active */}
                       {isAssessment && (

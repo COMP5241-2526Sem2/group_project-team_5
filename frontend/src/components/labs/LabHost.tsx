@@ -6,6 +6,7 @@
 import { lazy, Suspense, useState, useCallback, useTransition, useEffect } from 'react';
 import type { LabWidgetProps, LabState } from './types';
 import { WidgetRegistry, MOCK_DYNAMIC_DEFS } from './LabRegistry';
+import { normalizeDriveCommandsForLabHost } from './normalizeDriveCommands';
 
 // ── Lazy-load each lab — NO static imports from these files ──────────────────
 const FunctionGraph  = lazy(() => import('./mathLab/FunctionGraph'));
@@ -99,9 +100,16 @@ interface LabHostProps {
   initialState?: LabState;
   readonly?: boolean;
   height?: number;
+  /** AI commands from ChatContext — applied automatically when present */
+  pendingCommands?: Array<{ type: string; payload?: Record<string, unknown> }>;
+  /** Called after applying pending commands so ChatContext can clear them */
+  onConsumeCommands?: () => void;
 }
 
-export default function LabHost({ widgetType, initialState, readonly, height }: LabHostProps) {
+export default function LabHost({
+  widgetType, initialState, readonly, height,
+  pendingCommands, onConsumeCommands,
+}: LabHostProps) {
   // Defer widgetType transitions so lazy-load suspense never fires synchronously
   const [activeType, setActiveType] = useState(widgetType);
   const [isPending, startTransition] = useTransition();
@@ -126,6 +134,37 @@ export default function LabHost({ widgetType, initialState, readonly, height }: 
 
   const baseState = initialState ?? staticMeta?.defaultState ?? dynamicDef?.initialState ?? {};
   const [state, setState] = useState<LabState>(baseState);
+
+  // Apply AI commands from ChatContext（含 LLM 非标准 JSON 的兜底规范化）
+  useEffect(() => {
+    if (!pendingCommands?.length || readonly) return;
+    const normalized = normalizeDriveCommandsForLabHost(
+      pendingCommands as unknown[],
+      Object.keys(state),
+    );
+    if (normalized.length === 0) {
+      onConsumeCommands?.();
+      return;
+    }
+    setState(prev => {
+      let next: LabState = { ...prev };
+      for (const cmd of normalized) {
+        if (cmd.type === 'RESET') {
+          next = { ...baseState };
+        } else if (cmd.type === 'SET_STATE' && cmd.payload) {
+          next = { ...next, ...cmd.payload };
+        } else if (cmd.type === 'SET_PARAM' && cmd.payload) {
+          const { key, value } = cmd.payload;
+          if (key && value !== undefined) {
+            next = { ...next, [key]: value };
+          }
+        }
+      }
+      return next;
+    });
+    onConsumeCommands?.();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingCommands]);
 
   const onStateChange = useCallback((patch: Partial<LabState>) => {
     if (readonly) return;

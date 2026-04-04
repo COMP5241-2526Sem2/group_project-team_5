@@ -7,15 +7,25 @@ class Base(DeclarativeBase):
 
 from app.models.assessment import Exercise, ExerciseAttempt, ExerciseAttemptAnswer
 from app.models.assessment import Paper, PaperQuestion, PaperQuestionOption, PaperSection
+from app.models.lab import (
+    LabChatMessage,
+    LabDefinition,
+    LabGenerationSession,
+)
 
 
 __all__ = [
-	"Base",
-	"Paper",
-	"PaperSection",
-	"PaperQuestion",
-	"PaperQuestionOption",
-	"Exercise",
-	"ExerciseAttempt",
-	"ExerciseAttemptAnswer",
+    "Base",
+    # assessment
+    "Paper",
+    "PaperSection",
+    "PaperQuestion",
+    "PaperQuestionOption",
+    "Exercise",
+    "ExerciseAttempt",
+    "ExerciseAttemptAnswer",
+    # lab
+    "LabDefinition",
+    "LabGenerationSession",
+    "LabChatMessage",
 ]

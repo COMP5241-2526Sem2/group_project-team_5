@@ -56,10 +56,13 @@ export interface LabComponentDefinition {
   title: string;
   description?: string;
   rendererProfile: RendererProfile;
+  /** 显式指定 DynamicLabHost 使用的内置可视化模板（如 ph_slider、snells_law），便于上传 JSON 稳定渲染 */
+  visualProfile?: string;
   initialState: LabState;
   reducerSpec?: {
     allowedCommands: LabCommandType[];
     maxNodes?: number;
+    maxConnections?: number;
   };
   metadata?: {
     grade?: string;
@@ -143,7 +146,12 @@ export interface ChatMessage {
   role: ChatRole;
   content: string;
   commands?: LabCommand[];
+  /** AI 已生成、等待用户选择草稿/发布时存在 */
+  pendingDefinition?: LabComponentDefinition;
+  /** 用户确认并入目录后的定义 */
   definition?: LabComponentDefinition;
+  /** 草稿保存 / 发布后的中文提示（Save 按钮已隐藏后展示） */
+  commitNotice?: string;
   timestamp: number;
   streaming?: boolean;
 }
