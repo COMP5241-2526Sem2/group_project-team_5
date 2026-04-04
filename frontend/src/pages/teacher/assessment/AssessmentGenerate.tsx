@@ -1,11 +1,11 @@
-import { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Upload, FileText, AlignLeft, BookOpen, ScanLine, Layers,
   X, Check, ChevronRight, ChevronLeft,
   Sparkles, Loader2, CheckCircle2, AlertCircle,
   Plus, Minus, Image, ImageOff, RefreshCw,
   BarChart2, Camera, Shapes, FlaskConical,
-  Search, Library, Scan, FolderOpen, FileImage, Trash2,
+  Search, Library, Trash2,
   PenLine, Copy,
 } from 'lucide-react';
 import { CustomSelect, SelectField } from '../../../components/teacher/CustomSelect';
@@ -14,13 +14,15 @@ import { CustomSelect, SelectField } from '../../../components/teacher/CustomSel
 type SourceTab = 'upload' | 'text' | 'textbook' | 'exam' | 'questions';
 type IllustStyle = 'auto' | 'diagram' | 'chart' | 'photo' | 'scientific';
 type QuestionInputMode = 'paste' | 'bank';
-type ExamInputMode = 'scan' | 'upload';
 type ExamGenMode = 'error-questions' | 'simulation';
 
 interface QTypeCfg {
-  label: string; desc: string; emoji: string;
+  label: string; desc: string;
   key: string; count: number; active: boolean;
 }
+
+/** Enter Text：至少字数与 canProceedStep1、占位符一致 */
+const TEXT_SOURCE_MIN_CHARS = 5;
 
 interface GeneratedQ {
   id: string; type: string; prompt: string;
@@ -296,35 +298,6 @@ const BANK_SUBJECTS = ['All Subjects', 'Physics', 'Biology', 'Math', 'Chemistry'
 const BANK_TYPES    = ['All Types', 'MCQ', 'True/False', 'Fill-blank', 'Short Answer'];
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
-function StepDot({ n, label, active, done, onClick }: { n: number; label: string; active: boolean; done: boolean; onClick?: () => void }) {
-  return (
-    <div
-      onClick={onClick}
-      style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: done ? 'pointer' : 'default', borderRadius: '8px', padding: '4px 8px 4px 2px', margin: '-4px -8px -4px -2px', transition: 'background 0.13s' }}
-      onMouseEnter={e => { if (done) (e.currentTarget as HTMLElement).style.background = '#eef2ff'; }}
-      onMouseLeave={e => { if (done) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-    >
-      <div style={{
-        width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: done ? '#3b5bdb' : active ? '#3b5bdb' : '#e8eaed',
-        color: done || active ? '#fff' : '#9ca3af',
-        fontSize: '12px', fontWeight: 700, transition: 'all 0.2s',
-      }}>
-        {done ? <Check size={13} /> : n}
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-        <span style={{ fontSize: '13px', fontWeight: active ? 600 : 400, color: active ? '#0f0f23' : done ? '#374151' : '#9ca3af' }}>
-          {label}
-        </span>
-        {done && (
-          <span style={{ fontSize: '10px', color: '#6366f1', letterSpacing: '0.01em' }}>← back to edit</span>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // Toggle switch
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -370,7 +343,9 @@ function IllustPlaceholder({ qIndex, style: styleName }: { qIndex: number; style
         padding: '7px 12px', background: '#fafafa',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
-        <span style={{ fontSize: '11px', color: '#9ca3af' }}>✨ AI Illustration · {meta.label}</span>
+        <span style={{ fontSize: '11px', color: '#9ca3af', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+          <Sparkles size={11} style={{ opacity: 0.65 }} /> AI Illustration · {meta.label}
+        </span>
         <button style={{ fontSize: '11px', color: '#3b5bdb', border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
           <RefreshCw size={11} /> Regenerate
         </button>
@@ -391,19 +366,18 @@ export default function AssessmentGenerate() {
   const [isDragging, setIsDragging] = useState(false);
   const [deriveMode, setDeriveMode] = useState<'variation' | 'extension' | 'contrast'>('variation');
   const [qInputMode, setQInputMode] = useState<QuestionInputMode>('paste');
-  const [examInputMode, setExamInputMode] = useState<ExamInputMode>('upload');
   const [examGenMode, setExamGenMode] = useState<ExamGenMode>('error-questions');
   const [examMatchMode, setExamMatchMode] = useState<'type' | 'knowledge'>('type');
   const [examDifficulty, setExamDifficulty] = useState<'basic' | 'solid' | 'advanced'>('solid');
   const [examFiles, setExamFiles] = useState<{ name: string; size: number; url: string }[]>([]);
   const [examDragging, setExamDragging] = useState(false);
-  const [cameraActive, setCameraActive] = useState(false);
   const examFileRef = useRef<HTMLInputElement>(null);
   const [bankSearch, setBankSearch] = useState('');
   const [bankSubject, setBankSubject] = useState('All Subjects');
   const [bankType, setBankType] = useState('All Types');
   const [selectedBankIds, setSelectedBankIds] = useState<Set<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
+  const mainScrollRef = useRef<HTMLDivElement>(null);
 
   // Textbook tab state
   const [tbPublisher, setTbPublisher] = useState('');
@@ -448,16 +422,13 @@ export default function AssessmentGenerate() {
   };
 
   // Step 2 state
-  const [grade, setGrade] = useState('');
-  const [subject, setSubject] = useState('');
-  const [semester, setSemester] = useState<'Vol.1' | 'Vol.2'>('Vol.1');
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [qTypes, setQTypes] = useState<QTypeCfg[]>([
-    { label: 'Multiple Choice (MCQ)', desc: 'Choose the best answer from a list of options.', emoji: 'ABCDE', key: 'mcq',   count: 5, active: true  },
-    { label: 'True / False',          desc: 'Determine if the statement is true or false.',   emoji: 'TF',    key: 'tf',    count: 2, active: true  },
-    { label: 'Fill in the Blank',     desc: 'Complete the sentence with the correct word.',   emoji: '___',   key: 'fill',  count: 2, active: true  },
-    { label: 'Short Answer',          desc: 'Provide a concise answer to the question.',      emoji: '✍️',   key: 'sa',    count: 1, active: true  },
-    { label: 'Essay',                 desc: 'Write a detailed response to the question.',     emoji: '📝',   key: 'essay', count: 0, active: false },
+    { label: 'Multiple Choice (MCQ)', desc: 'Choose the best answer from a list of options.', key: 'mcq',   count: 5, active: true  },
+    { label: 'True / False',          desc: 'Determine if the statement is true or false.',   key: 'tf',    count: 2, active: true  },
+    { label: 'Fill in the Blank',     desc: 'Complete the sentence with the correct word.',   key: 'fill',  count: 2, active: true  },
+    { label: 'Short Answer',          desc: 'Provide a concise answer to the question.',      key: 'sa',    count: 1, active: true  },
+    { label: 'Essay',                 desc: 'Write a detailed response to the question.',     key: 'essay', count: 0, active: false },
   ]);
 
   // Illustration settings
@@ -505,16 +476,20 @@ export default function AssessmentGenerate() {
 
   function canProceedStep1() {
     if (sourceTab === 'upload') return !!uploadedFile;
-    if (sourceTab === 'text') return textInput.trim().length > 40;
-    if (sourceTab === 'exam') {
-      if (examInputMode === 'upload') return examFiles.length > 0;
-      return examFiles.length > 0; // camera captured
-    }
+    // 与下方占位「至少 N 字」一致；中英文都按字符数计
+    if (sourceTab === 'text') return textInput.trim().length >= TEXT_SOURCE_MIN_CHARS;
+    if (sourceTab === 'exam') return examFiles.length > 0;
     if (sourceTab === 'questions') {
       if (qInputMode === 'paste') return pastedQuestions.trim().length > 30;
       return selectedBankIds.size > 0;
     }
     return true;
+  }
+
+  function canProceedStep2() {
+    if (sourceTab === 'exam') return true;
+    // Grade/subject 仅在 Textbook 流程的 Step 1 中选择；上传/文本等来源 Step 2 不要求填写
+    return totalQ() > 0;
   }
 
   async function handleGenerate() {
@@ -588,6 +563,13 @@ export default function AssessmentGenerate() {
     return true;
   });
 
+  useEffect(() => {
+    // Keep each step entry anchored at the top of the right pane.
+    if (mainScrollRef.current) {
+      mainScrollRef.current.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, [step]);
+
   const DERIVE_MODES = [
     { id: 'variation',  label: 'Variation',  desc: 'Similar questions with different parameters' },
     { id: 'extension',  label: 'Extension',  desc: 'Deeper / follow-up questions on the same topic' },
@@ -595,146 +577,72 @@ export default function AssessmentGenerate() {
   ] as const;
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 48px)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 48px)', overflow: 'hidden', background: '#fafafa' }}>
 
-      {/* Left: Steps panel */}
-      <div style={{ width: '244px', borderRight: '1px solid #e8eaed', padding: '28px 16px 28px 20px', flexShrink: 0, background: '#fafafa', display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto' }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '16px' }}>Generation Wizard</div>
-        {(sourceTab === 'questions' ? [
-          { n: 1, label: 'Choose Source',     matchStep: 1, total: 2 },
-          { n: 2, label: 'Generate & Review', matchStep: 3, total: 2 },
-        ] : [
-          { n: 1, label: 'Choose Source',       matchStep: 1, total: 3 },
-          { n: 2, label: 'Configure Questions', matchStep: 2, total: 3 },
-          { n: 3, label: 'Generate & Review',   matchStep: 3, total: 3 },
-        ]).map(s => (
-          <div key={s.n}>
-            <StepDot
-              n={s.n}
-              label={s.label}
-              active={step === s.matchStep}
-              done={step > s.matchStep}
-              onClick={step > s.matchStep ? () => setStep(s.matchStep) : undefined}
-            />
-            {s.n < s.total && (
-              <div style={{ width: '1px', height: '20px', background: step > s.matchStep ? '#3b5bdb' : '#e8eaed', margin: '4px 0 4px 14px' }} />
-            )}
+      {/* Top: Generation Wizard — flat horizontal stepper */}
+      <div style={{ borderBottom: '1px solid #e5e7eb', background: '#fff', padding: '12px 20px 10px' }}>
+        <div style={{ width: '100%', maxWidth: '980px', margin: '0 auto', overflowX: 'auto' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '10px' }}>Generation Wizard</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'nowrap' }}>
+            {(sourceTab === 'questions' ? [
+              { n: 1, label: 'Choose Source',     matchStep: 1, total: 2 },
+              { n: 2, label: 'Generate & Review', matchStep: 3, total: 2 },
+            ] : [
+              { n: 1, label: 'Choose Source',       matchStep: 1, total: 3 },
+              { n: 2, label: 'Configure Questions', matchStep: 2, total: 3 },
+              { n: 3, label: 'Generate & Review',   matchStep: 3, total: 3 },
+            ]).map((s, idx, arr) => (
+              <React.Fragment key={s.n}>
+                <button
+                  type="button"
+                  onClick={step > s.matchStep ? () => setStep(s.matchStep) : undefined}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    padding: '6px 4px 8px',
+                    border: 'none',
+                    background: 'transparent',
+                    borderBottom: step === s.matchStep ? '2px solid #111827' : '2px solid transparent',
+                    color: step === s.matchStep ? '#111827' : step > s.matchStep ? '#4b5563' : '#9ca3af',
+                    cursor: step > s.matchStep ? 'pointer' : 'default',
+                    fontSize: '12px', fontWeight: step === s.matchStep ? 600 : 500,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <span style={{
+                    width: '20px', height: '20px', borderRadius: '50%',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    border: `1px solid ${step === s.matchStep ? '#111827' : step > s.matchStep ? '#d1d5db' : '#e5e7eb'}`,
+                    background: step > s.matchStep ? '#f9fafb' : '#fff',
+                    color: step === s.matchStep ? '#111827' : step > s.matchStep ? '#374151' : '#9ca3af',
+                    fontSize: '10px', fontWeight: 700,
+                  }}>
+                    {step > s.matchStep ? <Check size={11} strokeWidth={2.5} /> : s.n}
+                  </span>
+                  {s.label}
+                </button>
+                {idx < arr.length - 1 && (
+                  <ChevronRight size={14} style={{ color: '#d1d5db', flexShrink: 0 }} aria-hidden />
+                )}
+              </React.Fragment>
+            ))}
           </div>
-        ))}
-
-        {/* ── Step 1 Summary Card (shown on step 2 & 3) ── */}
-        {step >= 2 && (() => {
-          const tabMeta = SOURCE_TABS.find(t => t.id === sourceTab);
-          const TabIcon = tabMeta?.icon ?? FileText;
-          const rows: { label: string; value: string; color?: string }[] = [];
-          if (sourceTab === 'upload') {
-            rows.push({ label: 'Source', value: 'Upload Doc' });
-            if (uploadedFile) {
-              rows.push({ label: 'File', value: uploadedFile.name.length > 20 ? uploadedFile.name.slice(0, 18) + '…' : uploadedFile.name });
-              rows.push({ label: 'Size', value: fmtSize(uploadedFile.size) });
-            }
-          } else if (sourceTab === 'text') {
-            rows.push({ label: 'Source', value: 'Enter Text' });
-            rows.push({ label: 'Length', value: `${textInput.length} chars` });
-            if (textInput.trim()) rows.push({ label: 'Preview', value: textInput.trim().slice(0, 38) + (textInput.trim().length > 38 ? '…' : '') });
-          } else if (sourceTab === 'textbook') {
-            rows.push({ label: 'Source', value: 'Textbook' });
-            if (tbSubject)   rows.push({ label: 'Subject',   value: tbSubject });
-            if (tbGrade)     rows.push({ label: 'Grade',     value: tbGrade });
-            if (tbPublisher) rows.push({ label: 'Publisher', value: PUBLISHER_SHORT[tbPublisher] ?? tbPublisher.split(' ')[0] });
-            if (tbSemester)  rows.push({ label: 'Semester',  value: tbSemester.split(' ')[0] });
-            if (selectedSections.size > 0) {
-              const chapCount = new Set(Array.from(selectedSections).map(k => k.split('::')[0])).size;
-              rows.push({ label: 'Sections', value: `${selectedSections.size} selected (${chapCount} ch.)`, color: '#3b5bdb' });
-            }
-          } else if (sourceTab === 'exam') {
-            rows.push({ label: 'Source', value: 'Exam Paper' });
-            rows.push({ label: 'Mode',  value: examGenMode === 'error-questions' ? 'Error-Based' : 'Simulation' });
-            rows.push({ label: 'Input', value: examInputMode === 'scan' ? 'Camera Scan' : 'Upload File' });
-            if (examFiles.length > 0) rows.push({ label: 'Files', value: `${examFiles.length} file${examFiles.length > 1 ? 's' : ''}`, color: '#3b5bdb' });
-          } else if (sourceTab === 'questions') {
-            rows.push({ label: 'Source', value: 'From Questions' });
-            rows.push({ label: 'Mode',  value: DERIVE_MODES.find(d => d.id === deriveMode)?.label ?? deriveMode });
-            if (qInputMode === 'paste') {
-              rows.push({ label: 'Input', value: 'Pasted text' });
-              if (pastedQuestions.trim()) rows.push({ label: 'Length', value: `${pastedQuestions.length} chars` });
-            } else {
-              rows.push({ label: 'Input', value: 'Question Bank' });
-              if (selectedBankIds.size > 0) rows.push({ label: 'Selected', value: `${selectedBankIds.size} question${selectedBankIds.size !== 1 ? 's' : ''}`, color: '#7c3aed' });
-            }
-          }
-          return (
-            <div style={{ marginTop: '20px', background: '#fff', border: '1px solid #e8eaed', borderRadius: '12px', overflow: 'hidden' }}>
-              <div style={{ padding: '10px 12px', background: '#f0f4ff', borderBottom: '1px solid #dbe4ff', display: 'flex', alignItems: 'center', gap: '7px' }}>
-                <div style={{ width: '22px', height: '22px', borderRadius: '6px', background: '#3b5bdb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <TabIcon size={11} style={{ color: '#fff' }} />
-                </div>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#3b5bdb' }}>Step 1 · Content Source</span>
-              </div>
-              <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {rows.map((r, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '10px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em', minWidth: '54px', paddingTop: '1px', flexShrink: 0 }}>{r.label}</span>
-                    <span style={{ fontSize: '11px', color: r.color ?? '#374151', lineHeight: 1.45, wordBreak: 'break-all' }}>{r.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* ── Step 2 Summary Card (shown on step 3) ── */}
-        {step === 3 && (() => {
-          const rows: { label: string; value: string; color?: string }[] = [];
-          if (sourceTab === 'exam') {
-            rows.push({ label: 'Match',      value: examMatchMode === 'type' ? '题型一致' : '知识点一致' });
-            rows.push({ label: 'Difficulty', value: examDifficulty === 'basic' ? '基础' : examDifficulty === 'solid' ? '巩固' : '拔高' });
-          } else {
-            if (sourceTab !== 'textbook') {
-              if (grade)   rows.push({ label: 'Grade',   value: grade });
-              if (subject) rows.push({ label: 'Subject', value: subject });
-              rows.push({ label: 'Semester', value: semester });
-            }
-            rows.push({ label: 'Difficulty', value: difficulty.charAt(0).toUpperCase() + difficulty.slice(1) });
-            rows.push({ label: 'Total Qs',   value: `${totalQ()} questions`, color: '#3b5bdb' });
-            const activeTypes = qTypes.filter(t => t.active);
-            if (activeTypes.length > 0) rows.push({ label: 'Types', value: activeTypes.map(t => `${t.key.toUpperCase()}×${t.count}`).join(' · ') });
-            if (illustEnabled) rows.push({ label: 'Illust.', value: `${ILLUST_STYLES.find(s => s.id === illustStyle)?.label ?? 'Auto'} · ${illustTypes.size} type${illustTypes.size !== 1 ? 's' : ''}`, color: '#7c3aed' });
-          }
-          return (
-            <div style={{ background: '#fff', border: '1px solid #e8eaed', borderRadius: '12px', overflow: 'hidden' }}>
-              <div style={{ padding: '10px 12px', background: '#f5f3ff', borderBottom: '1px solid #ede9fe', display: 'flex', alignItems: 'center', gap: '7px' }}>
-                <div style={{ width: '22px', height: '22px', borderRadius: '6px', background: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Sparkles size={11} style={{ color: '#fff' }} />
-                </div>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#7c3aed' }}>Step 2 · Configuration</span>
-              </div>
-              <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {rows.map((r, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '10px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em', minWidth: '54px', paddingTop: '1px', flexShrink: 0 }}>{r.label}</span>
-                    <span style={{ fontSize: '11px', color: r.color ?? '#374151', lineHeight: 1.45, wordBreak: 'break-all' }}>{r.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
+        </div>
       </div>
 
-      {/* Right: Main content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
+      {/* Main content */}
+      <div ref={mainScrollRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '16px 20px', minWidth: 0, display: 'flex', justifyContent: 'center' }}>
+        <div style={{ width: '100%', maxWidth: '680px' }}>
 
         {/* ── STEP 1 ── */}
         {step === 1 && (
-          <div style={{ maxWidth: '720px' }}>
+          <div>
             <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f0f23', margin: '0 0 4px' }}>Choose Content Source</h2>
             <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '24px' }}>
               Select how you'd like to provide content for AI question generation.
             </p>
 
             {/* Source tabs — single row */}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
               {SOURCE_TABS.map(tab => {
                 const Icon = tab.icon;
                 const isActive = sourceTab === tab.id;
@@ -742,11 +650,11 @@ export default function AssessmentGenerate() {
                   <button key={tab.id} onClick={() => setSourceTab(tab.id)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '6px',
-                      padding: '9px 14px', borderRadius: '10px', cursor: 'pointer',
-                      border: `1.5px solid ${isActive ? '#3b5bdb' : '#e8eaed'}`,
-                      background: isActive ? '#eff6ff' : '#fff',
-                      color: isActive ? '#3b5bdb' : '#374151',
-                      fontSize: '13px', fontWeight: isActive ? 600 : 400,
+                      padding: '7px 10px', borderRadius: '6px', cursor: 'pointer',
+                      border: `1px solid ${isActive ? '#d1d5db' : '#e5e7eb'}`,
+                      background: '#fff',
+                      color: isActive ? '#111827' : '#6b7280',
+                      fontSize: '12px', fontWeight: isActive ? 600 : 500,
                       transition: 'all 0.12s', whiteSpace: 'nowrap', flexShrink: 0,
                     }}>
                     <Icon size={14} />
@@ -772,10 +680,10 @@ export default function AssessmentGenerate() {
                     onDrop={handleDrop}
                     onClick={() => fileRef.current?.click()}
                     style={{
-                      border: `2px dashed ${isDragging ? '#3b5bdb' : '#d1d5db'}`,
-                      borderRadius: '16px', padding: '56px 40px',
+                      border: `1px dashed ${isDragging ? '#9ca3af' : '#d1d5db'}`,
+                      borderRadius: '12px', padding: '36px 24px',
                       textAlign: 'center', cursor: 'pointer',
-                      background: isDragging ? '#eff6ff' : '#fafafa',
+                      background: isDragging ? '#f9fafb' : '#fff',
                       transition: 'all 0.15s',
                     }}>
                     <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: isDragging ? '#3b5bdb' : '#e8eaed', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', transition: 'all 0.15s' }}>
@@ -808,8 +716,8 @@ export default function AssessmentGenerate() {
                 <div style={{ display: 'flex', gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
                   {['Ch.3 Photosynthesis.pdf', "Newton's Laws.docx", 'Quadratic Functions.pdf'].map(f => (
                     <button key={f} onClick={() => setUploadedFile({ name: f, size: Math.floor(Math.random() * 500000 + 50000) })}
-                      style={{ padding: '5px 12px', borderRadius: '20px', border: '1px solid #e8eaed', background: '#fff', fontSize: '12px', color: '#374151', cursor: 'pointer' }}>
-                      📄 {f}
+                      style={{ padding: '5px 12px', borderRadius: '20px', border: '1px solid #e8eaed', background: '#fff', fontSize: '12px', color: '#374151', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      <FileText size={13} style={{ color: '#9ca3af', flexShrink: 0 }} />{f}
                     </button>
                   ))}
                 </div>
@@ -821,14 +729,17 @@ export default function AssessmentGenerate() {
               <div>
                 <textarea
                   value={textInput} onChange={e => setTextInput(e.target.value)}
-                  placeholder="Paste your text content here — lecture notes, article, textbook excerpt, etc. (min. 50 characters)..."
+                  placeholder={`Paste your text content here — lecture notes, article, textbook excerpt, etc. (at least ${TEXT_SOURCE_MIN_CHARS} characters)...`}
                   rows={12}
                   style={{ width: '100%', boxSizing: 'border-box', padding: '14px 16px', border: '1.5px solid #e8eaed', borderRadius: '12px', fontSize: '13px', color: '#374151', lineHeight: 1.7, outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
                   onFocus={e => { e.currentTarget.style.borderColor = '#3b5bdb'; }}
                   onBlur={e => { e.currentTarget.style.borderColor = '#e8eaed'; }}
                 />
-                <div style={{ marginTop: '6px', fontSize: '11px', color: '#9ca3af', textAlign: 'right' }}>
-                  {textInput.length} characters
+                <div style={{ marginTop: '6px', fontSize: '11px', color: '#9ca3af', textAlign: 'right', display: 'flex', justifyContent: 'flex-end', flexWrap: 'wrap', gap: '6px' }}>
+                  <span>{textInput.length} characters</span>
+                  {textInput.trim().length < TEXT_SOURCE_MIN_CHARS && (
+                    <span style={{ color: '#b45309' }}>· 至少还需 {TEXT_SOURCE_MIN_CHARS - textInput.trim().length} 字可进入下一步</span>
+                  )}
                 </div>
               </div>
             )}
@@ -1010,8 +921,8 @@ export default function AssessmentGenerate() {
                       }}>
                         <span style={{ fontSize: '13px', fontWeight: 600, color: '#3b5bdb' }}>
                           已选 {selectedSections.size} 个知识点
-                          {Array.from(new Set(Array.from(selectedSections).map(k => k.split('::')[0]))).length > 0 &&
-                            ` · 跨 ${Array.from(new Set(Array.from(selectedSections).map(k => k.split('::')[0]))).length} 个章节`}
+                          {Array.from(new Set([...selectedSections].map((k: string) => k.split('::')[0]))).length > 0 &&
+                            ` · 跨 ${Array.from(new Set([...selectedSections].map((k: string) => k.split('::')[0]))).length} 个章节`}
                         </span>
                         <button
                           onClick={() => setSelectedSections(new Set())}
@@ -1027,7 +938,9 @@ export default function AssessmentGenerate() {
                 {/* Empty state prompt */}
                 {!tbSubject && (
                   <div style={{ padding: '20px 16px', background: '#f9fafb', border: '1px dashed #d1d5db', borderRadius: '10px', fontSize: '13px', color: '#9ca3af', textAlign: 'center', lineHeight: 1.8 }}>
-                    <div style={{ fontSize: '22px', marginBottom: '6px' }}>📚</div>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
+                      <BookOpen size={22} style={{ color: '#d1d5db' }} />
+                    </div>
                     请依次选择出版社、年级、科目和学期，再选择教材版本
                   </div>
                 )}
@@ -1089,7 +1002,7 @@ export default function AssessmentGenerate() {
                             transition: 'all 0.14s', outline: 'none',
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '8px' }}>
                             <div style={{
                               width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0,
                               background: active ? m.iconBg : '#e8eaed',
@@ -1098,7 +1011,7 @@ export default function AssessmentGenerate() {
                             }}>
                               <m.Icon size={17} style={{ color: active ? '#fff' : '#9ca3af' }} />
                             </div>
-                            <div style={{ flex: 1 }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: '14px', fontWeight: 700, color: active ? m.color : '#374151', lineHeight: 1.25 }}>
                                 {m.label}
                               </div>
@@ -1110,9 +1023,9 @@ export default function AssessmentGenerate() {
                               <div style={{
                                 width: '20px', height: '20px', borderRadius: '50%',
                                 background: m.color, display: 'flex', alignItems: 'center',
-                                justifyContent: 'center', flexShrink: 0,
+                                justifyContent: 'center', flexShrink: 0, marginTop: '1px',
                               }}>
-                                <Check size={11} style={{ color: '#fff' }} />
+                                <Check size={11} style={{ color: '#fff' }} strokeWidth={2.5} />
                               </div>
                             )}
                           </div>
@@ -1130,137 +1043,17 @@ export default function AssessmentGenerate() {
                   </div>
                 </div>
 
-                {/* Mode selector cards */}
-                <div style={{ display: 'flex', gap: '12px', marginBottom: '18px' }}>
-                  {([
-                    { id: 'scan'   as ExamInputMode, icon: Scan,       label: 'Camera Scan',  desc: 'Use your device camera to scan a physical paper in real-time', color: '#7c3aed', activeBg: '#f5f3ff', activeBorder: '#c4b5fd', iconBg: 'linear-gradient(135deg,#7c3aed,#a78bfa)' },
-                    { id: 'upload' as ExamInputMode, icon: FolderOpen, label: 'Upload File',   desc: 'Upload scanned images or PDF files directly from your device',  color: '#3b5bdb', activeBg: '#eff6ff', activeBorder: '#bfdbfe', iconBg: 'linear-gradient(135deg,#3b5bdb,#6366f1)' },
-                  ]).map(m => {
-                    const Icon = m.icon;
-                    const active = examInputMode === m.id;
-                    return (
-                      <button key={m.id} onClick={() => setExamInputMode(m.id)}
-                        style={{
-                          flex: 1, padding: '16px 18px', borderRadius: '14px', cursor: 'pointer', textAlign: 'left',
-                          border: `1.5px solid ${active ? m.activeBorder : '#e8eaed'}`,
-                          background: active ? m.activeBg : '#fafafa',
-                          transition: 'all 0.14s', outline: 'none',
-                          boxShadow: active ? `0 0 0 3px ${m.activeBorder}55` : 'none',
-                        }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '7px' }}>
-                          <div style={{ width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0, background: active ? m.iconBg : '#e8eaed', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.14s' }}>
-                            <Icon size={17} style={{ color: active ? '#fff' : '#9ca3af' }} />
-                          </div>
-                          <span style={{ fontSize: '14px', fontWeight: 700, color: active ? m.color : '#374151', flex: 1 }}>{m.label}</span>
-                          {active && (
-                            <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: m.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              <Check size={11} style={{ color: '#fff' }} />
-                            </div>
-                          )}
-                        </div>
-                        <p style={{ margin: 0, fontSize: '12px', color: '#6b7280', lineHeight: 1.55, paddingLeft: '46px' }}>{m.desc}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Tip banner */}
+                {/* Tip banner (upload only — no camera scan) */}
                 <div style={{ padding: '11px 14px', borderRadius: '9px', background: '#fffbeb', border: '1px solid #fde68a', marginBottom: '20px', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                   <AlertCircle size={13} style={{ color: '#d97706', flexShrink: 0, marginTop: '1px' }} />
                   <span style={{ fontSize: '12px', color: '#92400e', lineHeight: 1.6 }}>
                     <strong>Tip: </strong>
-                    {examInputMode === 'scan'
-                      ? 'Point your camera at the exam paper. Ensure good lighting and hold steady for best OCR accuracy.'
-                      : 'Upload up to 5 images (JPG, PNG) or a single PDF. Max 10 MB per file. AI will extract all questions automatically.'}
+                    Upload up to 5 images (JPG, PNG) or a single PDF. Max 10 MB per file. AI will extract all questions automatically.
                   </span>
                 </div>
 
-                {/* ── Camera Scan panel ── */}
-                {examInputMode === 'scan' && (
-                  <div>
-                    {!cameraActive ? (
-                      <div
-                        onClick={() => setCameraActive(true)}
-                        style={{ border: '2px dashed #c4b5fd', borderRadius: '16px', padding: '52px 40px', textAlign: 'center', cursor: 'pointer', background: '#fafafa', transition: 'all 0.15s' }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f5f3ff'; (e.currentTarget as HTMLElement).style.borderColor = '#7c3aed'; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fafafa'; (e.currentTarget as HTMLElement).style.borderColor = '#c4b5fd'; }}>
-                        <div style={{ width: '60px', height: '60px', borderRadius: '16px', background: 'linear-gradient(135deg,#7c3aed,#a78bfa)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-                          <Camera size={28} style={{ color: '#fff' }} />
-                        </div>
-                        <div style={{ fontSize: '16px', fontWeight: 700, color: '#0f0f23', marginBottom: '6px' }}>Start Camera Scan</div>
-                        <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '18px' }}>Your browser will request camera permission</div>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '10px 24px', borderRadius: '10px', background: '#7c3aed', color: '#fff', fontSize: '13px', fontWeight: 600 }}>
-                          <Camera size={14} /> Open Camera
-                        </div>
-                      </div>
-                    ) : (
-                      <div style={{ borderRadius: '16px', overflow: 'hidden', border: '2px solid #7c3aed' }}>
-                        {/* Mock viewfinder */}
-                        <div style={{ width: '100%', aspectRatio: '4/3', background: 'linear-gradient(160deg,#1e1b4b 0%,#312e81 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-                          {/* Corner brackets */}
-                          {([{top:'16px',left:'16px'},{top:'16px',right:'16px'},{bottom:'16px',left:'16px'},{bottom:'16px',right:'16px'}] as React.CSSProperties[]).map((pos,i) => (
-                            <div key={i} style={{ position:'absolute', width:'28px', height:'28px',
-                              borderTop: pos.top    ? '3px solid #a78bfa' : 'none',
-                              borderBottom: pos.bottom ? '3px solid #a78bfa' : 'none',
-                              borderLeft: pos.left   ? '3px solid #a78bfa' : 'none',
-                              borderRight: pos.right  ? '3px solid #a78bfa' : 'none',
-                              ...pos }} />
-                          ))}
-                          {/* Scan sweep line */}
-                          <div style={{ position:'absolute', left:'10%', right:'10%', height:'2px', background:'linear-gradient(90deg,transparent,#a78bfa,transparent)', animation:'scanSweep 2s ease-in-out infinite' }}/>
-                          <ScanLine size={40} style={{ color:'rgba(167,139,250,0.35)', marginBottom:'12px' }} />
-                          <span style={{ fontSize:'13px', color:'rgba(255,255,255,0.65)', fontWeight:500 }}>Align paper within frame</span>
-                        </div>
-                        {/* Controls */}
-                        <div style={{ padding:'12px 16px', background:'#1e1b4b', display:'flex', gap:'10px' }}>
-                          <button
-                            onClick={() => { setCameraActive(false); setExamFiles(prev => [...prev, { name:`scan_page_${prev.length+1}.jpg`, size:512000, url:'' }].slice(0,5)); }}
-                            style={{ flex:1, padding:'10px', borderRadius:'9px', border:'none', cursor:'pointer', background:'#7c3aed', color:'#fff', fontSize:'13px', fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', gap:'7px' }}>
-                            <Scan size={15}/> Capture Page
-                          </button>
-                          <button onClick={() => setCameraActive(false)}
-                            style={{ padding:'10px 18px', borderRadius:'9px', border:'1px solid #4c1d95', cursor:'pointer', background:'transparent', color:'#a78bfa', fontSize:'13px', fontWeight:600 }}>
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    {/* Captured list */}
-                    {examFiles.length > 0 && (
-                      <div style={{ marginTop:'16px' }}>
-                        <div style={{ fontSize:'12px', fontWeight:600, color:'#374151', marginBottom:'8px' }}>Captured Pages ({examFiles.length}/5)</div>
-                        <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
-                          {examFiles.map((f,i) => (
-                            <div key={i} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'9px 12px', borderRadius:'9px', border:'1px solid #ede9fe', background:'#fafafa' }}>
-                              <div style={{ width:'32px', height:'32px', borderRadius:'7px', background:'#f5f3ff', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                                <FileImage size={15} style={{ color:'#7c3aed' }}/>
-                              </div>
-                              <div style={{ flex:1 }}>
-                                <div style={{ fontSize:'12px', fontWeight:600, color:'#0f0f23' }}>{f.name}</div>
-                                <div style={{ fontSize:'10px', color:'#9ca3af' }}>Scanned · {fmtSize(f.size)}</div>
-                              </div>
-                              <span style={{ fontSize:'10px', padding:'2px 7px', borderRadius:'20px', background:'#dcfce7', color:'#15803d', fontWeight:600 }}>✓ Ready</span>
-                              <button onClick={() => removeExamFile(i)} style={{ width:'26px', height:'26px', borderRadius:'6px', border:'1px solid #fecaca', background:'#fff', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#ef4444', flexShrink:0 }}>
-                                <Trash2 size={11}/>
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                        {examFiles.length < 5 && (
-                          <button onClick={() => setCameraActive(true)}
-                            style={{ marginTop:'8px', width:'100%', padding:'9px', borderRadius:'9px', border:'1.5px dashed #c4b5fd', background:'transparent', color:'#7c3aed', fontSize:'12px', fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px' }}>
-                            <Camera size={13}/> Scan Another Page
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    <style>{`@keyframes scanSweep { 0%,100%{top:20%} 50%{top:80%} }`}</style>
-                  </div>
-                )}
-
-                {/* ── Upload File panel ── */}
-                {examInputMode === 'upload' && (
-                  <div>
+                {/* ── Upload exam paper ── */}
+                <div>
                     <input ref={examFileRef} type="file" accept=".pdf,.png,.jpg,.jpeg" multiple onChange={e => handleExamFiles(e.target.files)} style={{ display:'none' }}/>
                     {/* Drop zone */}
                     <div
@@ -1299,7 +1092,7 @@ export default function AssessmentGenerate() {
                               <div style={{ fontSize:'13px', fontWeight:600, color:'#0f0f23', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{f.name}</div>
                               <div style={{ fontSize:'11px', color:'#9ca3af' }}>{fmtSize(f.size)}</div>
                             </div>
-                            <span style={{ fontSize:'10px', padding:'2px 8px', borderRadius:'20px', background:'#dcfce7', color:'#15803d', fontWeight:600, flexShrink:0 }}>✓ Ready</span>
+                            <span style={{ fontSize:'10px', padding:'2px 8px', borderRadius:'20px', background:'#dcfce7', color:'#15803d', fontWeight:600, flexShrink:0, display:'inline-flex', alignItems:'center', gap:'3px' }}><Check size={10} strokeWidth={3} />Ready</span>
                             <button onClick={e => { e.stopPropagation(); removeExamFile(i); }} style={{ width:'28px', height:'28px', borderRadius:'7px', border:'1px solid #fecaca', background:'#fff', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#ef4444', flexShrink:0 }}>
                               <Trash2 size={12}/>
                             </button>
@@ -1314,7 +1107,6 @@ export default function AssessmentGenerate() {
                       </div>
                     )}
                   </div>
-                )}
               </div>
             )}
 
@@ -1393,8 +1185,8 @@ export default function AssessmentGenerate() {
                         { label: 'Photosynthesis (Biology)', text: "1. Where do the light-dependent reactions occur in the chloroplast?\n   A. Stroma  B. Thylakoid membrane  C. Outer membrane  D. Matrix\n2. What gas is released as a by-product of photosynthesis?" },
                       ].map(s => (
                         <button key={s.label} onClick={() => setPastedQuestions(s.text)}
-                          style={{ padding: '6px 14px', borderRadius: '20px', border: '1px solid #e8eaed', background: '#fff', fontSize: '12px', color: '#374151', cursor: 'pointer' }}>
-                          📋 {s.label}
+                          style={{ padding: '6px 14px', borderRadius: '20px', border: '1px solid #e8eaed', background: '#fff', fontSize: '12px', color: '#374151', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <PenLine size={13} style={{ color: '#9ca3af', flexShrink: 0 }} />{s.label}
                         </button>
                       ))}
                     </div>
@@ -1493,7 +1285,7 @@ export default function AssessmentGenerate() {
             )}
 
             {/* Footer nav */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '28px', paddingTop: '4px' }}>
               <button onClick={() => setStep(sourceTab === 'questions' ? 3 : 2)} disabled={!canProceedStep1()}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '6px',
@@ -1510,14 +1302,16 @@ export default function AssessmentGenerate() {
 
         {/* ── STEP 2 ── */}
         {step === 2 && (
-          <div style={{ maxWidth: '720px' }}>
+          <div>
             <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f0f23', margin: '0 0 4px' }}>
               {sourceTab === 'exam' ? '定制题目要求' : 'Configure Questions'}
             </h2>
             <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '24px' }}>
               {sourceTab === 'exam'
                 ? '设置题目匹配方式与难度级别，AI 将依此生成针对性题目。'
-                : 'Set grade, subject, question types, and illustration preferences.'}
+                : sourceTab === 'textbook'
+                  ? '教材与年级已在第 1 步选择。此处设置题型、难度与配图等。'
+                  : '设置题型、难度与配图等'}
             </p>
 
             {/* ── Exam Paper simplified config ── */}
@@ -1617,28 +1411,7 @@ export default function AssessmentGenerate() {
             {/* ── Non-exam full config ── */}
             {sourceTab !== 'exam' && (<>
 
-            {/* Basic info — hidden for Textbook (grade/subject already chosen in Step 1) */}
-            {sourceTab !== 'textbook' && (
-            <div style={{ background: '#fff', border: '1px solid #e8eaed', borderRadius: '12px', padding: '20px 22px', marginBottom: '16px' }}>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '14px' }}>Basic Information</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
-                <SelectField label="Grade *" options={GRADES} placeholder="Select grade" value={grade} onChange={setGrade} />
-                <SelectField label="Subject *" options={SUBJECTS} placeholder="Select subject" value={subject} onChange={setSubject} />
-              </div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <span style={{ fontSize: '13px', color: '#374151', marginRight: '4px' }}>Semester</span>
-                {(['Vol.1', 'Vol.2'] as const).map(s => (
-                  <button key={s} onClick={() => setSemester(s)}
-                    style={{
-                      padding: '5px 14px', borderRadius: '7px', border: `1.5px solid ${semester === s ? '#3b5bdb' : '#e8eaed'}`,
-                      background: semester === s ? '#eff6ff' : '#fff',
-                      color: semester === s ? '#3b5bdb' : '#6b7280',
-                      fontSize: '12px', fontWeight: semester === s ? 600 : 400, cursor: 'pointer',
-                    }}>{s}</button>
-                ))}
-              </div>
-            </div>
-            )}
+            {/* Grade/subject/semester：仅教材来源在 Step 1 中选择，上传等来源不在此填写 */}
 
             {/* Question types */}
             <div style={{ background: '#fff', border: '1px solid #e8eaed', borderRadius: '12px', overflow: 'hidden', marginBottom: '16px' }}>
@@ -1662,10 +1435,6 @@ export default function AssessmentGenerate() {
                     {/* Checkbox */}
                     <div style={{ width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0, border: `2px solid ${qt.active ? '#3b5bdb' : '#d1d5db'}`, background: qt.active ? '#3b5bdb' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}>
                       {qt.active && <Check size={11} style={{ color: '#fff', strokeWidth: 3 }} />}
-                    </div>
-                    {/* Icon badge */}
-                    <div style={{ width: '36px', height: '36px', borderRadius: '9px', flexShrink: 0, background: qt.active ? '#eff6ff' : '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: qt.emoji.length > 2 ? '10px' : '18px', fontWeight: 800, color: qt.active ? '#3b5bdb' : '#9ca3af', letterSpacing: '-0.5px', transition: 'all 0.15s' }}>
-                      {qt.emoji}
                     </div>
                     {/* Label */}
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -1830,8 +1599,8 @@ export default function AssessmentGenerate() {
                 style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 22px', borderRadius: '9px', border: '1px solid #e8eaed', background: '#fff', color: '#374151', fontSize: '14px', cursor: 'pointer' }}>
                 <ChevronLeft size={15} /> Back
               </button>
-              <button onClick={() => setStep(3)}
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 22px', borderRadius: '9px', border: 'none', background: '#3b5bdb', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={() => setStep(3)} disabled={!canProceedStep2()}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 22px', borderRadius: '9px', border: 'none', background: canProceedStep2() ? '#3b5bdb' : '#e8eaed', color: canProceedStep2() ? '#fff' : '#9ca3af', fontSize: '14px', fontWeight: 600, cursor: canProceedStep2() ? 'pointer' : 'not-allowed' }}>
                 Next <ChevronRight size={15} />
               </button>
             </div>
@@ -1841,27 +1610,29 @@ export default function AssessmentGenerate() {
 
         {/* ── STEP 3 ── */}
         {step === 3 && (
-          <div style={{ maxWidth: '800px' }}>
+          <div>
             <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f0f23', margin: '0 0 4px' }}>Generate & Review</h2>
             <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '24px' }}>
               Confirm your configuration and let AI generate the questions{illustEnabled ? ' and illustrations' : ''}.
             </p>
 
-            {/* Config summary */}
+            {/* Config summary — flat, no nested boxes */}
             {!genDone && (
-              <div style={{ background: '#fff', border: '1px solid #e8eaed', borderRadius: '12px', padding: '18px 22px', marginBottom: '20px' }}>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '10px' }}>Generation Summary</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+              <div style={{ marginBottom: '24px', paddingBottom: '20px', borderBottom: '1px solid #e8eaed' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: '#6b7280', marginBottom: '14px' }}>Summary</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', columnGap: '20px', rowGap: '14px' }}>
                   {[
                     { label: 'Source', val: sourceTab === 'questions' ? `From Questions (${deriveMode})` : SOURCE_TABS.find(t => t.id === sourceTab)?.label ?? '—' },
-                    { label: 'Grade & Subject', val: `${grade || '—'} · ${subject || '—'}` },
+                    ...(sourceTab === 'textbook'
+                      ? [{ label: 'Grade & Subject', val: `${tbGrade || '—'} · ${tbSubject || '—'}` }]
+                      : []),
                     { label: 'Difficulty', val: difficulty },
                     { label: 'Illustrations', val: illustEnabled ? `${ILLUST_STYLES.find(s => s.id === illustStyle)?.label} · ${illustTypes.size} type(s)` : 'Disabled' },
                     ...qTypes.filter(t => t.active).map(t => ({ label: t.label, val: `${t.count} questions` })),
                   ].map((row, i) => (
-                    <div key={i} style={{ padding: '10px 12px', background: '#f9fafb', borderRadius: '8px' }}>
-                      <div style={{ fontSize: '10px', color: '#9ca3af', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{row.label}</div>
-                      <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', wordBreak: 'break-word' }}>{row.val}</div>
+                    <div key={i} style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '10px', color: '#9ca3af', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{row.label}</div>
+                      <div style={{ fontSize: '13px', fontWeight: 500, color: '#111827', lineHeight: 1.4, wordBreak: 'break-word' }}>{row.val}</div>
                     </div>
                   ))}
                 </div>
@@ -1871,14 +1642,14 @@ export default function AssessmentGenerate() {
             {/* Generate / progress */}
             {!genDone ? (
               generating ? (
-                <div style={{ background: '#fff', border: '1px solid #e8eaed', borderRadius: '12px', padding: '36px 28px', textAlign: 'center', marginBottom: '20px' }}>
+                <div style={{ background: '#fafafa', borderRadius: '12px', padding: '28px 20px', textAlign: 'center', marginBottom: '20px' }}>
                   <Loader2 size={32} style={{ color: '#3b5bdb', animation: 'spin 1s linear infinite', marginBottom: '16px' }} />
 
                   {/* Phase 1: Questions */}
                   <div style={{ marginBottom: illustEnabled ? '20px' : '0' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
                       <span style={{ fontSize: '13px', fontWeight: 600, color: genPhase === 'questions' ? '#0f0f23' : '#9ca3af' }}>
-                        {genPhase === 'questions' ? '⚡ Generating questions…' : '✅ Questions generated'}
+                        {genPhase === 'questions' ? 'Generating questions…' : 'Questions generated'}
                       </span>
                       <span style={{ fontSize: '12px', color: '#6b7280' }}>{genPhase === 'questions' ? genProgress : 100}%</span>
                     </div>
@@ -1892,7 +1663,7 @@ export default function AssessmentGenerate() {
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
                         <span style={{ fontSize: '13px', fontWeight: 600, color: genPhase === 'illustrations' ? '#0f0f23' : genPhase === 'done' ? '#9ca3af' : '#d1d5db' }}>
-                          {genPhase === 'illustrations' ? '🎨 Generating illustrations…' : genPhase === 'done' ? '✅ Illustrations generated' : '🎨 Illustrations (pending)'}
+                          {genPhase === 'illustrations' ? 'Generating illustrations…' : genPhase === 'done' ? 'Illustrations generated' : 'Illustrations (pending)'}
                         </span>
                         <span style={{ fontSize: '12px', color: '#6b7280' }}>
                           {genPhase === 'illustrations' ? illustProgress : genPhase === 'done' ? 100 : 0}%
@@ -2043,6 +1814,7 @@ export default function AssessmentGenerate() {
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

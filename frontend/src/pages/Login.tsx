@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Eye, EyeOff, ArrowRight } from 'lucide-react';
 
-type UserType = 'student' | 'staff';
+type UserType = 'student' | 'teacher' | 'admin';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -21,11 +21,19 @@ export default function Login() {
     await new Promise(r => setTimeout(r, 600));
     setIsLoading(false);
     const isStudent = /^\d{8,12}$/.test(accountId);
-    if (userType === 'student' && isStudent) {
-      alert('Student login successful!');
-    } else {
-      navigate('/admin');
+    if (userType === 'student') {
+      if (!isStudent) {
+        setError('Student ID should be 8-12 digits.');
+        return;
+      }
+      navigate('/student/home');
+      return;
     }
+    if (userType === 'teacher') {
+      navigate('/teacher/lessons');
+      return;
+    }
+    navigate('/admin/users');
   };
 
   return (
@@ -93,7 +101,7 @@ export default function Login() {
 
           {/* Role toggle */}
           <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: '8px', padding: '3px', marginBottom: '22px', gap: '3px' }}>
-            {(['student', 'staff'] as UserType[]).map(type => (
+            {(['student', 'teacher', 'admin'] as UserType[]).map(type => (
               <button
                 key={type}
                 onClick={() => setUserType(type)}
@@ -111,7 +119,7 @@ export default function Login() {
                   transition: 'all 0.15s',
                 }}
               >
-                {type === 'student' ? 'Student' : 'Staff / Admin'}
+                {type === 'student' ? 'Student' : type === 'teacher' ? 'Teacher' : 'Admin'}
               </button>
             ))}
           </div>
@@ -120,13 +128,19 @@ export default function Login() {
           <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
               <label style={{ fontSize: '14px', fontWeight: 500, color: '#374151', display: 'block', marginBottom: '7px' }}>
-                {userType === 'student' ? 'Student ID' : 'Employee ID / Account'}
+                {userType === 'student' ? 'Student ID' : userType === 'teacher' ? 'Teacher ID / Account' : 'Admin Account'}
               </label>
               <input
                 type="text"
                 value={accountId}
                 onChange={e => setAccountId(e.target.value)}
-                placeholder={userType === 'student' ? 'Enter your student ID' : 'Enter employee ID or admin account'}
+                placeholder={
+                  userType === 'student'
+                    ? 'Enter your student ID'
+                    : userType === 'teacher'
+                      ? 'Enter teacher ID or account'
+                      : 'Enter admin account'
+                }
                 style={{
                   width: '100%',
                   padding: '10px 13px',

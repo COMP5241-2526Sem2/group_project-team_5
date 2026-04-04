@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import {
   ChevronRight, ChevronLeft, Check, Sparkles, Loader2,
   FileText, Clock, Award, BookOpen, Target, Layers,
   Download, Printer, Save, RotateCcw, ChevronDown,
   Plus, Minus, GripVertical, Trash2, Edit3, Send,
-  FilePen, AlertCircle,
+  FilePen, AlertCircle, ClipboardList, Trophy, Medal, RefreshCw,
 } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -50,13 +51,13 @@ interface DraftPaper {
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const EXAM_TYPES: { id: ExamType; icon: string; label: string; desc: string; color: string; bg: string }[] = [
-  { id: 'midterm',  icon: '📋', label: 'Midterm Exam',      desc: 'Mid-semester comprehensive test',         color: '#1d4ed8', bg: '#dbeafe' },
-  { id: 'final',    icon: '🏆', label: 'Final Exam',        desc: 'End-of-semester comprehensive test',      color: '#7c3aed', bg: '#ede9fe' },
-  { id: 'unit',     icon: '📖', label: 'Unit Test',         desc: 'Targeted chapter/unit assessment',        color: '#0369a1', bg: '#e0f2fe' },
-  { id: 'special',  icon: '🎯', label: 'Special Practice',  desc: 'Focused knowledge point drills',          color: '#15803d', bg: '#dcfce7' },
-  { id: 'review',   icon: '🔄', label: 'Review Test',       desc: 'Multi-chapter comprehensive review',      color: '#b45309', bg: '#fef3c7' },
-  { id: 'contest',  icon: '🥇', label: 'Contest Mock',      desc: 'Competition-level simulation exam',       color: '#9f1239', bg: '#ffe4e6' },
+const EXAM_TYPES: { id: ExamType; Icon: LucideIcon; label: string; desc: string }[] = [
+  { id: 'midterm', Icon: ClipboardList, label: 'Midterm Exam',     desc: 'Mid-semester comprehensive test' },
+  { id: 'final',   Icon: Trophy,        label: 'Final Exam',       desc: 'End-of-semester comprehensive test' },
+  { id: 'unit',    Icon: BookOpen,      label: 'Unit Test',        desc: 'Targeted chapter/unit assessment' },
+  { id: 'special', Icon: Target,        label: 'Special Practice', desc: 'Focused knowledge point drills' },
+  { id: 'review',  Icon: RefreshCw,     label: 'Review Test',      desc: 'Multi-chapter comprehensive review' },
+  { id: 'contest', Icon: Medal,         label: 'Contest Mock',     desc: 'Competition-level simulation exam' },
 ];
 
 const GRADES = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'];
@@ -180,26 +181,6 @@ function fmtDate(iso: string) {
     ' · ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
-// ── Step indicator ─────────────────────────────────────────────────────────────
-function StepDot({ n, label, active, done }: { n: number; label: string; active: boolean; done: boolean }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-      <div style={{
-        width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: done ? '#3b5bdb' : active ? '#3b5bdb' : '#e8eaed',
-        color: done || active ? '#fff' : '#9ca3af',
-        fontSize: '12px', fontWeight: 700, transition: 'all 0.2s',
-      }}>
-        {done ? <Check size={13} /> : n}
-      </div>
-      <span style={{ fontSize: '13px', fontWeight: active ? 600 : 400, color: active ? '#0f0f23' : done ? '#374151' : '#9ca3af' }}>
-        {label}
-      </span>
-    </div>
-  );
-}
-
 // ── Custom select ─────────────────────────────────────────────────────────────
 function SimpleSelect({ label, options, value, onChange, placeholder, required }: {
   label: string; options: string[]; value: string; onChange: (v: string) => void;
@@ -282,6 +263,7 @@ function DraftCard({
   onPublish: (id: string) => void;
 }) {
   const examCfg = EXAM_TYPES.find(e => e.id === draft.examType);
+  const EtIcon = examCfg?.Icon;
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
@@ -306,15 +288,16 @@ function DraftCard({
         (e.currentTarget as HTMLElement).style.borderColor = '#e8eaed';
       }}
     >
-      {/* Watermark stripe */}
-      <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: examCfg?.color ?? '#3b5bdb', borderRadius: '14px 0 0 14px' }} />
+      {/* Left accent */}
+      <div style={{ position: 'absolute', top: 0, left: 0, width: '3px', height: '100%', background: '#e5e7eb', borderRadius: '14px 0 0 14px' }} />
 
       {/* Top row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', paddingLeft: '8px' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px', background: examCfg?.bg ?? '#eef2ff', color: examCfg?.color ?? '#3b5bdb', letterSpacing: '0.03em' }}>
-              {examCfg?.icon} {examCfg?.label}
+            <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px', background: '#f3f4f6', color: '#374151', letterSpacing: '0.03em', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              {EtIcon && <EtIcon size={11} style={{ color: '#9ca3af' }} />}
+              {examCfg?.label}
             </span>
             <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', background: '#fef9c3', color: '#a16207' }}>
               DRAFT
@@ -409,7 +392,7 @@ function DraftsView({
   onPublish: (id: string) => void;
 }) {
   return (
-    <div style={{ maxWidth: '800px' }}>
+    <div style={{ width: '100%' }}>
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -442,7 +425,9 @@ function DraftsView({
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {drafts.map(d => (
-            <DraftCard key={d.id} draft={d} onDelete={onDelete} onPublish={onPublish} />
+            <React.Fragment key={d.id}>
+              <DraftCard draft={d} onDelete={onDelete} onPublish={onPublish} />
+            </React.Fragment>
           ))}
         </div>
       )}
@@ -540,100 +525,90 @@ export default function AssessmentAIPaper() {
   }
 
   const examTypeCfg = EXAM_TYPES.find(e => e.id === examType);
+  const mainScrollRef = useRef<HTMLDivElement>(null);
+
+  const WIZARD_STEPS = [
+    { n: 1, label: 'Exam Type' },
+    { n: 2, label: 'Basic Info' },
+    { n: 3, label: 'Content & Structure' },
+    { n: 4, label: 'Generate & Preview' },
+  ] as const;
+
+  useEffect(() => {
+    if (mainScrollRef.current) {
+      mainScrollRef.current.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, [step, pageView]);
+
+  const contentMaxWidth = step === 4 && pageView === 'wizard' ? '800px' : '680px';
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 48px)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 48px)', overflow: 'hidden', background: '#fafafa' }}>
 
-      {/* ── Left panel ─────────────────────────────────────── */}
-      <div style={{
-        width: '220px', borderRight: '1px solid #e8eaed', padding: '28px 20px',
-        flexShrink: 0, background: '#fafafa', display: 'flex', flexDirection: 'column', gap: '6px',
-      }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '16px' }}>
-          Paper Generator
-        </div>
-        {[
-          { n: 1, label: 'Exam Type' },
-          { n: 2, label: 'Basic Info' },
-          { n: 3, label: 'Content & Structure' },
-          { n: 4, label: 'Generate & Preview' },
-        ].map(s => (
-          <div key={s.n} style={{ opacity: pageView === 'drafts' ? 0.45 : 1, transition: 'opacity 0.2s' }}>
-            <StepDot n={s.n} label={s.label} active={pageView === 'wizard' && step === s.n} done={pageView === 'wizard' && step > s.n} />
-            {s.n < 4 && <div style={{ width: '1px', height: '20px', background: step > s.n ? '#3b5bdb' : '#e8eaed', margin: '4px 0 4px 14px' }} />}
+      {/* Top: Paper Generator — flat horizontal stepper (wizard only) */}
+      {pageView === 'wizard' && (
+        <div style={{ borderBottom: '1px solid #e5e7eb', background: '#fff', padding: '12px 20px 10px' }}>
+          <div style={{ width: '100%', maxWidth: '980px', margin: '0 auto', overflowX: 'auto' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '10px' }}>Paper Generator</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'nowrap' }}>
+              {WIZARD_STEPS.map((s, idx, arr) => (
+                <React.Fragment key={s.n}>
+                  <button
+                    type="button"
+                    onClick={step > s.n ? () => setStep(s.n) : undefined}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '6px',
+                      padding: '6px 4px 8px',
+                      border: 'none',
+                      background: 'transparent',
+                      borderBottom: step === s.n ? '2px solid #111827' : '2px solid transparent',
+                      color: step === s.n ? '#111827' : step > s.n ? '#4b5563' : '#9ca3af',
+                      cursor: step > s.n ? 'pointer' : 'default',
+                      fontSize: '12px', fontWeight: step === s.n ? 600 : 500,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    <span style={{
+                      width: '20px', height: '20px', borderRadius: '50%',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      border: `1px solid ${step === s.n ? '#111827' : step > s.n ? '#d1d5db' : '#e5e7eb'}`,
+                      background: step > s.n ? '#f9fafb' : '#fff',
+                      color: step === s.n ? '#111827' : step > s.n ? '#374151' : '#9ca3af',
+                      fontSize: '10px', fontWeight: 700,
+                    }}>
+                      {step > s.n ? <Check size={11} strokeWidth={2.5} /> : s.n}
+                    </span>
+                    {s.label}
+                  </button>
+                  {idx < arr.length - 1 && (
+                    <ChevronRight size={14} style={{ color: '#d1d5db', flexShrink: 0 }} aria-hidden />
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
           </div>
-        ))}
+        </div>
+      )}
 
-        {/* Divider */}
-        <div style={{ height: '1px', background: '#e8eaed', margin: '12px 0' }} />
+      {pageView === 'drafts' && (
+        <div style={{ borderBottom: '1px solid #e5e7eb', background: '#fff', padding: '12px 20px 10px' }}>
+          <div style={{ width: '100%', maxWidth: '980px', margin: '0 auto' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '4px' }}>Paper Generator</div>
+            <div style={{ fontSize: '13px', color: '#6b7280' }}>Draft papers — review and publish when ready</div>
+          </div>
+        </div>
+      )}
 
-        {/* Drafts shortcut */}
-        <button
-          onClick={() => setPageView(v => v === 'drafts' ? 'wizard' : 'drafts')}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '9px 12px', borderRadius: '9px', cursor: 'pointer',
-            border: `1.5px solid ${pageView === 'drafts' ? '#3b5bdb' : '#e8eaed'}`,
-            background: pageView === 'drafts' ? '#eef2ff' : '#fff',
-            color: pageView === 'drafts' ? '#3b5bdb' : '#374151',
-            transition: 'all 0.15s', textAlign: 'left', width: '100%',
-          }}>
-          <FilePen size={14} style={{ color: pageView === 'drafts' ? '#3b5bdb' : '#9ca3af', flexShrink: 0 }} />
-          <span style={{ fontSize: '13px', fontWeight: pageView === 'drafts' ? 700 : 500, flex: 1 }}>
-            Drafts
-          </span>
-          {drafts.length > 0 && (
-            <span style={{
-              fontSize: '10px', fontWeight: 700, minWidth: '18px', height: '18px',
-              borderRadius: '9px', background: pageView === 'drafts' ? '#3b5bdb' : '#e8eaed',
-              color: pageView === 'drafts' ? '#fff' : '#6b7280',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px',
-            }}>
-              {drafts.length}
-            </span>
-          )}
-        </button>
+      {/* Main content */}
+      <div ref={mainScrollRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '16px 20px', minWidth: 0, display: 'flex', justifyContent: 'center' }}>
 
-        {/* Summary cards (only in wizard) */}
-        {pageView === 'wizard' && (
-          <>
-            {step >= 2 && examTypeCfg && (
-              <div style={{ marginTop: '8px', padding: '11px 12px', background: examTypeCfg.bg, borderRadius: '10px', border: `1px solid ${examTypeCfg.bg}` }}>
-                <div style={{ fontSize: '10px', fontWeight: 600, color: examTypeCfg.color, textTransform: 'uppercase', marginBottom: '4px' }}>Exam Type</div>
-                <div style={{ fontSize: '12px', color: examTypeCfg.color, fontWeight: 600 }}>{examTypeCfg.icon} {examTypeCfg.label}</div>
-              </div>
-            )}
-            {step >= 3 && grade && subject && (
-              <div style={{ padding: '11px 12px', background: '#fff', border: '1px solid #e8eaed', borderRadius: '10px' }}>
-                <div style={{ fontSize: '10px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', marginBottom: '5px' }}>Config</div>
-                <div style={{ fontSize: '11px', color: '#374151', lineHeight: 1.8 }}>
-                  {grade}<br />{subject} · {semester}
-                  {totalScore > 0 && <><br />{totalScore} pts · {duration} min</>}
-                </div>
-              </div>
-            )}
-            {step >= 4 && (
-              <div style={{ padding: '11px 12px', background: '#fff', border: '1px solid #e8eaed', borderRadius: '10px' }}>
-                <div style={{ fontSize: '10px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', marginBottom: '5px' }}>Structure</div>
-                <div style={{ fontSize: '11px', color: '#374151', lineHeight: 1.8 }}>
-                  {sections.filter(s => s.count > 0).map(s => (
-                    <div key={s.key}>{s.count} × {s.type}</div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* ── Right content ───────────────────────────────────── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '28px 36px' }}>
+        <div style={{ width: '100%', maxWidth: contentMaxWidth }}>
 
         {/* ── Tab bar ── */}
-        <div style={{ display: 'flex', gap: '4px', marginBottom: '28px', borderBottom: '1px solid #e8eaed', paddingBottom: '0' }}>
+        <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', borderBottom: '1px solid #e5e7eb', paddingBottom: '0' }}>
           {([
-            { id: 'wizard' as PageView, label: 'New Paper', icon: <Sparkles size={13} /> },
-            { id: 'drafts' as PageView, label: `Drafts${drafts.length > 0 ? ` (${drafts.length})` : ''}`, icon: <FilePen size={13} /> },
+            { id: 'wizard' as PageView, label: 'New Paper' },
+            { id: 'drafts' as PageView, label: `Drafts${drafts.length > 0 ? ` (${drafts.length})` : ''}` },
           ]).map(tab => {
             const active = pageView === tab.id;
             return (
@@ -641,17 +616,15 @@ export default function AssessmentAIPaper() {
                 key={tab.id}
                 onClick={() => setPageView(tab.id)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  padding: '8px 16px', cursor: 'pointer',
+                  padding: '8px 12px', cursor: 'pointer',
                   borderTop: 'none', borderRight: 'none', borderLeft: 'none',
-                  borderBottom: `2px solid ${active ? '#3b5bdb' : 'transparent'}`,
+                  borderBottom: `2px solid ${active ? '#111827' : 'transparent'}`,
                   background: 'transparent',
-                  color: active ? '#3b5bdb' : '#6b7280',
-                  fontSize: '13px', fontWeight: active ? 700 : 500,
+                  color: active ? '#111827' : '#6b7280',
+                  fontSize: '12px', fontWeight: active ? 600 : 500,
                   transition: 'all 0.15s',
                   marginBottom: '-1px',
                 }}>
-                {tab.icon}
                 {tab.label}
               </button>
             );
@@ -672,7 +645,7 @@ export default function AssessmentAIPaper() {
           <>
             {/* ══ STEP 1: Exam Type ══ */}
             {step === 1 && (
-              <div style={{ maxWidth: '720px' }}>
+              <div>
                 <div style={{ marginBottom: '24px' }}>
                   <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f0f23', margin: '0 0 6px' }}>Select Exam Type</h2>
                   <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
@@ -683,38 +656,42 @@ export default function AssessmentAIPaper() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '32px' }}>
                   {EXAM_TYPES.map(et => {
                     const isSelected = examType === et.id;
+                    const EtIcon = et.Icon;
                     return (
                       <button
                         key={et.id}
                         onClick={() => setExamType(et.id)}
                         style={{
                           display: 'flex', alignItems: 'flex-start', gap: '14px',
-                          padding: '18px 20px', borderRadius: '14px', cursor: 'pointer', textAlign: 'left',
-                          border: `2px solid ${isSelected ? et.color : '#e8eaed'}`,
-                          background: isSelected ? et.bg : '#fff',
+                          padding: '16px 18px', borderRadius: '12px', cursor: 'pointer', textAlign: 'left',
+                          border: `1px solid ${isSelected ? '#111827' : '#e5e7eb'}`,
+                          background: '#fff',
                           transition: 'all 0.15s',
                           position: 'relative', overflow: 'hidden',
+                          boxShadow: isSelected ? 'none' : '0 1px 2px rgba(0,0,0,0.04)',
                         }}
-                        onMouseEnter={e => { if (!isSelected) { (e.currentTarget as HTMLElement).style.border = `2px solid ${et.color}40`; (e.currentTarget as HTMLElement).style.background = `${et.bg}60`; } }}
-                        onMouseLeave={e => { if (!isSelected) { (e.currentTarget as HTMLElement).style.border = '2px solid #e8eaed'; (e.currentTarget as HTMLElement).style.background = '#fff'; } }}
+                        onMouseEnter={e => { if (!isSelected) { (e.currentTarget as HTMLElement).style.borderColor = '#d1d5db'; (e.currentTarget as HTMLElement).style.background = '#f9fafb'; } }}
+                        onMouseLeave={e => { if (!isSelected) { (e.currentTarget as HTMLElement).style.borderColor = '#e5e7eb'; (e.currentTarget as HTMLElement).style.background = '#fff'; } }}
                       >
-                        <div style={{ position: 'absolute', right: '-4px', top: '-8px', fontSize: '52px', opacity: 0.08, lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>
-                          {et.icon}
-                        </div>
-                        <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: isSelected ? et.color : et.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0, transition: 'background 0.15s' }}>
-                          {et.icon}
+                        <div style={{
+                          width: '40px', height: '40px', borderRadius: '10px',
+                          border: `1px solid ${isSelected ? '#111827' : '#e5e7eb'}`,
+                          background: isSelected ? '#f9fafb' : '#fff',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                        }}>
+                          <EtIcon size={20} style={{ color: isSelected ? '#111827' : '#6b7280' }} strokeWidth={1.75} />
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '15px', fontWeight: 700, color: isSelected ? et.color : '#0f0f23', marginBottom: '4px' }}>
+                          <div style={{ fontSize: '15px', fontWeight: 700, color: '#0f0f23', marginBottom: '4px' }}>
                             {et.label}
                           </div>
-                          <div style={{ fontSize: '12px', color: isSelected ? et.color : '#6b7280', lineHeight: 1.5, opacity: isSelected ? 0.9 : 1 }}>
+                          <div style={{ fontSize: '12px', color: '#6b7280', lineHeight: 1.5 }}>
                             {et.desc}
                           </div>
                         </div>
                         {isSelected && (
-                          <div style={{ position: 'absolute', top: '12px', right: '12px', width: '20px', height: '20px', borderRadius: '50%', background: et.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Check size={11} style={{ color: '#fff' }} />
+                          <div style={{ position: 'absolute', top: '12px', right: '12px', width: '20px', height: '20px', borderRadius: '50%', background: '#111827', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Check size={11} style={{ color: '#fff' }} strokeWidth={2.5} />
                           </div>
                         )}
                       </button>
@@ -736,7 +713,7 @@ export default function AssessmentAIPaper() {
 
             {/* ══ STEP 2: Basic Info ══ */}
             {step === 2 && (
-              <div style={{ maxWidth: '680px' }}>
+              <div>
                 <div style={{ marginBottom: '24px' }}>
                   <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f0f23', margin: '0 0 6px' }}>Basic Information</h2>
                   <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
@@ -830,7 +807,7 @@ export default function AssessmentAIPaper() {
 
             {/* ══ STEP 3: Content & Structure ══ */}
             {step === 3 && (
-              <div style={{ maxWidth: '720px' }}>
+              <div>
                 <div style={{ marginBottom: '24px' }}>
                   <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f0f23', margin: '0 0 6px' }}>Content & Structure</h2>
                   <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
@@ -851,15 +828,20 @@ export default function AssessmentAIPaper() {
                       const sel = selectedChapters.includes(ch);
                       return (
                         <button key={ch} onClick={() => toggleChapter(ch)}
+                          type="button"
                           style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '5px',
                             padding: '6px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px',
                             border: `1.5px solid ${sel ? '#3b5bdb' : '#e8eaed'}`,
                             background: sel ? '#eff6ff' : '#fff',
                             color: sel ? '#3b5bdb' : '#374151',
                             fontWeight: sel ? 600 : 400, transition: 'all 0.12s',
                           }}>
-                          {sel && <Check size={10} style={{ marginRight: '4px', verticalAlign: 'middle' }} />}
-                          {ch}
+                          {sel && <Check size={12} strokeWidth={2.5} style={{ flexShrink: 0 }} aria-hidden />}
+                          <span style={{ lineHeight: 1.25 }}>{ch}</span>
                         </button>
                       );
                     })}
@@ -871,24 +853,24 @@ export default function AssessmentAIPaper() {
                   <div style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Target size={14} style={{ color: '#3b5bdb' }} /> Overall Difficulty
                   </div>
-                  <div style={{ display: 'flex', gap: '10px' }}>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     {([
-                      { id: 'easy',   label: 'Easy',   emoji: '😊', bg: '#dcfce7', color: '#15803d', border: '#86efac' },
-                      { id: 'medium', label: 'Medium', emoji: '😐', bg: '#fef9c3', color: '#a16207', border: '#fde047' },
-                      { id: 'hard',   label: 'Hard',   emoji: '😤', bg: '#fee2e2', color: '#b91c1c', border: '#fca5a5' },
-                      { id: 'mixed',  label: 'Mixed',  emoji: '🎲', bg: '#ede9fe', color: '#7c3aed', border: '#c4b5fd' },
-                    ] as const).map(d => (
+                      { id: 'easy' as const,   label: 'Easy',   dot: '#22c55e', bg: '#f0fdf4', color: '#166534', border: '#d1d5db' },
+                      { id: 'medium' as const, label: 'Medium', dot: '#f59e0b', bg: '#fffbeb', color: '#92400e', border: '#d1d5db' },
+                      { id: 'hard' as const,   label: 'Hard',   dot: '#ef4444', bg: '#fef2f2', color: '#991b1b', border: '#d1d5db' },
+                      { id: 'mixed' as const,  label: 'Mixed',  dot: '#8b5cf6', bg: '#f5f3ff', color: '#5b21b6', border: '#d1d5db' },
+                    ]).map(d => (
                       <button key={d.id} onClick={() => setDifficulty(d.id as Difficulty)}
                         style={{
-                          flex: 1, padding: '12px 8px', borderRadius: '10px', cursor: 'pointer',
-                          border: `2px solid ${difficulty === d.id ? d.border : '#e8eaed'}`,
+                          flex: '1 1 calc(25% - 8px)', minWidth: '120px', padding: '10px 10px', borderRadius: '8px', cursor: 'pointer',
+                          border: `1px solid ${difficulty === d.id ? '#111827' : d.border}`,
                           background: difficulty === d.id ? d.bg : '#fff',
-                          color: difficulty === d.id ? d.color : '#9ca3af',
-                          fontSize: '12px', fontWeight: difficulty === d.id ? 700 : 400,
-                          transition: 'all 0.12s', display: 'flex', flexDirection: 'column',
-                          alignItems: 'center', gap: '4px',
+                          color: difficulty === d.id ? d.color : '#6b7280',
+                          fontSize: '12px', fontWeight: difficulty === d.id ? 600 : 500,
+                          transition: 'all 0.12s', display: 'flex', flexDirection: 'row',
+                          alignItems: 'center', justifyContent: 'center', gap: '8px',
                         }}>
-                        <span style={{ fontSize: '18px' }}>{d.emoji}</span>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: d.dot, flexShrink: 0 }} />
                         {d.label}
                       </button>
                     ))}
@@ -954,7 +936,7 @@ export default function AssessmentAIPaper() {
 
             {/* ══ STEP 4: Generate & Preview ══ */}
             {step === 4 && (
-              <div style={{ maxWidth: '800px' }}>
+              <div>
 
                 {/* Generating state */}
                 {generating && (
@@ -1152,6 +1134,7 @@ export default function AssessmentAIPaper() {
             )}
           </>
         )}
+        </div>
       </div>
 
       <style>{`
