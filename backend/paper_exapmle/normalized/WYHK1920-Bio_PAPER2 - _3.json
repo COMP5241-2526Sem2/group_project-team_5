@@ -1,0 +1,55 @@
+{
+  "title": "WYHK1920-Bio_PAPER2 - _3",
+  "course_id": 1,
+  "grade": "Unknown",
+  "subject": "Biology",
+  "semester": "vol1",
+  "exam_type": "paper",
+  "total_score": 2,
+  "duration_min": 60,
+  "quality_score": null,
+  "sections": [
+    {
+      "title": "Main",
+      "question_type": "MIXED",
+      "score_each": 1,
+      "total_score": 2,
+      "questions": [
+        {
+          "publisher": "unknown",
+          "grade": "Unknown",
+          "subject": "Biology",
+          "semester": null,
+          "question_type": "SHORT_ANSWER",
+          "prompt": "100% glucose?              (2 marks)",
+          "difficulty": "medium",
+          "score": 2,
+          "answer_text": "TBD",
+          "explanation": "TBD",
+          "chapter": null,
+          "source_type": "paper",
+          "source_id": null,
+          "options": []
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "publisher": "unknown",
+      "grade": "Unknown",
+      "subject": "Biology",
+      "semester": null,
+      "question_type": "SHORT_ANSWER",
+      "prompt": "100% glucose?              (2 marks)",
+      "difficulty": "medium",
+      "score": 2,
+      "answer_text": "TBD",
+      "explanation": "TBD",
+      "chapter": null,
+      "source_type": "paper",
+      "source_id": null,
+      "options": []
+    }
+  ]
+}

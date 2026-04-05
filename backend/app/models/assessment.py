@@ -16,7 +16,7 @@ class PaperStatus(str, enum.Enum):
     ARCHIVED = "archived"
 
 
-class ExerciseStatus(str, enum.Enum):
+class QuestionStatus(str, enum.Enum):
     DRAFT = "draft"
     PUBLISHED = "published"
     CLOSED = "closed"
@@ -103,12 +103,16 @@ class PaperQuestion(Base):
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     difficulty: Mapped[str | None] = mapped_column(Text, nullable=True)
     score: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)
+    bank_question_id: Mapped[int] = mapped_column(
+        ForeignKey("question_bank_items.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
     answer_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
     chapter: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     paper: Mapped[Paper] = relationship(back_populates="questions")
     section: Mapped[PaperSection] = relationship(back_populates="questions")
+    bank_question: Mapped[QuestionBankItem | None] = relationship(back_populates="paper_questions")
     options: Mapped[list[PaperQuestionOption]] = relationship(back_populates="question", cascade="all, delete-orphan")
 
     __table_args__ = (
@@ -134,35 +138,78 @@ class PaperQuestionOption(Base):
     __table_args__ = (UniqueConstraint("question_id", "option_key", name="uq_paper_question_options_key"),)
 
 
-class Exercise(Base):
-    __tablename__ = "exercises"
+class QuestionBankItem(Base):
+    __tablename__ = "question_bank_items"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    publisher: Mapped[str | None] = mapped_column(Text, nullable=True)
+    grade: Mapped[str] = mapped_column(Text, nullable=False)
+    subject: Mapped[str] = mapped_column(Text, nullable=False)
+    semester: Mapped[str | None] = mapped_column(Text, nullable=True)
+    question_type: Mapped[str] = mapped_column(Text, nullable=False)
+    prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    difficulty: Mapped[str | None] = mapped_column(Text, nullable=True)
+    answer_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    chapter: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_type: Mapped[str] = mapped_column(Text, nullable=False)
+    source_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
+    created_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    options: Mapped[list[QuestionBankOption]] = relationship(back_populates="bank_question", cascade="all, delete-orphan")
+    paper_questions: Mapped[list[PaperQuestion]] = relationship(back_populates="bank_question")
+    question_items: Mapped[list[QuestionItem]] = relationship(back_populates="bank_question")
+
+
+class QuestionBankOption(Base):
+    __tablename__ = "question_bank_options"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    bank_question_id: Mapped[int] = mapped_column(
+        ForeignKey("question_bank_items.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    option_key: Mapped[str] = mapped_column(Text, nullable=False)
+    option_text: Mapped[str] = mapped_column(Text, nullable=False)
+    is_correct: Mapped[bool | None] = mapped_column(nullable=True)
+
+    bank_question: Mapped[QuestionBankItem] = relationship(back_populates="options")
+
+    __table_args__ = (UniqueConstraint("bank_question_id", "option_key", name="uq_question_bank_options_key"),)
+
+
+class Question(Base):
+    __tablename__ = "questions"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     title: Mapped[str] = mapped_column(Text, nullable=False)
     course_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
-    paper_id: Mapped[int | None] = mapped_column(ForeignKey("papers.id", ondelete="SET NULL"), nullable=True, index=True)
     due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     duration_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
     total_score: Mapped[int] = mapped_column(Integer, nullable=False)
-    status: Mapped[ExerciseStatus] = mapped_column(
-        SQLEnum(ExerciseStatus, name="exercise_status"), nullable=False, default=ExerciseStatus.DRAFT
+    status: Mapped[QuestionStatus] = mapped_column(
+        SQLEnum(QuestionStatus, name="question_status"), nullable=False, default=QuestionStatus.DRAFT
     )
     created_by: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    attempts: Mapped[list[ExerciseAttempt]] = relationship(back_populates="exercise", cascade="all, delete-orphan")
+    attempts: Mapped[list[QuestionAttempt]] = relationship(back_populates="question", cascade="all, delete-orphan")
+    items: Mapped[list[QuestionItem]] = relationship(back_populates="question", cascade="all, delete-orphan")
 
     __table_args__ = (
-        CheckConstraint("total_score >= 0", name="ck_exercises_total_score_non_negative"),
-        CheckConstraint("duration_min IS NULL OR duration_min >= 0", name="ck_exercises_duration_non_negative"),
+        CheckConstraint("total_score >= 0", name="ck_questions_total_score_non_negative"),
+        CheckConstraint("duration_min IS NULL OR duration_min >= 0", name="ck_questions_duration_non_negative"),
     )
 
 
-class ExerciseAttempt(Base):
-    __tablename__ = "exercise_attempts"
+class QuestionAttempt(Base):
+    __tablename__ = "question_attempts"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    exercise_id: Mapped[int] = mapped_column(ForeignKey("exercises.id", ondelete="CASCADE"), nullable=False, index=True)
+    question_id: Mapped[int] = mapped_column(ForeignKey("questions.id", ondelete="CASCADE"), nullable=False, index=True)
     student_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -171,21 +218,43 @@ class ExerciseAttempt(Base):
         SQLEnum(AttemptStatus, name="attempt_status"), nullable=False, default=AttemptStatus.IN_PROGRESS
     )
 
-    exercise: Mapped[Exercise] = relationship(back_populates="attempts")
-    answers: Mapped[list[ExerciseAttemptAnswer]] = relationship(back_populates="attempt", cascade="all, delete-orphan")
+    question: Mapped[Question] = relationship(back_populates="attempts")
+    answers: Mapped[list[QuestionAttemptAnswer]] = relationship(back_populates="attempt", cascade="all, delete-orphan")
 
     __table_args__ = (
-        UniqueConstraint("exercise_id", "student_id", name="uq_exercise_attempts_exercise_student"),
-        CheckConstraint("score IS NULL OR score >= 0", name="ck_exercise_attempts_score_non_negative"),
+        UniqueConstraint("question_id", "student_id", name="uq_question_attempts_question_student"),
+        CheckConstraint("score IS NULL OR score >= 0", name="ck_question_attempts_score_non_negative"),
     )
 
 
-class ExerciseAttemptAnswer(Base):
-    __tablename__ = "exercise_attempt_answers"
+class QuestionItem(Base):
+    __tablename__ = "question_items"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    question_id: Mapped[int] = mapped_column(ForeignKey("questions.id", ondelete="CASCADE"), nullable=False, index=True)
+    bank_question_id: Mapped[int] = mapped_column(
+        ForeignKey("question_bank_items.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    order_num: Mapped[int] = mapped_column(Integer, nullable=False)
+    score: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)
+    prompt_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    question: Mapped[Question] = relationship(back_populates="items")
+    bank_question: Mapped[QuestionBankItem] = relationship(back_populates="question_items")
+
+    __table_args__ = (
+        UniqueConstraint("question_id", "order_num", name="uq_question_items_order"),
+        CheckConstraint("order_num >= 1", name="ck_question_items_order_positive"),
+        CheckConstraint("score >= 0", name="ck_question_items_score_non_negative"),
+    )
+
+
+class QuestionAttemptAnswer(Base):
+    __tablename__ = "question_attempt_answers"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     attempt_id: Mapped[int] = mapped_column(
-        ForeignKey("exercise_attempts.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey("question_attempts.id", ondelete="CASCADE"), nullable=False, index=True
     )
     question_id: Mapped[int] = mapped_column(
         ForeignKey("paper_questions.id", ondelete="CASCADE"), nullable=False, index=True
@@ -196,9 +265,9 @@ class ExerciseAttemptAnswer(Base):
     awarded_score: Mapped[float | None] = mapped_column(Numeric(6, 2), nullable=True)
     teacher_feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    attempt: Mapped[ExerciseAttempt] = relationship(back_populates="answers")
+    attempt: Mapped[QuestionAttempt] = relationship(back_populates="answers")
 
     __table_args__ = (
-        UniqueConstraint("attempt_id", "question_id", name="uq_exercise_attempt_answers_attempt_question"),
+        UniqueConstraint("attempt_id", "question_id", name="uq_question_attempt_answers_attempt_question"),
         CheckConstraint("awarded_score IS NULL OR awarded_score >= 0", name="ck_attempt_answers_awarded_score_non_negative"),
     )

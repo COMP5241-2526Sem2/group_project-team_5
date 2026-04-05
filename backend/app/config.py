@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     app_env: str = "dev"
     api_base_url: str = "http://localhost:8000"
 
-    database_url: str = "sqlite+aiosqlite:///./data/dev.db"
+    database_url: str = "mysql+aiomysql://root:119892@localhost:3306/openstudy_dev"
 
     jwt_secret_key: str = "CHANGE_ME"
     jwt_algorithm: str = "HS256"
