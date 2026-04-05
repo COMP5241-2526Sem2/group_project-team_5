@@ -1,23 +1,38 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+
 [project]
 name = "openstudy-backend"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.9"
 dependencies = [
+    "asyncpg>=0.31.0",
     "aiomysql>=0.3.2",
     "aiosqlite>=0.22.1",
-    "alembic>=1.18.4",
-    "fastapi>=0.135.3",
+    "alembic>=1.16.0,<1.17; python_version<'3.10'",
+    "alembic>=1.18.4; python_version>='3.10'",
+    "fastapi>=0.115.0,<0.129; python_version<'3.10'",
+    "fastapi>=0.135.3; python_version>='3.10'",
+    "greenlet>=3.0",
     "httpx>=0.28.1",
     "openai>=2.30.0",
     "passlib[bcrypt]>=1.7.4",
     "pypdf>=5.4.0",
-    "pydantic>=2.12.5",
-    "pydantic-settings>=2.13.1",
+    "pydantic>=2.10.4,<2.12; python_version<'3.10'",
+    "pydantic>=2.12.5; python_version>='3.10'",
+    "pydantic-settings>=2.10.0,<2.12; python_version<'3.10'",
+    "pydantic-settings>=2.13.1; python_version>='3.10'",
     "python-jose[cryptography]>=3.5.0",
     "sqlalchemy>=2.0.48",
-    "uvicorn>=0.42.0",
+    "uvicorn>=0.30.0,<0.40; python_version<'3.10'",
+    "uvicorn>=0.42.0; python_version>='3.10'",
 ]
 
 [dependency-groups]

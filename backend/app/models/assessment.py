@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
+from typing import Optional
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Integer, Numeric, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Integer, LargeBinary, Numeric, Text, UniqueConstraint, func
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -36,12 +37,12 @@ class Paper(Base):
     course_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     grade: Mapped[str] = mapped_column(Text, nullable=False)
     subject: Mapped[str] = mapped_column(Text, nullable=False)
-    semester: Mapped[str | None] = mapped_column(Text, nullable=True)
+    semester: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     exam_type: Mapped[str] = mapped_column(Text, nullable=False)
     total_score: Mapped[int] = mapped_column(Integer, nullable=False)
     duration_min: Mapped[int] = mapped_column(Integer, nullable=False)
     question_count: Mapped[int] = mapped_column(Integer, nullable=False)
-    quality_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    quality_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     status: Mapped[PaperStatus] = mapped_column(
         SQLEnum(PaperStatus, name="paper_status"), nullable=False, default=PaperStatus.DRAFT
     )
@@ -50,7 +51,9 @@ class Paper(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
-    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    source_file_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source_pdf: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
 
     sections: Mapped[list[PaperSection]] = relationship(back_populates="paper", cascade="all, delete-orphan")
     questions: Mapped[list[PaperQuestion]] = relationship(back_populates="paper", cascade="all, delete-orphan")
@@ -101,14 +104,14 @@ class PaperQuestion(Base):
     order_num: Mapped[int] = mapped_column(Integer, nullable=False)
     question_type: Mapped[str] = mapped_column(Text, nullable=False)
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
-    difficulty: Mapped[str | None] = mapped_column(Text, nullable=True)
+    difficulty: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     score: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)
     bank_question_id: Mapped[int] = mapped_column(
         ForeignKey("question_bank_items.id", ondelete="RESTRICT"), nullable=False, index=True
     )
-    answer_text: Mapped[str | None] = mapped_column(Text, nullable=True)
-    explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
-    chapter: Mapped[str | None] = mapped_column(Text, nullable=True)
+    answer_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    explanation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    chapter: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     paper: Mapped[Paper] = relationship(back_populates="questions")
     section: Mapped[PaperSection] = relationship(back_populates="questions")
@@ -131,7 +134,7 @@ class PaperQuestionOption(Base):
     )
     option_key: Mapped[str] = mapped_column(Text, nullable=False)
     option_text: Mapped[str] = mapped_column(Text, nullable=False)
-    is_correct: Mapped[bool | None] = mapped_column(nullable=True)
+    is_correct: Mapped[Optional[bool]] = mapped_column(nullable=True)
 
     question: Mapped[PaperQuestion] = relationship(back_populates="options")
 
@@ -187,8 +190,8 @@ class Question(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     title: Mapped[str] = mapped_column(Text, nullable=False)
     course_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
-    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    duration_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    due_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    duration_min: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     total_score: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[QuestionStatus] = mapped_column(
         SQLEnum(QuestionStatus, name="question_status"), nullable=False, default=QuestionStatus.DRAFT
@@ -211,9 +214,9 @@ class QuestionAttempt(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     question_id: Mapped[int] = mapped_column(ForeignKey("questions.id", ondelete="CASCADE"), nullable=False, index=True)
     student_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
-    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    score: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    score: Mapped[Optional[float]] = mapped_column(Numeric(8, 2), nullable=True)
     status: Mapped[AttemptStatus] = mapped_column(
         SQLEnum(AttemptStatus, name="attempt_status"), nullable=False, default=AttemptStatus.IN_PROGRESS
     )
@@ -259,11 +262,11 @@ class QuestionAttemptAnswer(Base):
     question_id: Mapped[int] = mapped_column(
         ForeignKey("paper_questions.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    selected_option: Mapped[str | None] = mapped_column(Text, nullable=True)
-    text_answer: Mapped[str | None] = mapped_column(Text, nullable=True)
-    is_correct: Mapped[bool | None] = mapped_column(nullable=True)
-    awarded_score: Mapped[float | None] = mapped_column(Numeric(6, 2), nullable=True)
-    teacher_feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
+    selected_option: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    text_answer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_correct: Mapped[Optional[bool]] = mapped_column(nullable=True)
+    awarded_score: Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
+    teacher_feedback: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     attempt: Mapped[QuestionAttempt] = relationship(back_populates="answers")
 
