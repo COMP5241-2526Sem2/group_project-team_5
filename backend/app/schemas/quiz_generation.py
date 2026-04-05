@@ -7,7 +7,14 @@ from pydantic import BaseModel, Field, model_validator
 
 Difficulty = Literal["easy", "medium", "hard"]
 GenerateMode = Literal["textbook", "paper_mimic"]
-QuestionType = Literal["MCQ_SINGLE", "SHORT_ANSWER"]
+QuestionType = Literal[
+    "MCQ_SINGLE",
+    "MCQ_MULTI",
+    "TRUE_FALSE",
+    "FILL_BLANK",
+    "SHORT_ANSWER",
+    "ESSAY",
+]
 SourceType = Literal["paper", "exercise", "textbook", "ai_generated", "manual"]
 
 
@@ -24,7 +31,8 @@ class QuizGenerateRequest(BaseModel):
     chapter: str | None = None
 
     source_paper_id: int | None = None
-    rewrite_strength: Literal["medium"] = "medium"
+    rewrite_strength: Literal["low", "medium", "high"] = "medium"
+    type_targets: dict[QuestionType, int] | None = None
 
     @model_validator(mode="after")
     def validate_mode_dependencies(self) -> "QuizGenerateRequest":
@@ -32,6 +40,16 @@ class QuizGenerateRequest(BaseModel):
             raise ValueError("textbook_id is required when mode='textbook'")
         if self.mode == "paper_mimic" and self.source_paper_id is None:
             raise ValueError("source_paper_id is required when mode='paper_mimic'")
+
+        targets = self.type_targets or {}
+        if targets:
+            total = sum(targets.values())
+            if total != self.question_count:
+                raise ValueError("sum(type_targets) must equal question_count")
+            invalid = [k for k, v in targets.items() if v < 0]
+            if invalid:
+                raise ValueError(f"type_targets must be non-negative: {', '.join(invalid)}")
+
         return self
 
 

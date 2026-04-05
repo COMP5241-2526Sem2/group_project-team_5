@@ -260,7 +260,7 @@ class QuestionAttemptAnswer(Base):
         ForeignKey("question_attempts.id", ondelete="CASCADE"), nullable=False, index=True
     )
     question_id: Mapped[int] = mapped_column(
-        ForeignKey("paper_questions.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey("question_items.id", ondelete="CASCADE"), nullable=False, index=True
     )
     selected_option: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     text_answer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

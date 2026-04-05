@@ -108,3 +108,9 @@ PYTHONPATH=. .venv/bin/python scripts/import_documents.py paper_exapmle/import_m
 - 导入脚本会跳过同名试卷，避免重复导入同一份试卷。
 - 教材内容过长时会自动截断，避免 MySQL `TEXT` 长度报错。
 - 当前抽取属于启发式抽取，题目内容可能需要人工二次校对。
+
+## 接口文档
+
+- Quiz 正式接口文档：`API_QUIZ_DOCS.md`
+- 接口变更记录：`API_INTERFACE_CHANGELOG.md`
+- 功能验收清单：`QUIZ_ACCEPTANCE_CHECKLIST.md`

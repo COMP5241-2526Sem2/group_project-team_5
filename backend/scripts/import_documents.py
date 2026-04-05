@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 
 from app.database import SessionLocal, engine
 from app.models.assessment import Paper, PaperQuestion, PaperQuestionOption, PaperSection, PaperStatus, QuestionBankItem, QuestionBankOption
@@ -30,6 +30,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Import textbooks and papers from normalized JSON files.")
     parser.add_argument("manifest", type=Path, help="Path to a JSON manifest that lists source files and types.")
     parser.add_argument("--created-by", type=int, default=None, help="Optional creator user id for imported records.")
+    parser.add_argument(
+        "--on-conflict",
+        choices=["rebuild", "skip"],
+        default="rebuild",
+        help="When paper title already exists: rebuild (default) or skip.",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Validate and print what would be imported.")
     args = parser.parse_args()
 
@@ -37,21 +43,36 @@ def main() -> None:
     if not isinstance(manifest, list):
         raise ValueError("Manifest must be a JSON array of source entries.")
 
+    asyncio.run(
+        run_import_with_cleanup(
+            manifest=manifest,
+            manifest_path=args.manifest,
+            created_by=args.created_by,
+            dry_run=args.dry_run,
+            on_conflict=args.on_conflict,
+        )
+    )
+
+
+async def run_import_with_cleanup(
+    *, manifest: list[Any], manifest_path: Path, created_by: int | None, dry_run: bool, on_conflict: str
+) -> None:
     try:
-        asyncio.run(
-            run_import(
-                manifest=manifest,
-                manifest_path=args.manifest,
-                created_by=args.created_by,
-                dry_run=args.dry_run,
-            )
+        await run_import(
+            manifest=manifest,
+            manifest_path=manifest_path,
+            created_by=created_by,
+            dry_run=dry_run,
+            on_conflict=on_conflict,
         )
     finally:
-        # Ensure pooled MySQL connections are closed before loop shutdown.
-        asyncio.run(engine.dispose())
+        # Dispose engine in the same event loop used by the import.
+        await engine.dispose()
 
 
-async def run_import(*, manifest: list[Any], manifest_path: Path, created_by: int | None, dry_run: bool) -> None:
+async def run_import(
+    *, manifest: list[Any], manifest_path: Path, created_by: int | None, dry_run: bool, on_conflict: str
+) -> None:
     summary = ImportSummary()
     for entry in manifest:
         if not isinstance(entry, dict):
@@ -63,11 +84,23 @@ async def run_import(*, manifest: list[Any], manifest_path: Path, created_by: in
 
         document_type = entry.get("type")
         payload = load_json(source_path)
+        source_pdf_path = infer_source_pdf_path(
+            source_json_path=source_path,
+            manifest_path=manifest_path,
+            entry=entry,
+        )
 
         if document_type == "textbook":
             await import_textbook(payload=payload, created_by=created_by, dry_run=dry_run, summary=summary)
         elif document_type == "paper":
-            await import_paper(payload=payload, created_by=created_by, dry_run=dry_run, summary=summary)
+            await import_paper(
+                payload=payload,
+                created_by=created_by,
+                dry_run=dry_run,
+                summary=summary,
+                source_pdf_path=source_pdf_path,
+                on_conflict=on_conflict,
+            )
         else:
             raise ValueError(f"Unsupported document type: {document_type!r}")
 
@@ -113,7 +146,15 @@ async def import_textbook(*, payload: dict[str, Any], created_by: int | None, dr
         summary.textbooks_created += 1
 
 
-async def import_paper(*, payload: dict[str, Any], created_by: int | None, dry_run: bool, summary: ImportSummary) -> None:
+async def import_paper(
+    *,
+    payload: dict[str, Any],
+    created_by: int | None,
+    dry_run: bool,
+    summary: ImportSummary,
+    source_pdf_path: Path | None,
+    on_conflict: str,
+) -> None:
     ensure_required_fields(
         payload,
         ["title", "course_id", "grade", "subject", "exam_type", "total_score", "duration_min", "questions"],
@@ -138,28 +179,54 @@ async def import_paper(*, payload: dict[str, Any], created_by: int | None, dry_r
     async with SessionLocal() as db:
         result = await db.execute(select(Paper).where(Paper.title == payload["title"]))
         paper = result.scalar_one_or_none()
-        if paper is not None:
-            print(f"[skip] paper exists: {payload['title']}")
-            return
+        source_file_name = payload.get("source_file_name")
+        if source_pdf_path and source_pdf_path.exists():
+            source_file_name = source_pdf_path.name
 
-        paper = Paper(
-            title=payload["title"],
-            course_id=payload["course_id"],
-            grade=payload["grade"],
-            subject=payload["subject"],
-            semester=payload.get("semester"),
-            exam_type=payload["exam_type"],
-            total_score=payload["total_score"],
-            duration_min=payload["duration_min"],
-            question_count=len(questions),
-            quality_score=payload.get("quality_score"),
-            status=PaperStatus.DRAFT,
-            created_by=created_by or 1,
-            created_at=datetime.utcnow(),
-        )
-        db.add(paper)
-        await db.flush()
-        summary.papers_created += 1
+        if paper is None:
+            paper = Paper(
+                title=payload["title"],
+                course_id=payload["course_id"],
+                grade=payload["grade"],
+                subject=payload["subject"],
+                semester=payload.get("semester"),
+                exam_type=payload["exam_type"],
+                total_score=payload["total_score"],
+                duration_min=payload["duration_min"],
+                question_count=len(questions),
+                quality_score=payload.get("quality_score"),
+                status=PaperStatus.DRAFT,
+                created_by=created_by or 1,
+                created_at=datetime.utcnow(),
+                source_file_name=source_file_name,
+                source_pdf=None,
+            )
+            db.add(paper)
+            await db.flush()
+            summary.papers_created += 1
+        else:
+            if on_conflict == "skip":
+                print(f"[skip] paper exists: {payload['title']}")
+                return
+
+            paper.course_id = payload["course_id"]
+            paper.grade = payload["grade"]
+            paper.subject = payload["subject"]
+            paper.semester = payload.get("semester")
+            paper.exam_type = payload["exam_type"]
+            paper.total_score = payload["total_score"]
+            paper.duration_min = payload["duration_min"]
+            paper.question_count = len(questions)
+            paper.quality_score = payload.get("quality_score")
+            paper.status = PaperStatus.DRAFT
+            if source_file_name:
+                paper.source_file_name = source_file_name
+            paper.source_pdf = None
+
+            # Rebuild sections/questions to apply improved parsing results.
+            await db.execute(delete(PaperQuestion).where(PaperQuestion.paper_id == paper.id))
+            await db.execute(delete(PaperSection).where(PaperSection.paper_id == paper.id))
+            print(f"[rebuild] paper content refreshed: {payload['title']}")
 
         sections_payload = payload.get("sections") or [
             {"title": "Main", "question_type": "MCQ_SINGLE", "questions": questions}
@@ -182,6 +249,12 @@ async def import_paper(*, payload: dict[str, Any], created_by: int | None, dry_r
             summary.sections_created += 1
 
             for question_payload in section_questions:
+                question_payload = dict(question_payload)
+                question_payload["source_type"] = question_payload.get("source_type") or "paper"
+                if question_payload["source_type"] == "paper":
+                    question_payload["source_id"] = paper.id
+                question_payload["options"] = dedupe_option_payloads(question_payload.get("options", []))
+
                 bank_item = await find_or_create_bank_item(
                     db=db, question_payload=question_payload, created_by=created_by, summary=summary
                 )
@@ -238,6 +311,51 @@ async def find_or_create_bank_item(
     )
     existing = result.scalar_one_or_none()
     if existing is not None:
+        incoming_source_id = question_payload.get("source_id")
+        if (
+            existing.source_type == "paper"
+            and incoming_source_id is not None
+            and existing.source_id is None
+        ):
+            existing.source_id = incoming_source_id
+
+        if existing.question_type == "SHORT_ANSWER" and question_payload["question_type"] != "SHORT_ANSWER":
+            existing.question_type = question_payload["question_type"]
+
+        incoming_answer = fit_mysql_text(question_payload.get("answer_text"))
+        if incoming_answer and incoming_answer != "TBD":
+            existing.answer_text = incoming_answer
+
+        option_count = await db.scalar(
+            select(func.count()).select_from(QuestionBankOption).where(QuestionBankOption.bank_question_id == existing.id)
+        )
+        if (option_count or 0) == 0 and question_payload.get("options"):
+            for option_payload in dedupe_option_payloads(question_payload.get("options", [])):
+                db.add(
+                    QuestionBankOption(
+                        bank_question_id=existing.id,
+                        option_key=option_payload["option_key"],
+                        option_text=fit_mysql_text(option_payload["option_text"]),
+                        is_correct=option_payload.get("is_correct"),
+                    )
+                )
+                summary.bank_options_created += 1
+        elif question_payload.get("options"):
+            rows = await db.execute(
+                select(QuestionBankOption).where(QuestionBankOption.bank_question_id == existing.id)
+            )
+            by_key = {
+                str(option.option_key).strip().upper(): option
+                for option in rows.scalars().all()
+            }
+            for option_payload in dedupe_option_payloads(question_payload.get("options", [])):
+                key = str(option_payload.get("option_key", "")).strip().upper()
+                if not key or key not in by_key:
+                    continue
+                row = by_key[key]
+                row.option_text = fit_mysql_text(option_payload.get("option_text"))
+                row.is_correct = option_payload.get("is_correct")
+
         return existing
 
     bank_item = QuestionBankItem(
@@ -285,6 +403,31 @@ def load_json(path: Path) -> Any:
         return json.load(handle)
 
 
+def infer_source_pdf_path(*, source_json_path: Path, manifest_path: Path, entry: dict[str, Any]) -> Path | None:
+    if entry.get("source_pdf"):
+        candidate = Path(str(entry["source_pdf"]))
+        if not candidate.is_absolute():
+            candidate = (manifest_path.parent / candidate).resolve()
+        return candidate if candidate.exists() else None
+
+    candidate_names = [
+        f"{source_json_path.stem}.pdf",
+        str(entry.get("source_file_name", "")).strip(),
+    ]
+    candidate_names = [name for name in candidate_names if name]
+
+    roots = [manifest_path.parent]
+    if source_json_path.parent.name == "normalized":
+        roots.append(source_json_path.parent.parent)
+
+    for root in roots:
+        for name in candidate_names:
+            candidate = (root / name).resolve()
+            if candidate.exists() and candidate.is_file():
+                return candidate
+    return None
+
+
 def fit_mysql_text(value: Any, max_len: int = 60000) -> str | None:
     if value is None:
         return None
@@ -292,6 +435,19 @@ def fit_mysql_text(value: Any, max_len: int = 60000) -> str | None:
     if len(text) <= max_len:
         return text
     return text[: max_len - 20] + "\n[TRUNCATED_BY_IMPORT]"
+
+
+def dedupe_option_payloads(options: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen: set[str] = set()
+    unique: list[dict[str, Any]] = []
+    for option in options:
+        key = str(option.get("option_key", "")).strip()
+        text = str(option.get("option_text", "")).strip()
+        if not key or not text or key in seen:
+            continue
+        seen.add(key)
+        unique.append(option)
+    return unique
 
 
 if __name__ == "__main__":

@@ -1,8 +1,16 @@
+from sqlalchemy import BigInteger
+from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import DeclarativeBase
 
 
 class Base(DeclarativeBase):
 	pass
+
+
+@compiles(BigInteger, "sqlite")
+def _compile_bigint_for_sqlite(_type, _compiler, **_kw) -> str:
+	# SQLite auto-increment only works reliably with INTEGER PK affinity.
+	return "INTEGER"
 
 
 from app.models.assessment import Paper, PaperQuestion, PaperQuestionOption, PaperSection

@@ -120,3 +120,79 @@
 - `question_items`: 12
 
 说明：当前测试环境下题库与教材基础数据为空，因此生成流程走的是“题库不足时自动补齐模板题”的分支。
+
+## 8. Quiz 运行时接口补齐（新增路由）
+
+本批次新增学生端 Quiz 运行时接口，统一以 `questions` 作为 Quiz 主体。
+
+### 8.1 路由清单
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/v1/quizzes/todo` | 获取当前学生待做 Quiz 列表 |
+| GET | `/api/v1/quizzes/completed` | 获取当前学生已完成 Quiz 列表 |
+| GET | `/api/v1/quizzes/{quiz_id}` | 获取 Quiz 详情与题目列表 |
+| POST | `/api/v1/quizzes/{quiz_id}/attempts` | 创建或获取当前学生作答尝试 |
+| PUT | `/api/v1/attempts/{attempt_id}/answers` | 保存作答（可重复覆盖） |
+| POST | `/api/v1/attempts/{attempt_id}/submit` | 提交并完成客观题判分 |
+| GET | `/api/v1/attempts/{attempt_id}/review` | 获取提交后复盘视图 |
+
+说明：以上接口均要求请求头携带 `X-User-Id`，缺失时返回 400。
+
+### 8.2 保存作答请求示例
+
+路径：`PUT /api/v1/attempts/12/answers`
+
+```json
+{
+  "answers": [
+    {
+      "question_id": 101,
+      "selected_option": "A"
+    },
+    {
+      "question_id": 102,
+      "text_answer": "osmosis"
+    }
+  ]
+}
+```
+
+### 8.3 提交作答响应示例
+
+路径：`POST /api/v1/attempts/12/submit`
+
+```json
+{
+  "attempt_id": 12,
+  "status": "submitted",
+  "score": 66.68,
+  "total_score": 100,
+  "mcq_correct": 3,
+  "mcq_total": 3
+}
+```
+
+### 8.4 关键行为约定
+
+1. 同一学生对同一 Quiz 只保留一条 attempt 记录；重复创建会返回已有 attempt。
+2. `save answers` 在 attempt 状态为 `in_progress` 时可多次调用并覆盖旧答案。
+3. `submit` 对客观题型执行自动判分：
+   - `MCQ_SINGLE`
+   - `MCQ_MULTI`
+   - `TRUE_FALSE`
+   - `FILL_BLANK`
+4. 主观题型（如 `SHORT_ANSWER`、`ESSAY`）提交时不自动判分，保留为待人工评阅。
+
+## 9. 数据迁移说明
+
+新增迁移：`a9c4f6e2b1d0_fix_attempt_answer_fk_to_question_items`
+
+变更内容：
+
+1. 将 `question_attempt_answers.question_id` 的外键引用由 `paper_questions.id` 更正为 `question_items.id`。
+2. 保持 `ON DELETE CASCADE` 语义，确保 Quiz 题项删除时作答明细自动清理。
+
+影响说明：
+
+- 该迁移修复了 Quiz 运行时写答案时的外键语义错误，避免作答数据写入失败或关联错位。

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime
 from difflib import SequenceMatcher
-from uuid import uuid4
 from typing import cast
+from uuid import uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,47 +13,73 @@ from app.schemas.quiz_generation import GeneratedQuizItem, QuizGenerateRequest, 
 
 
 class QuizGenerationService:
+    TYPE_PRIORITY = [
+        "MCQ_SINGLE",
+        "MCQ_MULTI",
+        "TRUE_FALSE",
+        "FILL_BLANK",
+        "SHORT_ANSWER",
+        "ESSAY",
+    ]
+
     @staticmethod
     async def generate(db: AsyncSession, payload: QuizGenerateRequest, actor_id: int = 1) -> QuizGenerateResponse:
-        # 首版规则：固定 5 道单选 + 1 道简答；若 question_count != 6 则按 80/20 兜底
-        mcq_target, sa_target = QuizGenerationService._split_types(payload.question_count)
+        type_targets = payload.type_targets or QuizGenerationService._default_type_targets(payload.question_count)
 
-        bank_candidates = await QuizGenerationService._fetch_bank_candidates(db, payload)
+        bank_candidates = await QuizGenerationService._fetch_bank_candidates(
+            db,
+            payload,
+            question_types=list(type_targets.keys()),
+        )
 
-        selected_mcq = [q for q in bank_candidates if q.question_type == "MCQ_SINGLE"][:mcq_target]
-        selected_sa = [q for q in bank_candidates if q.question_type == "SHORT_ANSWER"][:sa_target]
-
-        reused = selected_mcq + selected_sa
-        missing_mcq = max(0, mcq_target - len(selected_mcq))
-        missing_sa = max(0, sa_target - len(selected_sa))
+        reused: list[QuestionBankItem] = []
         seen_prompts = [item.prompt for item in reused]
+        generated: list[QuestionBankItem] = []
 
-        generated = []
-        if missing_mcq > 0:
-            generated.extend(
-                await QuizGenerationService._generate_and_store_bank_items(
-                    db=db,
-                    payload=payload,
-                    actor_id=actor_id,
-                    question_type="MCQ_SINGLE",
-                    count=missing_mcq,
-                    seen_prompts=seen_prompts,
-                )
-            )
-            seen_prompts.extend(item.prompt for item in generated)
-        if missing_sa > 0:
-            generated.extend(
-                await QuizGenerationService._generate_and_store_bank_items(
-                    db=db,
-                    payload=payload,
-                    actor_id=actor_id,
-                    question_type="SHORT_ANSWER",
-                    count=missing_sa,
-                    seen_prompts=seen_prompts,
-                )
-            )
+        for question_type in QuizGenerationService.TYPE_PRIORITY:
+            target = type_targets.get(question_type, 0)
+            if target <= 0:
+                continue
 
-        final_bank_items = reused + generated
+            selected = [q for q in bank_candidates if q.question_type == question_type][:target]
+            reused.extend(selected)
+            seen_prompts.extend(item.prompt for item in selected)
+
+            missing = max(0, target - len(selected))
+            if missing <= 0:
+                continue
+
+            created = await QuizGenerationService._generate_and_store_bank_items(
+                db=db,
+                payload=payload,
+                actor_id=actor_id,
+                question_type=question_type,
+                count=missing,
+                seen_prompts=seen_prompts,
+            )
+            generated.extend(created)
+            seen_prompts.extend(item.prompt for item in created)
+
+        final_bank_items = []
+        for question_type in QuizGenerationService.TYPE_PRIORITY:
+            final_bank_items.extend([item for item in reused if item.question_type == question_type])
+            final_bank_items.extend([item for item in generated if item.question_type == question_type])
+
+        if len(final_bank_items) != payload.question_count:
+            # Defensive trim/pad in case unexpected targets are provided.
+            final_bank_items = final_bank_items[: payload.question_count]
+            if len(final_bank_items) < payload.question_count:
+                final_bank_items.extend(
+                    await QuizGenerationService._generate_and_store_bank_items(
+                        db=db,
+                        payload=payload,
+                        actor_id=actor_id,
+                        question_type="SHORT_ANSWER",
+                        count=payload.question_count - len(final_bank_items),
+                        seen_prompts=seen_prompts,
+                    )
+                )
+            
 
         question = Question(
             title=QuizGenerationService._build_title(payload),
@@ -83,7 +109,7 @@ class QuizGenerationService:
             )
 
             options = None
-            if bank_item.question_type == "MCQ_SINGLE":
+            if bank_item.question_type in {"MCQ_SINGLE", "MCQ_MULTI", "TRUE_FALSE"}:
                 option_rows = await db.execute(
                     select(QuestionBankOption.option_key, QuestionBankOption.option_text)
                     .where(QuestionBankOption.bank_question_id == bank_item.id)
@@ -116,19 +142,44 @@ class QuizGenerationService:
         )
 
     @staticmethod
-    def _split_types(question_count: int) -> tuple[int, int]:
+    def _default_type_targets(question_count: int) -> dict[str, int]:
         if question_count == 6:
-            return 5, 1
-        mcq = max(1, round(question_count * 0.8))
-        sa = max(0, question_count - mcq)
-        return mcq, sa
+            return {"MCQ_SINGLE": 5, "SHORT_ANSWER": 1}
+
+        # Default mix: objective-heavy with one subjective question when possible.
+        mcq_single = max(1, round(question_count * 0.5))
+        true_false = max(0, round(question_count * 0.15))
+        fill_blank = max(0, round(question_count * 0.15))
+        short_answer = max(0, question_count - mcq_single - true_false - fill_blank)
+
+        targets = {
+            "MCQ_SINGLE": mcq_single,
+            "TRUE_FALSE": true_false,
+            "FILL_BLANK": fill_blank,
+            "SHORT_ANSWER": short_answer,
+        }
+
+        # Ensure sum exactly equals question_count.
+        diff = question_count - sum(targets.values())
+        if diff > 0:
+            targets["MCQ_SINGLE"] += diff
+        elif diff < 0:
+            targets["MCQ_SINGLE"] = max(1, targets["MCQ_SINGLE"] + diff)
+
+        return {k: v for k, v in targets.items() if v > 0}
 
     @staticmethod
-    async def _fetch_bank_candidates(db: AsyncSession, payload: QuizGenerateRequest) -> list[QuestionBankItem]:
+    async def _fetch_bank_candidates(
+        db: AsyncSession,
+        payload: QuizGenerateRequest,
+        *,
+        question_types: list[str],
+    ) -> list[QuestionBankItem]:
         stmt = select(QuestionBankItem).where(
             QuestionBankItem.subject == payload.subject,
             QuestionBankItem.grade == payload.grade,
             QuestionBankItem.difficulty == payload.difficulty,
+            QuestionBankItem.question_type.in_(question_types),
         )
 
         if payload.mode == "textbook" and payload.chapter:
@@ -180,7 +231,6 @@ class QuizGenerationService:
                     unique_token=uuid4().hex[:8],
                 )
 
-            source_type = "textbook" if payload.mode == "textbook" else "paper"
             source_id = payload.textbook_id if payload.mode == "textbook" else payload.source_paper_id
             item = QuestionBankItem(
                 publisher="generated",
@@ -190,10 +240,10 @@ class QuizGenerationService:
                 question_type=question_type,
                 prompt=prompt,
                 difficulty=payload.difficulty,
-                answer_text="TBD",
+                answer_text=QuizGenerationService._template_answer(question_type),
                 explanation="TBD",
                 chapter=payload.chapter,
-                source_type=source_type,
+                source_type="ai_generated",
                 source_id=source_id,
                 created_by=actor_id,
                 created_at=datetime.utcnow(),
@@ -201,14 +251,25 @@ class QuizGenerationService:
             db.add(item)
             await db.flush()
 
-            if question_type == "MCQ_SINGLE":
+            if question_type in {"MCQ_SINGLE", "MCQ_MULTI"}:
+                correct_keys = {"A"} if question_type == "MCQ_SINGLE" else {"A", "C"}
                 for key, text in [("A", "Option A"), ("B", "Option B"), ("C", "Option C"), ("D", "Option D")]:
                     db.add(
                         QuestionBankOption(
                             bank_question_id=item.id,
                             option_key=key,
                             option_text=text,
-                            is_correct=True if key == "A" else False,
+                            is_correct=key in correct_keys,
+                        )
+                    )
+            elif question_type == "TRUE_FALSE":
+                for key, text in [("T", "True"), ("F", "False")]:
+                    db.add(
+                        QuestionBankOption(
+                            bank_question_id=item.id,
+                            option_key=key,
+                            option_text=text,
+                            is_correct=key == "T",
                         )
                     )
 
@@ -251,5 +312,25 @@ class QuizGenerationService:
     @staticmethod
     def _template_prompt(subject: str, difficulty: str, question_type: str, idx: int, unique_token: str) -> str:
         if question_type == "MCQ_SINGLE":
-            return f"[{subject}] ({difficulty}) MCQ #{idx} [{unique_token}]: template prompt"
+            return f"[{subject}] ({difficulty}) MCQ_SINGLE #{idx} [{unique_token}]: template prompt"
+        if question_type == "MCQ_MULTI":
+            return f"[{subject}] ({difficulty}) MCQ_MULTI #{idx} [{unique_token}]: select all that apply"
+        if question_type == "TRUE_FALSE":
+            return f"[{subject}] ({difficulty}) TRUE_FALSE #{idx} [{unique_token}]: statement"
+        if question_type == "FILL_BLANK":
+            return f"[{subject}] ({difficulty}) FILL_BLANK #{idx} [{unique_token}]: complete the blank ____"
+        if question_type == "ESSAY":
+            return f"[{subject}] ({difficulty}) ESSAY #{idx} [{unique_token}]: long-form response"
         return f"[{subject}] ({difficulty}) SHORT_ANSWER #{idx} [{unique_token}]: template prompt"
+
+    @staticmethod
+    def _template_answer(question_type: str) -> str:
+        if question_type == "MCQ_SINGLE":
+            return "A"
+        if question_type == "MCQ_MULTI":
+            return "A,C"
+        if question_type == "TRUE_FALSE":
+            return "T"
+        if question_type == "FILL_BLANK":
+            return "placeholder"
+        return "TBD"

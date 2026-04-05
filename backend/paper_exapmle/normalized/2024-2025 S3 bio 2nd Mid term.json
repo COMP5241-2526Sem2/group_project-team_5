@@ -5,7 +5,7 @@
   "subject": "Biology",
   "semester": "vol1",
   "exam_type": "midterm",
-  "total_score": 8,
+  "total_score": 10,
   "duration_min": 60,
   "quality_score": null,
   "sections": [
@@ -13,87 +13,192 @@
       "title": "Main",
       "question_type": "MIXED",
       "score_each": 1,
-      "total_score": 8,
+      "total_score": 10,
       "questions": [
         {
           "publisher": "unknown",
           "grade": "S3",
           "subject": "Biology",
           "semester": null,
-          "question_type": "SHORT_ANSWER",
-          "prompt": "The diagram below shows four types of human teeth.",
+          "question_type": "MCQ_SINGLE",
+          "prompt": "The diagram below shows four types of human teeth. Which type of teeth is absent in the milk teeth?",
           "difficulty": "medium",
           "score": 1,
-          "answer_text": "TBD",
+          "answer_text": "D",
           "explanation": "TBD",
           "chapter": null,
           "source_type": "paper",
           "source_id": null,
-          "options": []
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "W",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "X",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "Y",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "Z",
+              "is_correct": true
+            }
+          ]
         },
         {
           "publisher": "unknown",
           "grade": "S3",
           "subject": "Biology",
           "semester": null,
-          "question_type": "SHORT_ANSWER",
-          "prompt": "Which of t he following events ensure that the food bolus enter s the oesophagus during the process of",
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which of the following events ensure that the food bolus enter sthe oesophagus during the process of swallowing? (1) The soft palate moves up to prevent the bolus from entering the nasal cavity. (2) The larynx rises so that the epiglottis covers the opening to the trachea. (3) The tongue rises to push the bolus towards the pharynx.",
           "difficulty": "medium",
           "score": 1,
-          "answer_text": "TBD",
+          "answer_text": "B",
           "explanation": "TBD",
           "chapter": null,
           "source_type": "paper",
           "source_id": null,
-          "options": []
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "(1) only",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "(1) and (2) only",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "(2) and (3) only",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "(1), (2) and (3) ( ) BIO F. 3 ( ) W X Y Z F3 Integrated Science 2",
+              "is_correct": false
+            }
+          ]
         },
         {
           "publisher": "unknown",
           "grade": "S3",
           "subject": "Biology",
           "semester": null,
-          "question_type": "SHORT_ANSWER",
-          "prompt": "Which of the following combinations correctly matches the organisms with their modes of nutrition?",
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which of the following combinations correctly matches the organisms with their modes of nutrition? Bread mould Plant Dog",
           "difficulty": "medium",
           "score": 1,
-          "answer_text": "TBD",
+          "answer_text": "A",
           "explanation": "TBD",
           "chapter": null,
           "source_type": "paper",
           "source_id": null,
-          "options": []
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "saprophytic autotrophic holozoic",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "saprophytic holozoic autotrophic",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "holozoic autotrophic saprophytic",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "holozoic saprophytic autotrophic",
+              "is_correct": false
+            }
+          ]
         },
         {
           "publisher": "unknown",
           "grade": "S3",
           "subject": "Biology",
           "semester": null,
-          "question_type": "SHORT_ANSWER",
-          "prompt": "Which of the following are the functions of hydrochloric acid in the gastric juice?",
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which of the following are the functions of hydrochloric acid in the gastric juice? (1) killing bacteria in food (2) hydrolysing starch into maltose (3) providing an acidic medium for pepsin to work",
           "difficulty": "medium",
           "score": 1,
-          "answer_text": "TBD",
+          "answer_text": "B",
           "explanation": "TBD",
           "chapter": null,
           "source_type": "paper",
           "source_id": null,
-          "options": []
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "(1) and (2) only",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "(1) and (3) only",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "(2) and (3) only",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "(1), (2) and (3)",
+              "is_correct": false
+            }
+          ]
         },
         {
           "publisher": "unknown",
           "grade": "S3",
           "subject": "Biology",
           "semester": null,
-          "question_type": "SHORT_ANSWER",
+          "question_type": "MCQ_SINGLE",
           "prompt": "Which of the following is the function of the cardiac sphincter of the stomach?",
           "difficulty": "medium",
           "score": 1,
-          "answer_text": "TBD",
+          "answer_text": "C",
           "explanation": "TBD",
           "chapter": null,
           "source_type": "paper",
           "source_id": null,
-          "options": []
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "To secrete gastric juice.",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "To shape food into abolus.",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "To prevent food from returning to oesophagus.",
+              "is_correct": true
+            },
+            {
+              "option_key": "D",
+              "option_text": "To control the exit of food from the stomach. F3 Integrated Science 3",
+              "is_correct": false
+            }
+          ]
         },
         {
           "publisher": "unknown",
@@ -101,7 +206,7 @@
           "subject": "Biology",
           "semester": null,
           "question_type": "SHORT_ANSWER",
-          "prompt": "The graph below shows the digestion of three types of food substances (X, Y and Z) along the alimentary",
+          "prompt": "The graph below shows the digestion of three types of food substances (X, YandZ) along the alimentary canal. % of undigested food substance present mouth cavity oeso- phagus stomachQ R 100 50 different parts of the alimentary canal 0 Z Y X (a) Arrange the pH values of digestive juices found in mouth cavity, stomach and Qin descending order. (1 mark) > > (b) Name structureR. (1 mark) (c) Which curve represents the digestion of protein? Explain your answer. (3 marks) (d) State and explain how digestive juice(s) is/are responsible for the digestion of lipid in regionQ. (4 marks) F3 Integrated Science 4 (e) Describe how the food bolus passes through the oesophagus. (2 marks)",
           "difficulty": "medium",
           "score": 1,
           "answer_text": "TBD",
@@ -116,8 +221,8 @@
           "grade": "S3",
           "subject": "Biology",
           "semester": null,
-          "question_type": "SHORT_ANSWER",
-          "prompt": "In an experiment, four wells are made in a starch agar plate and each well is filled with a different solution",
+          "question_type": "FILL_BLANK",
+          "prompt": "In an experiment, four wells are made in astarch agar plate and each well is filled with adifferent solution as shown in the diagram below. (a) Identify the variables in the investigation. (i) Independent variable: ______________________________________________________ (1 mark) (ii) One controlled variable: ___________________________________________________ (1 mark) (b) Explain how to measure the dependent variable. (3 marks) (c) What should be added to Well 4 to show that the result of Well 1 is caused by the presence of amylase? (2 marks) (d) Explain which well will the salivary amylase work the best in. (2 marks) End of paper 1 2 3 4 Starch agar plate Salivary amylase + dilute hydrochloric acid Salivary amylase + distilled water Salivary amylase + dilute sodium hydroxide Control set-up F3 Integrated Science 5 MC DBABC",
           "difficulty": "medium",
           "score": 1,
           "answer_text": "TBD",
@@ -132,8 +237,67 @@
           "grade": "S3",
           "subject": "Biology",
           "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which of the following events ensure that the food bolus enters the oesophagus during the process of swallowing? (1) The soft palate moves up to prevent the bolus from entering the nasal cavity. (2) The larynx rises so that the epiglottis covers the opening to the trachea. (3) The tongue rises to push the bolus towards the pharynx. → this is aprocess of swallowing but not ensuring the food bolus enter the oesophagus.",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "TBD",
+          "explanation": "TBD",
+          "chapter": null,
+          "source_type": "paper",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "(1) only",
+              "is_correct": null
+            },
+            {
+              "option_key": "B",
+              "option_text": "(1) and (2) only (15%)",
+              "is_correct": null
+            },
+            {
+              "option_key": "C",
+              "option_text": "(2) and (3) only",
+              "is_correct": null
+            },
+            {
+              "option_key": "D",
+              "option_text": "(1), (2) and (3) (65%) Structural question",
+              "is_correct": null
+            }
+          ]
+        },
+        {
+          "publisher": "unknown",
+          "grade": "S3",
+          "subject": "Biology",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "(a) Q (small intestine) > mouth cavity > stomach 1m ‘Descending order’ means from higher pH to lower pH. Acid should have alower pH while alkaline is higher. (b) large intestine / colon / rectum 1m Digestion is completed in small intestine, so the undigested % dropped to ZERO when the food arrived at large intestine. (c) Y 1m Protein digestion starts in stomach. 1m Curve Ystarts to drop in stomach. 1m Ss cannot simply mention there is digestion of protein as the answer as protein also digested in small intestine. (d) Bile 1m",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "TBD",
+          "explanation": "TBD",
+          "chapter": null,
+          "source_type": "paper",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": ". 1m Pancreatic juice 1m contains lipase to breakdown lipid into fatty acid and glycerol. 1m (e) The two muscle layers in the wall of oesophagus contract alternatively 1m to produce awave-like movement (peristalsis) to push the food down. 1m Total: 11m",
+              "is_correct": null
+            }
+          ]
+        },
+        {
+          "publisher": "unknown",
+          "grade": "S3",
+          "subject": "Biology",
+          "semester": null,
           "question_type": "SHORT_ANSWER",
-          "prompt": "Which of t he following events ensure that the food bolus enters the oesophagus  during the process of",
+          "prompt": "(ai) pH value 1m (ii) amount/volume/concentration of salivary amylase / temperature / total volume of solution in well / well size / time for digestion 1m (b) Add iodine solution to the starch agar. 1m Brown clear zone is formed when starch is digested. 1m The greater the size / diameter of brown clear zone, the higher the amylase action. 1m Most Ss did not state how to understand the result by relating the size of clear to the enzyme action. Ss may mix up this brown clear zone with the clear zone in the milk agar plate. (c) Prepare an identical setup/well to well 1 1m except replacing salivary amylase with the same volume of distilled water. 1m Ss may mix up the control for ‘presence of enzyme’ with ‘catalytic action of enzyme’ and state ‘the use of boiled enzyme’ as the answer. (d) Well 2 1m because the pH of distilled water is similar to saliva in mouth cavity. 1m Total: 9m",
           "difficulty": "medium",
           "score": 1,
           "answer_text": "TBD",
@@ -152,80 +316,185 @@
       "grade": "S3",
       "subject": "Biology",
       "semester": null,
-      "question_type": "SHORT_ANSWER",
-      "prompt": "The diagram below shows four types of human teeth.",
+      "question_type": "MCQ_SINGLE",
+      "prompt": "The diagram below shows four types of human teeth. Which type of teeth is absent in the milk teeth?",
       "difficulty": "medium",
       "score": 1,
-      "answer_text": "TBD",
+      "answer_text": "D",
       "explanation": "TBD",
       "chapter": null,
       "source_type": "paper",
       "source_id": null,
-      "options": []
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "W",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "X",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "Y",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "Z",
+          "is_correct": true
+        }
+      ]
     },
     {
       "publisher": "unknown",
       "grade": "S3",
       "subject": "Biology",
       "semester": null,
-      "question_type": "SHORT_ANSWER",
-      "prompt": "Which of t he following events ensure that the food bolus enter s the oesophagus during the process of",
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which of the following events ensure that the food bolus enter sthe oesophagus during the process of swallowing? (1) The soft palate moves up to prevent the bolus from entering the nasal cavity. (2) The larynx rises so that the epiglottis covers the opening to the trachea. (3) The tongue rises to push the bolus towards the pharynx.",
       "difficulty": "medium",
       "score": 1,
-      "answer_text": "TBD",
+      "answer_text": "B",
       "explanation": "TBD",
       "chapter": null,
       "source_type": "paper",
       "source_id": null,
-      "options": []
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "(1) only",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "(1) and (2) only",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "(2) and (3) only",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "(1), (2) and (3) ( ) BIO F. 3 ( ) W X Y Z F3 Integrated Science 2",
+          "is_correct": false
+        }
+      ]
     },
     {
       "publisher": "unknown",
       "grade": "S3",
       "subject": "Biology",
       "semester": null,
-      "question_type": "SHORT_ANSWER",
-      "prompt": "Which of the following combinations correctly matches the organisms with their modes of nutrition?",
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which of the following combinations correctly matches the organisms with their modes of nutrition? Bread mould Plant Dog",
       "difficulty": "medium",
       "score": 1,
-      "answer_text": "TBD",
+      "answer_text": "A",
       "explanation": "TBD",
       "chapter": null,
       "source_type": "paper",
       "source_id": null,
-      "options": []
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "saprophytic autotrophic holozoic",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "saprophytic holozoic autotrophic",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "holozoic autotrophic saprophytic",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "holozoic saprophytic autotrophic",
+          "is_correct": false
+        }
+      ]
     },
     {
       "publisher": "unknown",
       "grade": "S3",
       "subject": "Biology",
       "semester": null,
-      "question_type": "SHORT_ANSWER",
-      "prompt": "Which of the following are the functions of hydrochloric acid in the gastric juice?",
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which of the following are the functions of hydrochloric acid in the gastric juice? (1) killing bacteria in food (2) hydrolysing starch into maltose (3) providing an acidic medium for pepsin to work",
       "difficulty": "medium",
       "score": 1,
-      "answer_text": "TBD",
+      "answer_text": "B",
       "explanation": "TBD",
       "chapter": null,
       "source_type": "paper",
       "source_id": null,
-      "options": []
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "(1) and (2) only",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "(1) and (3) only",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "(2) and (3) only",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "(1), (2) and (3)",
+          "is_correct": false
+        }
+      ]
     },
     {
       "publisher": "unknown",
       "grade": "S3",
       "subject": "Biology",
       "semester": null,
-      "question_type": "SHORT_ANSWER",
+      "question_type": "MCQ_SINGLE",
       "prompt": "Which of the following is the function of the cardiac sphincter of the stomach?",
       "difficulty": "medium",
       "score": 1,
-      "answer_text": "TBD",
+      "answer_text": "C",
       "explanation": "TBD",
       "chapter": null,
       "source_type": "paper",
       "source_id": null,
-      "options": []
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "To secrete gastric juice.",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "To shape food into abolus.",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "To prevent food from returning to oesophagus.",
+          "is_correct": true
+        },
+        {
+          "option_key": "D",
+          "option_text": "To control the exit of food from the stomach. F3 Integrated Science 3",
+          "is_correct": false
+        }
+      ]
     },
     {
       "publisher": "unknown",
@@ -233,7 +502,7 @@
       "subject": "Biology",
       "semester": null,
       "question_type": "SHORT_ANSWER",
-      "prompt": "The graph below shows the digestion of three types of food substances (X, Y and Z) along the alimentary",
+      "prompt": "The graph below shows the digestion of three types of food substances (X, YandZ) along the alimentary canal. % of undigested food substance present mouth cavity oeso- phagus stomachQ R 100 50 different parts of the alimentary canal 0 Z Y X (a) Arrange the pH values of digestive juices found in mouth cavity, stomach and Qin descending order. (1 mark) > > (b) Name structureR. (1 mark) (c) Which curve represents the digestion of protein? Explain your answer. (3 marks) (d) State and explain how digestive juice(s) is/are responsible for the digestion of lipid in regionQ. (4 marks) F3 Integrated Science 4 (e) Describe how the food bolus passes through the oesophagus. (2 marks)",
       "difficulty": "medium",
       "score": 1,
       "answer_text": "TBD",
@@ -248,8 +517,8 @@
       "grade": "S3",
       "subject": "Biology",
       "semester": null,
-      "question_type": "SHORT_ANSWER",
-      "prompt": "In an experiment, four wells are made in a starch agar plate and each well is filled with a different solution",
+      "question_type": "FILL_BLANK",
+      "prompt": "In an experiment, four wells are made in astarch agar plate and each well is filled with adifferent solution as shown in the diagram below. (a) Identify the variables in the investigation. (i) Independent variable: ______________________________________________________ (1 mark) (ii) One controlled variable: ___________________________________________________ (1 mark) (b) Explain how to measure the dependent variable. (3 marks) (c) What should be added to Well 4 to show that the result of Well 1 is caused by the presence of amylase? (2 marks) (d) Explain which well will the salivary amylase work the best in. (2 marks) End of paper 1 2 3 4 Starch agar plate Salivary amylase + dilute hydrochloric acid Salivary amylase + distilled water Salivary amylase + dilute sodium hydroxide Control set-up F3 Integrated Science 5 MC DBABC",
       "difficulty": "medium",
       "score": 1,
       "answer_text": "TBD",
@@ -264,8 +533,67 @@
       "grade": "S3",
       "subject": "Biology",
       "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which of the following events ensure that the food bolus enters the oesophagus during the process of swallowing? (1) The soft palate moves up to prevent the bolus from entering the nasal cavity. (2) The larynx rises so that the epiglottis covers the opening to the trachea. (3) The tongue rises to push the bolus towards the pharynx. → this is aprocess of swallowing but not ensuring the food bolus enter the oesophagus.",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "TBD",
+      "explanation": "TBD",
+      "chapter": null,
+      "source_type": "paper",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "(1) only",
+          "is_correct": null
+        },
+        {
+          "option_key": "B",
+          "option_text": "(1) and (2) only (15%)",
+          "is_correct": null
+        },
+        {
+          "option_key": "C",
+          "option_text": "(2) and (3) only",
+          "is_correct": null
+        },
+        {
+          "option_key": "D",
+          "option_text": "(1), (2) and (3) (65%) Structural question",
+          "is_correct": null
+        }
+      ]
+    },
+    {
+      "publisher": "unknown",
+      "grade": "S3",
+      "subject": "Biology",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "(a) Q (small intestine) > mouth cavity > stomach 1m ‘Descending order’ means from higher pH to lower pH. Acid should have alower pH while alkaline is higher. (b) large intestine / colon / rectum 1m Digestion is completed in small intestine, so the undigested % dropped to ZERO when the food arrived at large intestine. (c) Y 1m Protein digestion starts in stomach. 1m Curve Ystarts to drop in stomach. 1m Ss cannot simply mention there is digestion of protein as the answer as protein also digested in small intestine. (d) Bile 1m",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "TBD",
+      "explanation": "TBD",
+      "chapter": null,
+      "source_type": "paper",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": ". 1m Pancreatic juice 1m contains lipase to breakdown lipid into fatty acid and glycerol. 1m (e) The two muscle layers in the wall of oesophagus contract alternatively 1m to produce awave-like movement (peristalsis) to push the food down. 1m Total: 11m",
+          "is_correct": null
+        }
+      ]
+    },
+    {
+      "publisher": "unknown",
+      "grade": "S3",
+      "subject": "Biology",
+      "semester": null,
       "question_type": "SHORT_ANSWER",
-      "prompt": "Which of t he following events ensure that the food bolus enters the oesophagus  during the process of",
+      "prompt": "(ai) pH value 1m (ii) amount/volume/concentration of salivary amylase / temperature / total volume of solution in well / well size / time for digestion 1m (b) Add iodine solution to the starch agar. 1m Brown clear zone is formed when starch is digested. 1m The greater the size / diameter of brown clear zone, the higher the amylase action. 1m Most Ss did not state how to understand the result by relating the size of clear to the enzyme action. Ss may mix up this brown clear zone with the clear zone in the milk agar plate. (c) Prepare an identical setup/well to well 1 1m except replacing salivary amylase with the same volume of distilled water. 1m Ss may mix up the control for ‘presence of enzyme’ with ‘catalytic action of enzyme’ and state ‘the use of boiled enzyme’ as the answer. (d) Well 2 1m because the pH of distilled water is similar to saliva in mouth cavity. 1m Total: 9m",
       "difficulty": "medium",
       "score": 1,
       "answer_text": "TBD",

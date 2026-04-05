@@ -138,15 +138,11 @@ def parse_questions(text: str, *, subject: str, grade: str) -> list[dict[str, An
     if not text:
         return [placeholder_question(subject=subject, grade=grade, prompt="[NO_TEXT_EXTRACTED] Placeholder question")]
 
-    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-    numbered: list[tuple[int, str]] = []
-    for line in lines:
-        match = re.match(r"^(\d{1,3})[\).]\s*(.+)$", line)
-        if match:
-            numbered.append((int(match.group(1)), match.group(2).strip()))
+    lines = [normalize_ocr_line(ln.strip()) for ln in text.splitlines() if ln.strip()]
+    blocks = split_question_blocks(lines)
 
     questions: list[dict[str, Any]] = []
-    if not numbered:
+    if not blocks:
         fragments = re.split(r"[。！？!?]", text)
         prompts = [frag.strip() for frag in fragments if len(frag.strip()) >= 12][:10]
         if not prompts:
@@ -155,14 +151,17 @@ def parse_questions(text: str, *, subject: str, grade: str) -> list[dict[str, An
             questions.append(placeholder_question(subject=subject, grade=grade, prompt=prompt, idx=idx))
         return questions
 
-    for idx, prompt in numbered[:80]:
+    for idx, block in blocks[:80]:
+        prompt, options = parse_question_block(block)
+        question_type = infer_question_type(prompt=prompt, options=options)
+
         questions.append(
             {
                 "publisher": "unknown",
                 "grade": grade,
                 "subject": subject,
                 "semester": None,
-                "question_type": "SHORT_ANSWER",
+                "question_type": question_type,
                 "prompt": prompt,
                 "difficulty": "medium",
                 "score": extract_score(prompt),
@@ -171,11 +170,175 @@ def parse_questions(text: str, *, subject: str, grade: str) -> list[dict[str, An
                 "chapter": None,
                 "source_type": "paper",
                 "source_id": None,
-                "options": [],
+                "options": options,
             }
         )
 
+    apply_answer_keys(questions=questions, answer_tokens=extract_answer_key_tokens(text))
+
     return questions
+
+
+def split_question_blocks(lines: list[str]) -> list[tuple[int, list[str]]]:
+    blocks: list[tuple[int, list[str]]] = []
+    current_num: int | None = None
+    current_lines: list[str] = []
+
+    for line in lines:
+        match = re.match(r"^(\d{1,3})[\).]\s*(.*)$", line)
+        if match:
+            if current_num is not None and current_lines:
+                blocks.append((current_num, current_lines))
+            current_num = int(match.group(1))
+            first_line = match.group(2).strip()
+            current_lines = [first_line] if first_line else []
+            continue
+
+        if current_num is not None:
+            current_lines.append(line)
+
+    if current_num is not None and current_lines:
+        blocks.append((current_num, current_lines))
+
+    return blocks
+
+
+def parse_question_block(lines: list[str]) -> tuple[str, list[dict[str, Any]]]:
+    stem_lines: list[str] = []
+    options: list[dict[str, Any]] = []
+
+    for line in lines:
+        inline_options = split_inline_options(line)
+        if inline_options:
+            for key, text in inline_options:
+                options.append({"option_key": key, "option_text": text, "is_correct": None})
+            continue
+
+        if options:
+            # Option text may wrap onto multiple lines; attach continuation.
+            options[-1]["option_text"] = f"{options[-1]['option_text']} {line}".strip()
+            continue
+
+        stem_lines.append(line)
+
+    options = dedupe_options(options)
+
+    prompt = " ".join(stem_lines).strip()
+    prompt = re.sub(r"\s{2,}", " ", prompt)
+    if not prompt:
+        prompt = "[UNPARSED_QUESTION]"
+    return prompt, options
+
+
+def split_inline_options(line: str) -> list[tuple[str, str]]:
+    matches = list(re.finditer(r"([A-D])[\).]\s*", line))
+    if not matches:
+        return []
+
+    options: list[tuple[str, str]] = []
+    for i, match in enumerate(matches):
+        key = match.group(1)
+        start = match.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(line)
+        text = line[start:end].strip()
+        if text:
+            options.append((key, text))
+    return options
+
+
+def dedupe_options(options: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen: set[str] = set()
+    unique: list[dict[str, Any]] = []
+    for option in options:
+        key = str(option.get("option_key", "")).strip()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        unique.append(option)
+    return unique
+
+
+def infer_question_type(*, prompt: str, options: list[dict[str, Any]]) -> str:
+    low = prompt.lower()
+
+    if options:
+        option_texts = " ".join(str(o.get("option_text", "")) for o in options).lower()
+        if is_true_false_prompt(prompt=low, option_texts=option_texts):
+            return "TRUE_FALSE"
+        if "select two" in low or "choose two" in low or "all that apply" in low:
+            return "MCQ_MULTI"
+        return "MCQ_SINGLE"
+
+    if is_true_false_prompt(prompt=low, option_texts=""):
+        return "TRUE_FALSE"
+    if "___" in prompt or "____" in prompt or "fill in the blank" in low:
+        return "FILL_BLANK"
+    if "essay" in low:
+        return "ESSAY"
+    return "SHORT_ANSWER"
+
+
+def is_true_false_prompt(*, prompt: str, option_texts: str) -> bool:
+    if "true or false" in prompt or "true/false" in prompt or re.search(r"\b(t/f)\b", prompt):
+        return True
+    tf_signals = [" true ", " false ", "correct", "incorrect"]
+    signal_count = sum(1 for s in tf_signals if s in f" {option_texts} ")
+    return signal_count >= 2
+
+
+def extract_answer_key_tokens(text: str) -> list[str]:
+    lines = [normalize_ocr_line(ln.strip()) for ln in text.splitlines() if ln.strip()]
+    tail = lines[-80:]
+    patterns = [
+        re.compile(r"^(?:mc|multiple choice|answers?|answer key)\s*[:：]?\s*([A-DFT\s,;/]+)$", re.IGNORECASE),
+        re.compile(r"^([A-DFT](?:[\s,;/]+[A-DFT]){2,})$", re.IGNORECASE),
+        re.compile(r"^([A-DFT]{3,})$", re.IGNORECASE),
+    ]
+
+    tokens: list[str] = []
+    for line in tail:
+        for pattern in patterns:
+            match = pattern.match(line)
+            if not match:
+                continue
+            seq = match.group(1).upper()
+            tokens.extend(re.findall(r"[A-DFT]", seq))
+            break
+
+    return tokens
+
+
+def apply_answer_keys(*, questions: list[dict[str, Any]], answer_tokens: list[str]) -> None:
+    if not answer_tokens:
+        return
+
+    idx = 0
+    for question in questions:
+        qtype = str(question.get("question_type", "")).upper()
+        if qtype not in {"MCQ_SINGLE", "MCQ_MULTI", "TRUE_FALSE"}:
+            continue
+        if idx >= len(answer_tokens):
+            break
+
+        token = answer_tokens[idx]
+        idx += 1
+        question["answer_text"] = token
+
+        # Handle compact multi-select keys like "AC".
+        answer_set = set(re.findall(r"[A-DFT]", token.upper()))
+        if not answer_set:
+            answer_set = {token.upper()}
+
+        for option in question.get("options", []):
+            key = str(option.get("option_key", "")).strip().upper()
+            option["is_correct"] = key in answer_set
+
+
+def normalize_ocr_line(line: str) -> str:
+    # Repair common OCR artifacts like "t he" and "enter s".
+    line = re.sub(r"\b([A-Za-z])\s+([A-Za-z]{2,})\b", r"\1\2", line)
+    line = re.sub(r"\b([A-Za-z]{2,})\s+([A-Za-z])\b", r"\1\2", line)
+    return re.sub(r"\s{2,}", " ", line).strip()
 
 
 def placeholder_question(*, subject: str, grade: str, prompt: str, idx: int = 1) -> dict[str, Any]:
