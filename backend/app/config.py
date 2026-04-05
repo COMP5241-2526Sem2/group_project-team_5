@@ -1,4 +1,12 @@
+from pathlib import Path
+from typing import Optional
+from urllib.parse import quote_plus
+
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# backend/ (so ./data/dev.db is not tied to shell cwd)
+_BACKEND_ROOT = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):
@@ -6,7 +14,15 @@ class Settings(BaseSettings):
     app_env: str = "dev"
     api_base_url: str = "http://localhost:8000"
 
-    database_url: str = "mysql+aiomysql://root:119892@localhost:3306/openstudy_dev"
+    database_url: str = "mysql+aiomysql://root:YOUR_PASSWORD@localhost:3306/openstudy_dev"
+    # Optional: Supabase — split host/password so @/# in passwords never break the URL.
+    database_host: Optional[str] = None
+    database_user: str = "postgres"
+    database_password: str = ""
+    database_port: int = 5432
+    database_name: str = "postgres"
+    database_ssl: bool = False
+    database_ssl_insecure: bool = False
 
     jwt_secret_key: str = "CHANGE_ME"
     jwt_algorithm: str = "HS256"
@@ -16,6 +32,37 @@ class Settings(BaseSettings):
     ohmygpt_base_url: str = "https://api.ohmygpt.com/v1"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @model_validator(mode="after")
+    def assemble_database_url(self) -> "Settings":
+        host = (self.database_host or "").strip()
+        if not host:
+            return self
+        pwd = (self.database_password or "").strip()
+        if not pwd:
+            # Password not set yet — keep DATABASE_URL from .env (e.g. local SQLite).
+            return self
+        u = quote_plus(self.database_user)
+        p = quote_plus(pwd)
+        self.database_url = (
+            f"postgresql+asyncpg://{u}:{p}@{host}:{self.database_port}/{self.database_name}"
+        )
+        return self
+
+    @model_validator(mode="after")
+    def resolve_sqlite_path_under_backend(self) -> "Settings":
+        """Anchor relative SQLite paths to backend/ and ensure data/ exists."""
+        url = self.database_url
+        prefix = "sqlite+aiosqlite:///"
+        if not url.startswith(prefix):
+            return self
+        rest = url[len(prefix) :]
+        if not rest.startswith("./"):
+            return self
+        path = (_BACKEND_ROOT / rest[2:]).resolve()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.database_url = f"sqlite+aiosqlite:///{path}"
+        return self
 
 
 settings = Settings()
