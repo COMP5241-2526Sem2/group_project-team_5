@@ -592,7 +592,7 @@ export default function AssessmentGenerate() {
     }
 
     const detected = detectSubjectFromText(candidates.join(' '));
-    return detected || subject || 'Biology';
+    return detected || tbSubject || 'Biology';
   }
 
   function buildSourceMaterialText(): string {
@@ -702,11 +702,11 @@ export default function AssessmentGenerate() {
     try {
       const resolvedSemester = sourceTab === 'textbook'
         ? (tbSemester.includes('Vol.2') ? 'Vol.2' : tbSemester.includes('Vol.1') ? 'Vol.1' : null)
-        : semester;
+        : null;
 
       const response = await createPaperApi({
         title: `AI Generated ${inferEffectiveSubject()} Paper ${new Date().toISOString().slice(0, 10)}`,
-        grade: grade || tbGrade || 'Grade 7',
+        grade: tbGrade || 'Grade 7',
         subject: inferEffectiveSubject(),
         semester: resolvedSemester,
         exam_type: sourceTab === 'exam' ? 'simulation' : 'ai_generated',
@@ -822,9 +822,9 @@ export default function AssessmentGenerate() {
     let qs = buildGeneratedQuestions(effectiveSubject, topicPool, seedKey);
     try {
       const preview = await previewGenerateQuestionsApi({
-        source_text: sourceMaterial || `${effectiveSubject} ${grade || tbGrade || 'Grade 7'} ${difficulty}`,
+        source_text: sourceMaterial || `${effectiveSubject} ${tbGrade || 'Grade 7'} ${difficulty}`,
         subject: effectiveSubject,
-        grade: grade || tbGrade || 'Grade 7',
+        grade: tbGrade || 'Grade 7',
         difficulty,
         question_count: totalQ(),
         type_targets: typeTargets,
