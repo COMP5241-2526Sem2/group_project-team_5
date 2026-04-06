@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useParams, useNavigate, useSearchParams } from 'react-router';
 import StudentLayout from '../../components/student/StudentLayout';
 import { ChevronLeft, ChevronRight, Check, X, Volume2, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTTS } from '../../utils/speech';
+import { createOrGetAttemptApi, fetchQuizDetailApi, fetchReviewApi } from '../../utils/quizApi';
 
 interface ReviewItem {
   questionId: string;
@@ -24,6 +25,9 @@ interface ReviewItem {
 
 interface ReviewData {
   attemptId: string;
+  quizId: string;
+  title: string;
+  courseName: string;
   score: number;
   totalScore: number;
   mcqCorrect: number;
@@ -31,109 +35,49 @@ interface ReviewData {
   items: ReviewItem[];
 }
 
-// Mock data
-const mockReview: ReviewData = {
-  attemptId: 'a1',
-  score: 85,
-  totalScore: 100,
-  mcqCorrect: 4,
-  mcqTotal: 5,
-  items: [
-    {
-      questionId: 'q1',
-      order: 1,
-      type: 'MCQ_SINGLE',
-      prompt: 'What is the time complexity of binary search?',
-      options: [
-        { key: 'A', text: 'O(n)' },
-        { key: 'B', text: 'O(log n)' },
-        { key: 'C', text: 'O(n log n)' },
-        { key: 'D', text: 'O(n²)' },
-      ],
-      myAnswer: { mcqChoice: 'B' },
-      correctAnswer: { mcqChoice: 'B' },
-      isCorrect: true,
-    },
-    {
-      questionId: 'q2',
-      order: 2,
-      type: 'MCQ_SINGLE',
-      prompt: 'Which data structure uses LIFO principle?',
-      options: [
-        { key: 'A', text: 'Queue' },
-        { key: 'B', text: 'Stack' },
-        { key: 'C', text: 'Tree' },
-        { key: 'D', text: 'Graph' },
-      ],
-      myAnswer: { mcqChoice: 'B' },
-      correctAnswer: { mcqChoice: 'B' },
-      isCorrect: true,
-    },
-    {
-      questionId: 'q3',
-      order: 3,
-      type: 'MCQ_SINGLE',
-      prompt: 'What is the best case time complexity of quicksort?',
-      options: [
-        { key: 'A', text: 'O(n)' },
-        { key: 'B', text: 'O(n log n)' },
-        { key: 'C', text: 'O(n²)' },
-        { key: 'D', text: 'O(log n)' },
-      ],
-      myAnswer: { mcqChoice: 'A' },
-      correctAnswer: { mcqChoice: 'B' },
-      isCorrect: false,
-    },
-    {
-      questionId: 'q4',
-      order: 4,
-      type: 'MCQ_SINGLE',
-      prompt: 'Which sorting algorithm is stable?',
-      options: [
-        { key: 'A', text: 'Quick sort' },
-        { key: 'B', text: 'Heap sort' },
-        { key: 'C', text: 'Merge sort' },
-        { key: 'D', text: 'Selection sort' },
-      ],
-      myAnswer: { mcqChoice: 'C' },
-      correctAnswer: { mcqChoice: 'C' },
-      isCorrect: true,
-    },
-    {
-      questionId: 'q5',
-      order: 5,
-      type: 'MCQ_SINGLE',
-      prompt: 'What is the space complexity of DFS traversal?',
-      options: [
-        { key: 'A', text: 'O(1)' },
-        { key: 'B', text: 'O(log n)' },
-        { key: 'C', text: 'O(n)' },
-        { key: 'D', text: 'O(n²)' },
-      ],
-      myAnswer: { mcqChoice: 'C' },
-      correctAnswer: { mcqChoice: 'C' },
-      isCorrect: true,
-    },
-    {
-      questionId: 'q6',
-      order: 6,
-      type: 'SHORT_ANSWER',
-      prompt: 'Explain the difference between a stack and a queue, and provide one real-world example for each.',
-      myAnswer: {
-        saText: 'A stack follows LIFO (Last In First Out) principle where the last element added is the first one removed. Example: undo operation in text editors. A queue follows FIFO (First In First Out) principle where the first element added is the first one removed. Example: printer job queue.',
-      },
-      teacherFeedback: 'Excellent answer! You correctly identified the key principles and provided relevant real-world examples. Your explanation is clear and demonstrates good understanding of both data structures.',
-    },
-  ],
-};
+async function fetchReview(quizId: string, attemptIdHint: string | null): Promise<ReviewData> {
+  const quizIdNum = Number(quizId);
+  const resolvedAttemptId = attemptIdHint ? Number(attemptIdHint) : (await createOrGetAttemptApi(quizIdNum)).attempt_id;
+  const [reviewDto, detail] = await Promise.all([
+    fetchReviewApi(resolvedAttemptId),
+    fetchQuizDetailApi(quizIdNum),
+  ]);
 
-async function fetchReview(quizId: string): Promise<ReviewData> {
-  return new Promise(resolve => setTimeout(() => resolve(mockReview), 300));
+  return {
+    attemptId: String(reviewDto.attempt_id),
+    quizId: String(reviewDto.quiz_id),
+    title: detail.title,
+    courseName: detail.course_name,
+    score: reviewDto.score,
+    totalScore: reviewDto.total_score,
+    mcqCorrect: reviewDto.mcq_correct,
+    mcqTotal: reviewDto.mcq_total,
+    items: reviewDto.items.map((item) => ({
+      questionId: String(item.question_id),
+      order: item.order,
+      type: item.type === 'SHORT_ANSWER' || item.type === 'ESSAY' ? 'SHORT_ANSWER' : 'MCQ_SINGLE',
+      prompt: item.prompt,
+      options: (item.options || []).map((opt, idx) => ({
+        key: String(opt.key || opt.option_key || ['A', 'B', 'C', 'D'][idx] || 'A') as 'A' | 'B' | 'C' | 'D',
+        text: String(opt.text || opt.option_text || ''),
+      })),
+      myAnswer: {
+        mcqChoice: item.my_answer.selected_option as 'A' | 'B' | 'C' | 'D' | undefined,
+        saText: item.my_answer.text_answer,
+      },
+      correctAnswer: item.correct_answer
+        ? { mcqChoice: item.correct_answer.selected_option as 'A' | 'B' | 'C' | 'D' | undefined }
+        : undefined,
+      isCorrect: item.is_correct ?? undefined,
+      teacherFeedback: item.teacher_feedback ?? undefined,
+    })),
+  };
 }
 
 export default function QuizReview() {
   const { quizId } = useParams<{ quizId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [review, setReview] = useState<ReviewData | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [blindMode] = useState(false);
@@ -141,15 +85,15 @@ export default function QuizReview() {
 
   useEffect(() => {
     if (!quizId) return;
-    fetchReview(quizId).then(setReview);
-  }, [quizId]);
+    fetchReview(quizId, searchParams.get('attemptId')).then(setReview);
+  }, [quizId, searchParams]);
 
   const currentItem = review?.items[currentIndex];
 
   const readQuestion = useCallback(() => {
     if (!currentItem || !blindMode) return;
 
-    let text = `Question ${currentItem.order} of 6. ${currentItem.prompt}. `;
+    let text = `Question ${currentItem.order} of ${review.items.length}. ${currentItem.prompt}. `;
 
     if (currentItem.type === 'MCQ_SINGLE') {
       text += `Your answer: ${currentItem.myAnswer?.mcqChoice}. `;
@@ -213,7 +157,7 @@ export default function QuizReview() {
                   Quiz Review
                 </h1>
                 <p style={{ fontSize: '13px', color: '#9ca3af', margin: 0 }}>
-                  Data Structures Quiz 1 • Score: {review.score}/{review.totalScore}
+                  {review.title} ({review.courseName}) • Score: {review.score}/{review.totalScore}
                 </p>
               </div>
               {blindMode && (

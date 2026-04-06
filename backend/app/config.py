@@ -30,6 +30,12 @@ class Settings(BaseSettings):
 
     ohmygpt_api_key: str = ""
     ohmygpt_base_url: str = "https://api.ohmygpt.com/v1"
+    ai_scoring_provider: str = "heuristic"
+    ai_scoring_model: str = "gpt-4o-mini"
+    ai_scoring_temperature: float = 0.1
+    ai_scoring_timeout_sec: float = 20.0
+    ai_scoring_max_tokens: int = 600
+    quiz_audio_max_bytes: int = 8 * 1024 * 1024
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

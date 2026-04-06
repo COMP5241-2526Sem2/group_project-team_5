@@ -1,3 +1,74 @@
+## OpenStudy 项目概览
+
+本仓库采用前后端分离结构，当前工作区包含两个顶层目录：
+
+- `backend/`：后端服务、数据库迁移、数据导入脚本、后端测试
+- `frontend/`：前端应用（学生端/教师端/管理员端页面）
+
+### 1. 项目框架
+
+后端（`backend/`）主要分层：
+
+- `app/api/v1`：FastAPI 路由层（Quiz、Paper、AI 评分等接口）
+- `app/services`：业务逻辑层（attempt 流程、评分、AI 建议与采纳）
+- `app/models`：SQLAlchemy ORM 模型层
+- `app/schemas`：Pydantic 请求/响应模型层
+- `alembic/versions`：数据库迁移版本管理
+- `scripts`：PDF 抽取与批量导入脚本
+- `tests`：unit + integration 测试
+
+前端（`frontend/`）主要结构：
+
+- `src/pages`：页面级组件（student/teacher/admin）
+- `src/components`：可复用 UI 与业务组件
+- `src/utils`：通用工具（语音、API client、模块 API 封装）
+
+### 2. 技术栈
+
+后端：
+
+- Python 3.11+
+- FastAPI（Web API 框架）
+- SQLAlchemy 2.x（异步 ORM）
+- Alembic（数据库迁移）
+- Pydantic v2（数据校验）
+- Pytest（测试）
+- OpenAI SDK（AI 评分建议，兼容 OpenAI/OhMyGPT 网关）
+
+数据库：
+
+- 开发环境：PostgreSQL（Supabase）
+- 目标方向：MySQL（生产统一方向）
+
+前端：
+
+- React 18 + TypeScript
+- Vite 6（构建与开发服务器）
+- React Router（路由）
+- Radix UI + Lucide + Motion + Sonner（UI 组件与交互）
+
+### 3. 快速启动（开发）
+
+后端：
+
+```bash
+cd /workspaces/group_project-team_5/backend
+# 建议先准备 .venv 与依赖，再启动
+```
+
+前端：
+
+```bash
+cd /workspaces/group_project-team_5/frontend
+npm i
+npm run dev
+```
+
+### 4. 关键文档入口
+
+- 最终接口文档：`API_FINAL_DOCS.md`
+- AI 辅助评分方案：`AI_PAPER_SCORING_IMPLEMENTATION_PLAN_V1.md`
+
 ## 数据录入说明
 
 如果你手上已经有教材或试卷数据，建议按当前数据库结构分两条线录入：教材入库和试卷入库。当前项目没有独立的导入界面，所以最稳妥的方式是先整理成结构化文件，再通过 SQL 或 Python 脚本批量写入 MySQL。
@@ -111,6 +182,18 @@ PYTHONPATH=. .venv/bin/python scripts/import_documents.py paper_exapmle/import_m
 
 ## 接口文档
 
-- Quiz 正式接口文档：`API_QUIZ_DOCS.md`
-- 接口变更记录：`API_INTERFACE_CHANGELOG.md`
-- 功能验收清单：`QUIZ_ACCEPTANCE_CHECKLIST.md`
+- 最终接口文档（唯一入口）：`API_FINAL_DOCS.md`
+- AI 辅助评分实施方案（规划）：`AI_PAPER_SCORING_IMPLEMENTATION_PLAN_V1.md`
+
+历史参考文档：
+
+- `API_QUIZ_DOCS.md`
+- `API_PAPER_DOCS.md`
+- `API_QUIZ_CONTRACT_V2.md`
+- `API_PAPER_CONTRACT_V1.md`
+- `API_PAPER_CONTRACT_V2_ATTEMPTS.md`
+- `PAPER_ATTEMPTS_ACCEPTANCE_CHECKLIST_V1.md`
+- `PAPER_ATTEMPTS_MIGRATION_PLAN_V1_REVIEW.md`
+- `API_INTERFACE_CHANGELOG.md`
+- `QUIZ_ACCEPTANCE_CHECKLIST.md`
+- `QUIZ_ACCEPTANCE_CHECKLIST_V2.md`

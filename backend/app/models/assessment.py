@@ -29,6 +29,12 @@ class AttemptStatus(str, enum.Enum):
     GRADED = "graded"
 
 
+class PaperAttemptStatus(str, enum.Enum):
+    IN_PROGRESS = "in_progress"
+    SUBMITTED = "submitted"
+    GRADED = "graded"
+
+
 class Paper(Base):
     __tablename__ = "papers"
 
@@ -57,6 +63,7 @@ class Paper(Base):
 
     sections: Mapped[list[PaperSection]] = relationship(back_populates="paper", cascade="all, delete-orphan")
     questions: Mapped[list[PaperQuestion]] = relationship(back_populates="paper", cascade="all, delete-orphan")
+    attempts: Mapped[list[PaperAttempt]] = relationship(back_populates="paper", cascade="all, delete-orphan")
 
     __table_args__ = (
         CheckConstraint("total_score >= 0", name="ck_papers_total_score_non_negative"),
@@ -139,6 +146,120 @@ class PaperQuestionOption(Base):
     question: Mapped[PaperQuestion] = relationship(back_populates="options")
 
     __table_args__ = (UniqueConstraint("question_id", "option_key", name="uq_paper_question_options_key"),)
+
+
+class PaperAttempt(Base):
+    __tablename__ = "paper_attempts"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    paper_id: Mapped[int] = mapped_column(ForeignKey("papers.id", ondelete="CASCADE"), nullable=False, index=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    score: Mapped[Optional[float]] = mapped_column(Numeric(8, 2), nullable=True)
+    status: Mapped[PaperAttemptStatus] = mapped_column(
+        SQLEnum(
+            PaperAttemptStatus,
+            name="paper_attempt_status",
+            values_callable=lambda enum_cls: [item.value for item in enum_cls],
+        ),
+        nullable=False,
+        default=PaperAttemptStatus.IN_PROGRESS,
+    )
+
+    paper: Mapped[Paper] = relationship(back_populates="attempts")
+    answers: Mapped[list[PaperAttemptAnswer]] = relationship(back_populates="attempt", cascade="all, delete-orphan")
+    ai_scores: Mapped[list[PaperAttemptAIScore]] = relationship(back_populates="attempt", cascade="all, delete-orphan")
+    ai_adoption_audits: Mapped[list[PaperAIAdoptionAudit]] = relationship(
+        back_populates="attempt", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("paper_id", "student_id", name="uq_paper_attempts_paper_student"),
+        CheckConstraint("score IS NULL OR score >= 0", name="ck_paper_attempts_score_non_negative"),
+    )
+
+
+class PaperAttemptAnswer(Base):
+    __tablename__ = "paper_attempt_answers"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    attempt_id: Mapped[int] = mapped_column(
+        ForeignKey("paper_attempts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    question_id: Mapped[int] = mapped_column(
+        ForeignKey("paper_questions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    selected_option: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    text_answer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_correct: Mapped[Optional[bool]] = mapped_column(nullable=True)
+    awarded_score: Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
+    teacher_feedback: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    attempt: Mapped[PaperAttempt] = relationship(back_populates="answers")
+
+    __table_args__ = (
+        UniqueConstraint("attempt_id", "question_id", name="uq_paper_attempt_answers_attempt_question"),
+        CheckConstraint("awarded_score IS NULL OR awarded_score >= 0", name="ck_paper_attempt_answers_awarded_non_negative"),
+    )
+
+
+class PaperAttemptAIScore(Base):
+    __tablename__ = "paper_attempt_ai_scores"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    attempt_id: Mapped[int] = mapped_column(
+        ForeignKey("paper_attempts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    question_id: Mapped[int] = mapped_column(
+        ForeignKey("paper_questions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    suggested_score: Mapped[float | None] = mapped_column(Numeric(6, 2), nullable=True)
+    suggested_feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Numeric(4, 3), nullable=True)
+    rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
+    model_name: Mapped[str] = mapped_column(Text, nullable=False, server_default="heuristic-v1")
+    prompt_version: Mapped[str] = mapped_column(Text, nullable=False, server_default="v1")
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="success")
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    attempt: Mapped[PaperAttempt] = relationship(back_populates="ai_scores")
+
+    __table_args__ = (
+        UniqueConstraint("attempt_id", "question_id", "prompt_version", name="uq_paper_attempt_ai_scores_attempt_question_prompt"),
+        CheckConstraint("suggested_score IS NULL OR suggested_score >= 0", name="ck_paper_attempt_ai_scores_suggested_score_non_negative"),
+        CheckConstraint("confidence IS NULL OR (confidence >= 0 AND confidence <= 1)", name="ck_paper_attempt_ai_scores_confidence_range"),
+    )
+
+
+class PaperAIAdoptionAudit(Base):
+    __tablename__ = "paper_ai_adoption_audits"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    attempt_id: Mapped[int] = mapped_column(
+        ForeignKey("paper_attempts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    question_id: Mapped[int] = mapped_column(
+        ForeignKey("paper_questions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    actor_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
+    source_ai_score_id: Mapped[int] = mapped_column(
+        ForeignKey("paper_attempt_ai_scores.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    adopted_score: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)
+    adopted_feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
+    action: Mapped[str] = mapped_column(Text, nullable=False, server_default="adopt")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    attempt: Mapped[PaperAttempt] = relationship(back_populates="ai_adoption_audits")
+
+    __table_args__ = (
+        CheckConstraint("adopted_score >= 0", name="ck_paper_ai_adoption_audits_adopted_score_non_negative"),
+    )
 
 
 class QuestionBankItem(Base):
@@ -274,3 +395,40 @@ class QuestionAttemptAnswer(Base):
         UniqueConstraint("attempt_id", "question_id", name="uq_question_attempt_answers_attempt_question"),
         CheckConstraint("awarded_score IS NULL OR awarded_score >= 0", name="ck_attempt_answers_awarded_score_non_negative"),
     )
+
+
+class QuizAudioRecord(Base):
+    __tablename__ = "quiz_audio_records"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    attempt_id: Mapped[int] = mapped_column(
+        ForeignKey("question_attempts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    question_id: Mapped[int] = mapped_column(
+        ForeignKey("question_items.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    student_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
+    file_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    content_type: Mapped[str] = mapped_column(Text, nullable=False)
+    audio_data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    retention_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("size_bytes >= 1", name="ck_quiz_audio_records_size_positive"),
+    )
+
+
+class QuizAudioPlaybackAudit(Base):
+    __tablename__ = "quiz_audio_playback_audits"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    audio_id: Mapped[int] = mapped_column(
+        ForeignKey("quiz_audio_records.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    actor_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
+    action: Mapped[str] = mapped_column(Text, nullable=False, server_default="stream")
+    ip: Mapped[str | None] = mapped_column(Text, nullable=True)
+    device_info: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

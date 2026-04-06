@@ -1,6 +1,6 @@
 # Quiz 接口文档（规范版）
 
-更新日期：2026-04-05  
+更新日期：2026-04-06  
 适用分支：feature/quiz_gen  
 基础前缀：`/api/v1`
 
@@ -38,6 +38,14 @@
 | Quiz Runtime | PUT | `/attempts/{attempt_id}/answers` | 保存作答 |
 | Quiz Runtime | POST | `/attempts/{attempt_id}/submit` | 提交作答 |
 | Quiz Runtime | GET | `/attempts/{attempt_id}/review` | 获取复盘 |
+| Quiz Management | POST | `/quizzes/{quiz_id}/publish` | 发布 Quiz |
+| Quiz Management | POST | `/quizzes/{quiz_id}/close` | 关闭 Quiz |
+| Quiz Management | POST | `/quizzes/{quiz_id}/reopen` | 重开 Quiz |
+| Quiz Management | PUT | `/attempts/{attempt_id}/answers/{question_id}/grade` | 教师单题评分 |
+| Quiz Management | PUT | `/attempts/{attempt_id}/answers/grade-batch` | 教师批量评分 |
+| Quiz Audio | POST | `/audio` | 学生上传音频 |
+| Quiz Audio | GET | `/audio/{audio_id}/stream` | 教师/Admin 回放音频 |
+| Quiz Audio | POST | `/audio/{audio_id}/audit` | 写入音频审计 |
 
 ## 3. 接口明细
 
@@ -291,6 +299,117 @@
 | items[].is_correct | bool/null | 自动判分结果 |
 | items[].awarded_score | number/null | 该题得分 |
 | items[].teacher_feedback | string/null | 教师反馈 |
+| items[].audio_records | array | 该题关联的音频摘要 |
+
+---
+
+### 3.10 发布 Quiz
+
+- 方法：`POST`
+- 路径：`/api/v1/quizzes/{quiz_id}/publish`
+- 鉴权：需要 `X-User-Id`（教师/管理员）
+
+成功响应示例：
+
+```json
+{
+  "quiz_id": 11,
+  "status": "published",
+  "changed_at": "2026-04-06T10:05:00Z"
+}
+```
+
+### 3.11 关闭 Quiz
+
+- 方法：`POST`
+- 路径：`/api/v1/quizzes/{quiz_id}/close`
+- 鉴权：需要 `X-User-Id`（教师/管理员）
+
+### 3.12 重开 Quiz
+
+- 方法：`POST`
+- 路径：`/api/v1/quizzes/{quiz_id}/reopen`
+- 鉴权：需要 `X-User-Id`（教师/管理员）
+
+### 3.13 教师单题评分
+
+- 方法：`PUT`
+- 路径：`/api/v1/attempts/{attempt_id}/answers/{question_id}/grade`
+- 鉴权：需要 `X-User-Id`（教师/管理员）
+
+请求示例：
+
+```json
+{
+  "awarded_score": 8.5,
+  "teacher_feedback": "结构完整，可补充一个例子",
+  "is_correct": null
+}
+```
+
+### 3.14 教师批量评分
+
+- 方法：`PUT`
+- 路径：`/api/v1/attempts/{attempt_id}/answers/grade-batch`
+- 鉴权：需要 `X-User-Id`（教师/管理员）
+
+说明：任意 item 校验失败会整批回滚，不落地任何评分结果。
+
+请求示例：
+
+```json
+{
+  "items": [
+    {"question_id": 210, "awarded_score": 8.5, "teacher_feedback": "结构完整"},
+    {"question_id": 211, "awarded_score": 7.0, "teacher_feedback": "可补充示例"}
+  ]
+}
+```
+
+### 3.15 上传音频
+
+- 方法：`POST`
+- 路径：`/api/v1/audio`
+- 鉴权：需要 `X-User-Id`（学生）
+- 类型：`multipart/form-data`
+
+字段：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| attempt_id | int | 是 | attempt id |
+| question_id | int | 是 | question item id |
+| file | binary | 是 | 音频文件 |
+| retention_until | ISO datetime | 否 | 保留截止时间 |
+
+说明：
+
+- 音频文件大小上限由配置项 `QUIZ_AUDIO_MAX_BYTES` 控制，默认 `8388608`（8 MiB）。
+- 不限制音频格式。
+
+### 3.16 回放音频
+
+- 方法：`GET`
+- 路径：`/api/v1/audio/{audio_id}/stream`
+- 鉴权：需要 `X-User-Id`（教师/管理员）
+
+说明：响应为内联播放（`Content-Disposition: inline`），服务端会自动写入一条 `stream` 审计。
+
+### 3.17 写入音频审计
+
+- 方法：`POST`
+- 路径：`/api/v1/audio/{audio_id}/audit`
+- 鉴权：需要 `X-User-Id`（教师/管理员）
+
+请求示例：
+
+```json
+{
+  "action": "manual_review",
+  "ip": "127.0.0.1",
+  "device_info": "curl"
+}
+```
 
 ## 4. 关键验收点
 

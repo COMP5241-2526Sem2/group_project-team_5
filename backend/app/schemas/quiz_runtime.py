@@ -105,6 +105,7 @@ class QuizReviewItem(BaseModel):
     is_correct: bool | None = None
     awarded_score: float | None = None
     teacher_feedback: str | None = None
+    audio_records: list["AudioRecordSummary"] = Field(default_factory=list)
 
 
 class QuizReviewResponse(BaseModel):
@@ -115,3 +116,72 @@ class QuizReviewResponse(BaseModel):
     mcq_correct: int
     mcq_total: int
     items: list[QuizReviewItem]
+
+
+class QuizStatusMutationResponse(BaseModel):
+    quiz_id: int
+    status: Literal["draft", "published", "closed"]
+    changed_at: datetime
+
+
+class GradeAnswerRequest(BaseModel):
+    awarded_score: float = Field(ge=0)
+    teacher_feedback: str | None = None
+    is_correct: bool | None = None
+
+
+class GradeAnswerResponse(BaseModel):
+    attempt_id: int
+    question_id: int
+    awarded_score: float
+    max_score: float
+    attempt_status: Literal["in_progress", "submitted", "graded"]
+    total_score: float
+
+
+class GradeAnswersBatchRequest(BaseModel):
+    items: list["GradeAnswerBatchItem"] = Field(min_length=1)
+
+
+class GradeAnswersBatchResponse(BaseModel):
+    attempt_id: int
+    attempt_status: Literal["in_progress", "submitted", "graded"]
+    total_score: float
+    items: list[GradeAnswerResponse]
+
+
+class GradeAnswerBatchItem(BaseModel):
+    question_id: int = Field(ge=1)
+    awarded_score: float = Field(ge=0)
+    teacher_feedback: str | None = None
+    is_correct: bool | None = None
+
+
+class AudioRecordSummary(BaseModel):
+    audio_id: int
+    content_type: str
+    size_bytes: int
+    created_at: datetime
+
+
+class AudioUploadResponse(BaseModel):
+    audio_id: int
+    attempt_id: int
+    question_id: int
+    content_type: str
+    size_bytes: int
+    created_at: datetime
+    retention_until: datetime | None
+
+
+class AudioAuditRequest(BaseModel):
+    action: str = Field(min_length=1, max_length=64)
+    ip: str | None = Field(default=None, max_length=128)
+    device_info: str | None = Field(default=None, max_length=512)
+
+
+class AudioAuditResponse(BaseModel):
+    audit_id: int
+    audio_id: int
+    action: str
+    created_at: datetime

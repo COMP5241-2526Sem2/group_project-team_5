@@ -4,6 +4,7 @@ import { FileText, Clock, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { QuizPreviewModal } from '../../components/student/QuizPreviewModal';
 import { QuizResultModal } from '../../components/student/QuizResultModal';
+import { fetchCompletedQuizzesApi, fetchTodoQuizzesApi, type QuizListItemDto } from '../../utils/quizApi';
 
 // Mock data types
 export interface Quiz {
@@ -22,82 +23,32 @@ export interface Quiz {
   mcqCorrect?: number;
 }
 
-// Mock API functions
-const mockTodoQuizzes: Quiz[] = [
-  {
-    quizId: 'q1',
-    title: 'Data Structures Quiz 1',
-    courseId: 'c1',
-    courseName: 'Data Structures',
-    dueAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours from now
-    questionCount: 6,
-    mcqCount: 5,
-    saCount: 1,
-    status: 'In progress',
-  },
-  {
-    quizId: 'q2',
-    title: 'Algorithm Design Quiz 2',
-    courseId: 'c2',
-    courseName: 'Algorithm Design',
-    dueAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days
-    questionCount: 6,
-    mcqCount: 5,
-    saCount: 1,
-    status: 'Not started',
-  },
-  {
-    quizId: 'q3',
-    title: 'Machine Learning Quiz 3',
-    courseId: 'c3',
-    courseName: 'Machine Learning Fundamentals',
-    dueAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
-    questionCount: 6,
-    mcqCount: 5,
-    saCount: 1,
-    status: 'In progress',
-  },
-];
-
-const mockCompletedQuizzes: Quiz[] = [
-  {
-    quizId: 'q4',
-    title: 'Database Systems Quiz 1',
-    courseId: 'c4',
-    courseName: 'Database Systems',
-    dueAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    questionCount: 6,
-    mcqCount: 5,
-    saCount: 1,
-    submittedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 - 60 * 60 * 1000).toISOString(),
-    score: 85,
-    totalScore: 100,
-    mcqCorrect: 4,
-  },
-  {
-    quizId: 'q5',
-    title: 'Software Engineering Quiz 1',
-    courseId: 'c5',
-    courseName: 'Software Engineering',
-    dueAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    questionCount: 6,
-    mcqCount: 5,
-    saCount: 1,
-    submittedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - 3 * 60 * 60 * 1000).toISOString(),
-    score: 92,
-    totalScore: 100,
-    mcqCorrect: 5,
-  },
-];
+function mapQuizDtoToView(item: QuizListItemDto): Quiz {
+  return {
+    quizId: String(item.quiz_id),
+    title: item.title,
+    courseId: String(item.course_id),
+    courseName: item.course_name,
+    dueAt: item.due_at || new Date().toISOString(),
+    questionCount: item.question_count,
+    mcqCount: item.mcq_count,
+    saCount: item.sa_count,
+    status: item.status === 'Completed' ? undefined : item.status,
+    submittedAt: item.submitted_at || undefined,
+    score: item.score ?? undefined,
+    totalScore: item.total_score,
+    mcqCorrect: item.mcq_correct ?? undefined,
+  };
+}
 
 async function fetchTodoQuizzes(): Promise<Quiz[]> {
-  // Mock API call
-  return new Promise(resolve => setTimeout(() => resolve(mockTodoQuizzes), 500));
+  const items = await fetchTodoQuizzesApi();
+  return items.map(mapQuizDtoToView);
 }
 
 async function fetchCompletedQuizzes(): Promise<Quiz[]> {
-  // Mock API call
-  return new Promise(resolve => setTimeout(() => resolve(mockCompletedQuizzes), 500));
+  const items = await fetchCompletedQuizzesApi();
+  return items.map(mapQuizDtoToView);
 }
 
 function formatDueDate(isoDate: string): string {

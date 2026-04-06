@@ -196,3 +196,87 @@
 影响说明：
 
 - 该迁移修复了 Quiz 运行时写答案时的外键语义错误，避免作答数据写入失败或关联错位。
+
+## 10. Paper 接口阶段性进展（2026-04-06）
+
+### 10.1 已落地（无数据库结构改动）
+
+1. Paper V1 查询接口
+  - `GET /api/v1/papers`
+  - `GET /api/v1/papers/{paper_id}`
+2. Paper 生命周期接口
+  - `POST /api/v1/papers/{paper_id}/publish`
+  - `POST /api/v1/papers/{paper_id}/close`
+  - `POST /api/v1/papers/{paper_id}/reopen`
+
+### 10.2 行为约束
+
+1. 对外状态收敛为三态：`draft/published/closed`
+2. 内部 `archived` 对外映射为 `closed`
+3. 发布前要求 paper 至少包含 1 道题，否则返回 `400`
+
+### 10.3 文档新增
+
+1. `API_PAPER_CONTRACT_V1.md`：列表与详情契约
+2. `API_PAPER_CONTRACT_V2_ATTEMPTS.md`：attempts 草案（仅契约，不含实现）
+
+### 10.4 已落地（2026-04-06）
+
+1. 独立表与迁移：
+  - `paper_attempts`
+  - `paper_attempt_answers`
+  - Alembic revision: `e3f4a5b6c7d8`
+2. 学生作答流程接口：
+  - `GET /papers/{paper_id}/attempts/me`
+  - `PUT /paper-attempts/{attempt_id}/answers`
+  - `POST /paper-attempts/{attempt_id}/submit`
+  - `GET /paper-attempts/{attempt_id}/review`
+3. 教师评分接口：
+  - `GET /papers/{paper_id}/attempts`
+  - `PUT /paper-attempts/{attempt_id}/answers/{question_id}/grade`
+  - `PUT /paper-attempts/{attempt_id}/answers/grade-batch`
+4. 规则：
+  - submit 后默认不可再修改答案
+  - 批量评分原子提交（all-or-nothing）
+
+### 10.5 迁移与运行时修复
+
+1. 在 Supabase 迁移执行中处理了 `paper_attempt_status` 重复创建问题。
+2. 修复了 PostgreSQL 枚举值写入兼容问题：
+  - 运行时写入 `in_progress/submitted/graded`（value）
+  - 避免写入 `IN_PROGRESS`（name）导致失败。
+
+### 10.6 新增评审与验收文档
+
+1. `PAPER_ATTEMPTS_ACCEPTANCE_CHECKLIST_V1.md`
+  - Paper attempts 接口可执行验收步骤（含权限、参数与原子性边界）
+2. `PAPER_ATTEMPTS_MIGRATION_PLAN_V1_REVIEW.md`
+  - 最小迁移方案评审稿（仅方案，不执行迁移）
+
+## 11. 接口文档整并（2026-04-06）
+
+为减少分散文档造成的维护与阅读成本，已新增统一入口：
+
+1. `API_FINAL_DOCS.md`：当前接口唯一推荐入口（Quiz + Paper 实现态）
+
+说明：
+
+1. 原有 `API_*DOCS`、`API_*CONTRACT`、验收与变更文档保留为历史参考。
+2. `README.md` 的“接口文档”入口已调整为优先指向 `API_FINAL_DOCS.md`。
+
+## 12. Paper AI 辅助评分 V1（2026-04-06）
+
+新增规划文档：
+
+1. `AI_PAPER_SCORING_IMPLEMENTATION_PLAN_V1.md`
+
+已落地要点：
+
+1. AI 建议分与正式分离（先建议后采纳）
+2. 新增表：`paper_attempt_ai_scores`、`paper_ai_adoption_audits`
+3. 新增接口：
+  - `POST /paper-attempts/{attempt_id}/ai-score`
+  - `GET /paper-attempts/{attempt_id}/ai-score`
+  - `POST /paper-attempts/{attempt_id}/ai-score/{question_id}/adopt`
+  - `POST /paper-attempts/{attempt_id}/ai-score/adopt-batch`
+4. 采纳路径复用现有评分逻辑，批量采纳保留原子提交语义。
