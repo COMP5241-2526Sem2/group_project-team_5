@@ -178,6 +178,10 @@ async def create_session(
         lab_definition_id=lab_definition_id,
         mode=payload.mode,
     )
+    # Some DB/proxy setups may not populate server_default immediately.
+    # Ensure response_model fields are always present to avoid 500 ResponseValidationError.
+    if getattr(session, "created_at", None) is None:
+        session.created_at = datetime.utcnow()
     if _is_sqlite(db):
         session.id = await _sqlite_alloc_id(db, LabGenerationSession)
     db.add(session)
@@ -397,6 +401,9 @@ async def stream_chat(
                     role=MessageRole.USER,
                     content=message,
                 )
+                # Some DB schemas enforce NOT NULL but may not have defaults/triggers.
+                if getattr(user_msg, "created_at", None) is None:
+                    user_msg.created_at = datetime.utcnow()
                 if _is_sqlite(db):
                     user_msg.id = await _sqlite_alloc_id(db, LabChatMessage)
                 db.add(user_msg)
@@ -710,6 +717,9 @@ async def stream_chat(
                     commands=commands_to_persist,
                     definition=definitions[0] if definitions else None,
                 )
+                # Some DB schemas enforce NOT NULL but may not have defaults/triggers.
+                if getattr(msg, "created_at", None) is None:
+                    msg.created_at = datetime.utcnow()
                 if _is_sqlite(db):
                     msg.id = await _sqlite_alloc_id(db, LabChatMessage)
                 db.add(msg)

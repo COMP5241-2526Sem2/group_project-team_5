@@ -578,7 +578,21 @@ class RenderCodeAgent:
             ))
 
         # 检查是否为 React 式 createElement('div'|'svg'|…)
-        if not re.search(r"(?<!\.)\bcreateElement\s*\(\s*['\"]", rc):
+        #
+        # 兼容常见别名写法：
+        # - const { createElement: h } = props;  h('svg', ...)
+        # - const h = createElement;            h('svg', ...)
+        elem_fn: str | None = None
+        if re.search(r"(?<!\.)\bcreateElement\s*\(\s*['\"]", rc):
+            elem_fn = "createElement"
+        else:
+            m1 = re.search(r"\bcreateElement\s*:\s*([A-Za-z_]\w*)\b", rc)
+            m2 = re.search(r"\bconst\s+([A-Za-z_]\w*)\s*=\s*createElement\b", rc)
+            alias = (m1.group(1) if m1 else None) or (m2.group(1) if m2 else None)
+            if alias and re.search(rf"(?<!\.)\b{re.escape(alias)}\s*\(\s*['\"]", rc):
+                elem_fn = alias
+
+        if not elem_fn:
             issues.append(RenderCodeIssue(
                 code=ISSUE_MISSING_CREATE_ELEMENT,
                 description="未找到 React 式 createElement('tag', …) 调用（禁止仅用 document.createElementNS）",
@@ -590,23 +604,54 @@ class RenderCodeAgent:
 
         # Heuristic: require at least one usage of `t` in an expression that affects visuals.
         # It's not enough to only destructure `{ ..., t }`.
+        #
+        # Compatibility notes:
+        # - Allow both camelCase and kebab-case svg style keys (e.g. strokeDashoffset vs 'stroke-dashoffset')
+        # - Allow indirect usage: `const anim = t; ... strokeDashoffset: -((anim*28)%28)`
         has_any_t = re.search(r"\bt\b", rc) is not None or "props.t" in rc
+
+        # Extract simple aliases derived from t (best-effort).
+        # Examples:
+        # - var anim = t;
+        # - const anim = (typeof t === 'number') ? t : 0;
+        # - let pulse = 0.55 + 0.35*Math.sin(t*2);
+        t_aliases: set[str] = set()
+        for m in re.finditer(
+            r"\b(?:const|let|var)\s+([A-Za-z_]\w*)\s*=\s*[^;\n]*\bt\b[^;\n]*[;\n]",
+            rc,
+        ):
+            t_aliases.add(m.group(1))
+        t_symbol = r"(?:t|props\.t"
+        if t_aliases:
+            t_symbol += r"|" + r"|".join(re.escape(a) for a in sorted(t_aliases))
+        t_symbol += r")"
+
         has_visual_time_usage = any(
             re.search(pat, rc)
             for pat in [
-                r"strokeDashoffset\s*:\s*[^,\n]*\bt\b",
-                r"opacity\s*:\s*[^,\n]*\bt\b",
-                r"transform\s*:\s*[^,\n]*\bt\b",
-                r"Math\.(?:sin|cos)\s*\(\s*[^)]*\bt\b",
-                r"\bt\s*[*\/+\-]\s*\d",
-                r"\d\s*[*\/+\-]\s*\bt\b",
+                # style object keys (camelCase)
+                rf"strokeDashoffset\s*:\s*[^,\n]*\b{t_symbol}\b",
+                rf"opacity\s*:\s*[^,\n]*\b{t_symbol}\b",
+                rf"transform\s*:\s*[^,\n]*\b{t_symbol}\b",
+                # style object keys (kebab-case in quotes)
+                rf"['\"]stroke-dashoffset['\"]\s*:\s*[^,\n]*\b{t_symbol}\b",
+                rf"['\"]opacity['\"]\s*:\s*[^,\n]*\b{t_symbol}\b",
+                rf"['\"]transform['\"]\s*:\s*[^,\n]*\b{t_symbol}\b",
+                # math usage
+                rf"Math\.(?:sin|cos)\s*\(\s*[^)]*\b{t_symbol}\b",
+                rf"\b{t_symbol}\b\s*[*\/+\-]\s*\d",
+                rf"\d\s*[*\/+\-]\s*\b{t_symbol}\b",
             ]
         )
 
-        # Special-case: circuit current flow should use dashoffset when showCurrent exists.
-        has_show_current_key = any(k.lower() in ("showcurrent", "show_current", "showcurrentflow") for k in state.keys())
-        if has_show_current_key and "strokeDashoffset" not in rc:
-            has_visual_time_usage = False
+        # Special-case: if state exposes `showCurrent`, we *prefer* current-flow dash animation.
+        # But do not hard-fail if there's another visible t-driven animation (avoid false negatives).
+        has_show_current_key = any(
+            k.lower() in ("showcurrent", "show_current", "showcurrentflow") for k in state.keys()
+        )
+        if has_show_current_key and ("strokeDashoffset" not in rc and "stroke-dashoffset" not in rc):
+            # Keep has_visual_time_usage as-is; it may already be satisfied via opacity/transform/etc.
+            pass
 
         if not has_any_t or not has_visual_time_usage:
             issues.append(RenderCodeIssue(
@@ -617,9 +662,24 @@ class RenderCodeAgent:
         # 检查交互（强制：每个实验至少 1 个可用控件，并通过 onStateChange 写回 state）
         # Heuristic: require both (a) an interactive HTML control and (b) a call to onStateChange({...}).
         # Accept minimal patterns: input(range/checkbox) or button with onClick, plus onStateChange patch.
+        fn_pat = re.escape(elem_fn) if elem_fn else r"createElement"
+        # Accept string literals OR tag aliases like: const INPUT = 'input'; createElement(INPUT, ...)
+        tag_aliases: dict[str, str] = {}
+        for m in re.finditer(
+            r"\b(?:const|let|var)\s+([A-Za-z_]\w*)\s*=\s*['\"](input|button)['\"]\s*[;\n]",
+            rc,
+            flags=re.IGNORECASE,
+        ):
+            tag_aliases[m.group(1)] = m.group(2).lower()
+        input_vars = [re.escape(v) for v, tname in tag_aliases.items() if tname == "input"]
+        button_vars = [re.escape(v) for v, tname in tag_aliases.items() if tname == "button"]
+        input_arg = r"(?:['\"]input['\"]" + (r"|" + r"|".join(input_vars) if input_vars else "") + r")"
+        button_arg = r"(?:['\"]button['\"]" + (r"|" + r"|".join(button_vars) if button_vars else "") + r")"
+
+        # Match call form: fn('input', ...) / fn(INPUT, ...) and avoid \b after quotes.
         has_control_element = (
-            re.search(r"createElement\s*\(\s*['\"]input['\"]", rc) is not None
-            or re.search(r"createElement\s*\(\s*['\"]button['\"]", rc) is not None
+            re.search(rf"{fn_pat}\s*\(\s*{input_arg}\s*,", rc) is not None
+            or re.search(rf"{fn_pat}\s*\(\s*{button_arg}\s*,", rc) is not None
         )
         has_input_type = re.search(r"\btype\s*:\s*['\"](?:range|checkbox)['\"]", rc) is not None
         has_event_handler = re.search(r"\bon(Change|Input|Click)\s*:", rc) is not None
@@ -981,13 +1041,13 @@ return createElement('div', {{...}});`
 - **画面结构**：左侧绘制斜面与物块；右侧固定一个“计算结果面板”（半透明卡片），避免文字挡住图形。
 - **坐标与比例**：斜面长度占画布宽度约 65%～75%，物块位于斜面中段；力箭头长度按相对大小缩放，但要设上限/下限，确保在不同参数下仍可读。
 - **箭头方向（必须物理一致）**：
-  - 重力 \(mg\)：从物块质心竖直向下
-  - 支持力 \(N\)：垂直斜面向外
-  - 摩擦力 \(f\)：沿斜面方向，方向取“阻碍相对运动/阻碍下滑趋势”（若判断困难，允许用“抵抗下滑”作为默认方向）
-  - 分力：可选用虚线表示 \(mg\\sin\\theta\)（沿斜面向下）与 \(mg\\cos\\theta\)（垂直斜面向内）
+  - 重力 \\(mg\\)：从物块质心竖直向下
+  - 支持力 \\(N\\)：垂直斜面向外
+  - 摩擦力 \\(f\\)：沿斜面方向，方向取“阻碍相对运动/阻碍下滑趋势”（若判断困难，允许用“抵抗下滑”作为默认方向）
+  - 分力：可选用虚线表示 \\(mg\\sin\\theta\\)（沿斜面向下）与 \\(mg\\cos\\theta\\)（垂直斜面向内）
 - **标注规范**：每个力箭头旁必须有标签（mg、N、f、mg∥、mg⊥），标签与箭头同色；禁止只画箭头不标字。
-- **参数面板（必须）**：显示 \(\u03b8, m, \u03bc, g\) 与计算值（mg、N、fmax、f、a 或“是否下滑/临界”判定），数值统一保留 2 位小数。
-- **交互一致性**：`initial_state` 若包含 `showForces`/`showLabels`，必须真实控制对应元素显隐；\(\u03bc\) 改变时摩擦力与判定必须随之变化。
+- **参数面板（必须）**：显示 \\(\u03b8, m, \u03bc, g\\) 与计算值（mg、N、fmax、f、a 或“是否下滑/临界”判定），数值统一保留 2 位小数。
+- **交互一致性**：`initial_state` 若包含 `showForces`/`showLabels`，必须真实控制对应元素显隐；\\(\u03bc\\) 改变时摩擦力与判定必须随之变化。
 - **SVG 细节**：箭头必须用 `marker` 实现，线宽 2.5～3.5；斜面与物块用高对比描边，避免“灰到看不见”。
 """
 

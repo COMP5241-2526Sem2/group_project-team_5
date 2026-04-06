@@ -232,6 +232,35 @@ function AIChatPanelInner({
         );
       });
 
+      es.addEventListener('status', (e: MessageEvent) => {
+        try {
+          const s = JSON.parse(e.data || '{}') as { stage?: string; message?: string; progress?: number };
+          const msg = (s.message || '处理中…').trim();
+          const p = typeof s.progress === 'number' ? Math.max(0, Math.min(100, s.progress)) : undefined;
+          const stage = (s.stage || '').trim();
+          const line = `${msg}${p !== undefined ? `（${p}%）` : ''}${stage ? `\n${stage}` : ''}`;
+          setMessages(prev =>
+            prev.map(m => m.id === asstId ? { ...m, content: line, streaming: true } : m)
+          );
+        } catch {
+          // ignore
+        }
+      });
+
+      es.addEventListener('thinking', (e: MessageEvent) => {
+        try {
+          const t = JSON.parse(e.data || '{}') as { message?: string; stage?: string };
+          const msg = (t.message || '推理中…').trim();
+          const stage = (t.stage || '').trim();
+          const line = `${msg}${stage ? `\n${stage}` : ''}`;
+          setMessages(prev =>
+            prev.map(m => m.id === asstId ? { ...m, content: line, streaming: true } : m)
+          );
+        } catch {
+          // ignore
+        }
+      });
+
       es.addEventListener('text', (e: MessageEvent) => {
         const finalText = e.data || '处理完成。';
         setMessages(prev =>
@@ -658,26 +687,103 @@ function AIChatPanelInner({
       </div>
 
       {/* Mode hint */}
-      <div style={{
-        padding: '6px 14px', background: th.hintBg,
-        fontSize: '10px', color: th.hintText,
-        borderTop: `1px solid ${th.divider}`,
-        display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0,
-      }}>
-        {effectiveMode === 'generate_lab'
-          ? generateBaseRegistryKey
-            ? (
+      <div
+        style={{
+          padding: '10px 12px',
+          background: th.hintBg,
+          color: th.hintText,
+          borderTop: `1px solid ${th.divider}`,
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '10px',
+          flexShrink: 0,
+          lineHeight: 1.3,
+        }}
+      >
+        <div
+          style={{
+            width: '22px',
+            height: '22px',
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            background: effectiveMode === 'generate_lab' ? 'rgba(124,58,237,0.18)' : 'rgba(59,130,246,0.16)',
+            border: effectiveMode === 'generate_lab' ? '1px solid rgba(167,139,250,0.32)' : '1px solid rgba(147,197,253,0.28)',
+            boxShadow: '0 6px 16px rgba(0,0,0,0.25)',
+          }}
+        >
+          {effectiveMode === 'generate_lab' ? <Sparkles size={12} /> : <Zap size={12} />}
+        </div>
+
+        <div style={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {effectiveMode === 'generate_lab' ? (
+            generateBaseRegistryKey ? (
               <>
-                <Sparkles size={10} />
-                Generate — 基于已选实验「
-                <strong style={{ color: th.hintText }}>
-                  {generateBaseTitle?.trim() || generateBaseRegistryKey}
-                </strong>
-                」（<code style={{ fontSize: '9px', opacity: 0.9 }}>{generateBaseRegistryKey}</code>）迭代；生成后 Drafts 可立即预览，需持久化时再点对话内保存或 Drafts 页「保存到服务器」
+                <div style={{ fontSize: '11px', fontWeight: 800, color: '#f5f3ff' }}>
+                  迭代基于已选实验
+                </div>
+                <div style={{ fontSize: '11px', color: 'rgba(233,213,255,0.86)' }}>
+                  <span style={{ fontWeight: 700, color: '#ffffff' }}>「{generateBaseTitle?.trim() || generateBaseRegistryKey}」</span>
+                  <span
+                    style={{
+                      marginLeft: '8px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '2px 8px',
+                      borderRadius: '999px',
+                      background: 'rgba(255,255,255,0.08)',
+                      border: '1px solid rgba(255,255,255,0.14)',
+                      color: '#f5f3ff',
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      maxWidth: '100%',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      verticalAlign: 'middle',
+                    }}
+                    title={generateBaseRegistryKey}
+                  >
+                    <code
+                      style={{
+                        fontSize: '10px',
+                        background: 'transparent',
+                        padding: 0,
+                        color: 'inherit',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {generateBaseRegistryKey}
+                    </code>
+                  </span>
+                </div>
+                <div style={{ fontSize: '10px', color: 'rgba(233,213,255,0.72)' }}>
+                  生成后 Drafts 会立即预览；需要持久化时再点「保存草稿」或 Drafts 页「保存到服务器」。
+                </div>
               </>
-              )
-            : <><Sparkles size={10} /> Generate — 未选中实验时从零生成；选中左侧实验后生成将围绕该实验展开</>
-          : <><Zap size={10} /> Drive mode — AI will control the current Lab's state</>}
+            ) : (
+              <>
+                <div style={{ fontSize: '11px', fontWeight: 800, color: '#f5f3ff' }}>
+                  从零生成实验
+                </div>
+                <div style={{ fontSize: '10px', color: 'rgba(233,213,255,0.72)' }}>
+                  选中左侧实验后，将围绕该实验迭代生成。
+                </div>
+              </>
+            )
+          ) : (
+            <>
+              <div style={{ fontSize: '11px', fontWeight: 800, color: '#eff6ff' }}>
+                Drive mode
+              </div>
+              <div style={{ fontSize: '10px', color: 'rgba(219,234,254,0.78)' }}>
+                AI 将控制当前实验的状态。
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Quick Ideas */}

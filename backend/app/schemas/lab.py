@@ -248,8 +248,9 @@ class LabDefinitionUpdate(BaseModel):
 class LabDefinitionResponse(LabDefinitionBase):
     id: int
     teacher_id: int | None
-    created_at: datetime
-    updated_at: datetime
+    # Some legacy rows may have null timestamps; tolerate in API responses.
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 

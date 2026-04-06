@@ -28,6 +28,9 @@ def async_engine_connect_args() -> dict:
     if ".pooler.supabase.com" in url:
         # Supabase Pooler uses PgBouncer and may clash on fixed prepared stmt names.
         connect_args["statement_cache_size"] = 0
+        # SQLAlchemy's asyncpg adapter also maintains its own prepared statement cache.
+        # Disable it for PgBouncer transaction/statement pooling.
+        connect_args["prepared_statement_cache_size"] = 0
         connect_args["prepared_statement_name_func"] = lambda: f"__asyncpg_{uuid4()}__"
 
     return connect_args

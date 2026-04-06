@@ -122,7 +122,16 @@ export const labsApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode, registry_key: registryKey }),
     });
-    const data = (await r.json()) as Record<string, unknown>;
+    // Backend may return plain text/HTML on 5xx; read text first to avoid JSON parse errors.
+    const rawText = await r.text().catch(() => '');
+    let data: Record<string, unknown> = {};
+    if (rawText) {
+      try {
+        data = JSON.parse(rawText) as Record<string, unknown>;
+      } catch {
+        data = { detail: rawText };
+      }
+    }
     if (!r.ok) {
       const detail = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail ?? data);
       throw new Error(detail || `createSession failed: ${r.status}`);

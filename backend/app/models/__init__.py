@@ -38,7 +38,6 @@ from app.models.lab import (  # noqa: E402
     LabChatMessage,
     LabDefinition,
     LabGenerationSession,
-    LabRegistry,
     LabStatus,
     LabType,
     MessageRole,
@@ -84,12 +83,10 @@ __all__ = [
     "LabDefinition",
     "LabGenerationSession",
     "LabChatMessage",
-    "LabRegistry",
     "LabStatus",
     "LabType",
     "SubjectLab",
     "Dimension",
     "SessionMode",
     "MessageRole",
-]
 ]

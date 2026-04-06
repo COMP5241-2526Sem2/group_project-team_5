@@ -1097,10 +1097,27 @@ async def build_session_messages(
 2. 生成高质量的 SVG render_code
 3. 解释实验原理和设计思路
 
-## 输出格式
-必须同时输出：
-1. **lab_definition JSON**: 完整的实验定义
-2. **解释文字**: 面向教师的说明
+## 输出格式（强制）
+你必须按以下顺序输出两部分：
+1) **lab_definition JSON（必须最先输出，且必须是唯一的 ` ```json ` 代码块）**
+2) **解释文字（可选，必须放在 JSON 代码块之后）**
+
+### 硬约束（违反任意一条视为错误输出）
+- **严禁只输出讲义/实验报告/说明文字而不输出 JSON。**
+- 必须输出 **且仅输出一个** ` ```json ` 代码块，其中必须包含完整的 `lab_definition` 对象。
+- 该 JSON 必须能被 `json.loads` 直接解析：禁止尾逗号、禁止注释、禁止省略双引号。
+- `render_code` **必须存在且为非空字符串**（不得缺失/不得为 null/不得为占位符 `...`）。
+- `render_code` 必须是严格 JSON 字符串：需要换行时用 `\\n`，需要双引号时用 `\\\"`（不要使用反引号模板字符串）。
+- `render_code` **必须**使用我们运行时提供的 React 式 `createElement('tag', props, children...)`（不能用 JSX，不能仅用 `document.createElementNS`）。
+- `render_code` **必须包含至少 1 处由 `t` 驱动的可见动态效果**（例如 `strokeDashoffset` / `opacity` / `transform` 任一项随 `t` 变化）。仅解构 `t` 但不使用视为失败。
+- `render_code` **必须包含至少 1 个交互控件**，且真实调用 `onStateChange` 改变 state：
+  - 至少一个 `input`（`type="range"`）用来调节电压/电阻等参数
+  - 至少一个 `input`（`type="checkbox"`）或 `button` 用来开关显示/开关电路
+- 交互控件必须用同一个 `createElement` 创建（例如 `createElement('input', ...)`），不能只写“应当有控件”的文字。
+- **state 一致性（强制）**：
+  - `render_code` 里凡是通过 `rv('key', default)` / `rb('key')` 读取的 key，必须在 `initial_state` 里出现（不能凭空读 `switchClosed` 却不提供）。
+  - `initial_state` 中的关键物理参数必须被真实使用并显示：`voltage`、`r1`、`r2`（串联时必须按 \\\\(R_{eq}=r1+r2\\\\)，\\\\(I=V/R_{eq}\\\\) 计算），不能只做摆设。
+  - `rv('key', default)` 的 default 必须与 `initial_state` 对应字段一致（例如 initial_state.voltage=12 就不要写 default=50）。
 
 ### lab_definition 格式
 ```json
@@ -1111,9 +1128,9 @@ async def build_session_messages(
   "subject_lab": "physics",
   "renderer_profile": "circuit_2d",
   "dimension": "2d",
-  "initial_state": {"voltage": 12, "r1": 100, "r2": 200, "showCurrent": true},
+  "initial_state": {"voltage": 12, "r1": 100, "r2": 200, "switchClosed": true, "showCurrent": true},
   "visual_hint": {"type": "circuit", "primary_concept": "欧姆定律", "renderSpec": {"topology": "series", "components": [], "wires": []}},
-  "render_code": "export default function LabRenderer(props) { ... }"
+  "render_code": "export default function LabRenderer(props) {\\n  const { state, onStateChange, readonly, t, createElement } = props || {};\\n  function rv(k,d){ var v=state&&state[k]; if(typeof v==='number'&&isFinite(v)) return v; var n=parseFloat(v); return isFinite(n)?n:d; }\\n  function rb(k){ var v=state&&state[k]; return !(v===false||v===0); }\\n  var V = rv('voltage', 12);\\n  var r1 = rv('r1', 100);\\n  var r2 = rv('r2', 200);\\n  var closed = rb('switchClosed');\\n  var Req = Math.max(1e-6, r1 + r2);\\n  var I = closed ? (V / Req) : 0;\\n  // ... 必须出现 createElement('svg'...)、createElement('input'...) 且使用 t 驱动动画（如 line 的 opacity/transform 随 t 变化） ...\\n}\\n"
 }
 ```
 
