@@ -14,14 +14,14 @@ class Settings(BaseSettings):
     app_env: str = "dev"
     api_base_url: str = "http://localhost:8000"
 
-    database_url: str = "mysql+aiomysql://root:YOUR_PASSWORD@localhost:3306/openstudy_dev"
+    database_url: str = "postgresql+asyncpg://postgres:YOUR_PASSWORD@db.YOUR_PROJECT_REF.supabase.co:5432/postgres"
     # Optional: Supabase — split host/password so @/# in passwords never break the URL.
     database_host: Optional[str] = None
     database_user: str = "postgres"
     database_password: str = ""
     database_port: int = 5432
     database_name: str = "postgres"
-    database_ssl: bool = False
+    database_ssl: bool = True
     database_ssl_insecure: bool = False
 
     jwt_secret_key: str = "CHANGE_ME"
