@@ -74,6 +74,7 @@ export default function QuizList() {
   const [completedQuizzes, setCompletedQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showResultModal, setShowResultModal] = useState(false);
@@ -85,12 +86,14 @@ export default function QuizList() {
   const loadQuizzes = async () => {
     setLoading(true);
     setError(false);
+    setErrorMessage(null);
     try {
       const [todo, completed] = await Promise.all([fetchTodoQuizzes(), fetchCompletedQuizzes()]);
       setTodoQuizzes(todo);
       setCompletedQuizzes(completed);
     } catch (err) {
       setError(true);
+      setErrorMessage(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
@@ -133,6 +136,9 @@ export default function QuizList() {
           <div style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'center', padding: '48px 24px' }}>
             <AlertCircle size={48} style={{ color: '#ef4444', margin: '0 auto 16px' }} />
             <div style={{ fontSize: '18px', fontWeight: 600, color: '#0f0f23', marginBottom: '8px' }}>Failed to load quizzes. Please try again.</div>
+            {errorMessage && (
+              <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '8px' }}>{errorMessage}</div>
+            )}
             <button
               onClick={loadQuizzes}
               style={{ marginTop: '16px', padding: '10px 24px', background: '#0f0f23', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: 500, cursor: 'pointer' }}

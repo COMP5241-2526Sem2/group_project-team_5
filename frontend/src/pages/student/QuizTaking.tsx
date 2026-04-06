@@ -77,6 +77,8 @@ export default function QuizTaking() {
   const [screenshotFlash, setScreenshotFlash] = useState(false);
   const [attemptId, setAttemptId] = useState<number | null>(null);
   const [header, setHeader] = useState<QuizHeader | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const { speak, stop: stopSpeaking, ttsStatus } = useTTS();
   const { recordings, startRecording, stopRecording } = useAudioRecorder();
@@ -94,11 +96,23 @@ export default function QuizTaking() {
 
   useEffect(() => {
     let active = true;
-    if (!quizId) return;
+    if (!quizId) {
+      setLoadError('Invalid quiz URL. Please go back to the quiz list and retry.');
+      setLoading(false);
+      return;
+    }
+
+    const numericQuizId = Number(quizId);
+    if (!Number.isFinite(numericQuizId) || numericQuizId <= 0) {
+      setLoadError('Invalid quiz id in URL. Please open a real quiz from the list page.');
+      setLoading(false);
+      return;
+    }
 
     (async () => {
+      setLoading(true);
+      setLoadError(null);
       try {
-        const numericQuizId = Number(quizId);
         const [detail, attempt] = await Promise.all([
           fetchQuizDetailApi(numericQuizId),
           createOrGetAttemptApi(numericQuizId),
@@ -128,8 +142,13 @@ export default function QuizTaking() {
         }));
 
         setQuestions(mapped);
-      } catch {
+      } catch (err) {
+        if (!active) return;
+        const detail = err instanceof Error ? err.message : 'Unknown error';
+        setLoadError(`Failed to load quiz: ${detail}`);
         toast.error('Failed to load quiz.');
+      } finally {
+        if (active) setLoading(false);
       }
     })();
 
@@ -528,11 +547,39 @@ export default function QuizTaking() {
 
   // ─── Loading ──────────────────────────────────────────────────────────────
 
-  if (questions.length === 0) {
+  if (loading) {
     return (
       <StudentLayout>
         <div style={{ padding: '32px', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
           <div style={{ fontSize: '14px', color: '#9ca3af' }}>Loading quiz...</div>
+        </div>
+      </StudentLayout>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <StudentLayout>
+        <div style={{ padding: '32px', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '14px', color: '#ef4444', marginBottom: '12px' }}>{loadError}</div>
+            <button
+              onClick={() => navigate('/student/quiz')}
+              style={{ padding: '10px 16px', background: '#0f0f23', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', cursor: 'pointer' }}
+            >
+              Back to quiz list
+            </button>
+          </div>
+        </div>
+      </StudentLayout>
+    );
+  }
+
+  if (questions.length === 0) {
+    return (
+      <StudentLayout>
+        <div style={{ padding: '32px', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+          <div style={{ fontSize: '14px', color: '#9ca3af' }}>No questions available for this quiz.</div>
         </div>
       </StudentLayout>
     );

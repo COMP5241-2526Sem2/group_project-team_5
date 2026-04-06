@@ -68,6 +68,42 @@ export interface PaperDetailDto {
   sections: PaperDetailSectionDto[];
 }
 
+export interface PaperCreateQuestionOptionDto {
+  key: string;
+  text: string;
+  is_correct?: boolean;
+}
+
+export interface PaperCreateQuestionDto {
+  type: string;
+  prompt: string;
+  difficulty?: string | null;
+  explanation?: string | null;
+  answer?: string | null;
+  options?: PaperCreateQuestionOptionDto[];
+  score?: number;
+}
+
+export interface PaperCreateRequestDto {
+  title: string;
+  grade: string;
+  subject: string;
+  semester?: string | null;
+  exam_type?: string;
+  duration_min?: number;
+  total_score?: number;
+  course_id?: number;
+  questions: PaperCreateQuestionDto[];
+}
+
+export interface PaperCreateResponseDto {
+  paper_id: number;
+  title: string;
+  status: "draft" | "published" | "closed";
+  question_count: number;
+  created_at: string;
+}
+
 export async function fetchPaperListApi(params: {
   status?: "draft" | "published" | "closed";
   subject?: string;
@@ -90,4 +126,11 @@ export async function fetchPaperListApi(params: {
 
 export async function fetchPaperDetailApi(paperId: number): Promise<PaperDetailDto> {
   return apiRequest<PaperDetailDto>(`/papers/${paperId}`, {}, "teacher");
+}
+
+export async function createPaperApi(payload: PaperCreateRequestDto): Promise<PaperCreateResponseDto> {
+  return apiRequest<PaperCreateResponseDto>("/papers", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }, "teacher");
 }

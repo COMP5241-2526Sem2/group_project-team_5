@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router';
 import {
   Upload, FileText, AlignLeft, BookOpen, ScanLine, Layers,
   X, Check, ChevronRight, ChevronLeft,
@@ -9,6 +10,7 @@ import {
   PenLine, Copy,
 } from 'lucide-react';
 import { CustomSelect, SelectField } from '../../../components/teacher/CustomSelect';
+import { createPaperApi } from '../../../utils/paperApi';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type SourceTab = 'upload' | 'text' | 'textbook' | 'exam' | 'questions';
@@ -143,7 +145,7 @@ const DIFFICULTY_COLORS = {
 };
 
 const GRADES    = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'];
-const SUBJECTS  = ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'English', 'History', 'Geography'];
+const SUBJECTS  = ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'Economics', 'English', 'History', 'Geography'];
 const PUBLISHERS = ["PEP (People's Education Press)", 'Beijing Normal University Press', 'Jiangsu Education Press', 'Oxford University Press'];
 
 // ── Textbook chapter data ──────────────────────────────────────────────────────
@@ -292,8 +294,129 @@ const QUESTION_BANK: BankQuestion[] = [
   { id: 'bq12', type: 'True/False',  subject: 'Chemistry', grade: 'Grade 11', difficulty: 'easy',   prompt: 'Ionic bonds form between a metal and a non-metal through electron transfer.',                                                            tags: ['Ionic bond', 'Chemical bonding'] },
 ];
 
-const BANK_SUBJECTS = ['All Subjects', 'Physics', 'Biology', 'Math', 'Chemistry'];
+const BANK_SUBJECTS = ['All Subjects', 'Physics', 'Biology', 'Economics', 'Math', 'Chemistry'];
 const BANK_TYPES    = ['All Types', 'MCQ', 'True/False', 'Fill-blank', 'Short Answer'];
+
+const GENERIC_STOPWORDS = new Set([
+  'the', 'and', 'for', 'with', 'that', 'this', 'from', 'your', 'into', 'about', 'paper', 'chapter', 'supplementary',
+  'notes', 'exercise', 'exam', 'test', 'question', 'questions', 'grade', 'vol', 'unit', 'file', 'upload', 'document',
+  'what', 'which', 'when', 'where', 'why', 'how', 'are', 'was', 'were', 'can', 'could', 'should', 'would', 'have',
+  'has', 'had', 'more', 'than', 'then', 'their', 'there', 'they', 'them', 'also', 'only', 'between', 'under', 'over',
+  'using', 'used', 'into', 'across', 'after', 'before', 'during', 'through', 'because', 'within', 'without', 'below',
+  'above', 'economics', 'biology', 'physics', 'chemistry', 'mathematics', 'english', 'history', 'geography',
+]);
+
+function hashString(input: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+  }
+  return h >>> 0;
+}
+
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a += 0x6D2B79F5;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function toTitleToken(token: string): string {
+  return token
+    .split('_')
+    .map((s) => s ? s[0].toUpperCase() + s.slice(1) : s)
+    .join(' ');
+}
+
+function extractKeywords(sourceText: string): string[] {
+  const normalized = sourceText
+    .toLowerCase()
+    .replace(/[^a-z0-9_\-\s]/g, ' ')
+    .replace(/[\-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!normalized) {
+    return [];
+  }
+
+  const freq = new Map<string, number>();
+  for (const raw of normalized.split(' ')) {
+    const token = raw.trim();
+    if (token.length < 4) continue;
+    if (/^\d+$/.test(token)) continue;
+    if (GENERIC_STOPWORDS.has(token)) continue;
+    freq.set(token, (freq.get(token) || 0) + 1);
+  }
+
+  return Array.from(freq.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 12)
+    .map(([k]) => toTitleToken(k));
+}
+
+function uniqueKeepOrder(items: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of items) {
+    const key = item.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
+
+const SUBJECT_KEYWORDS: Array<{ subject: string; keywords: string[] }> = [
+  { subject: 'Economics', keywords: ['economics', 'econ', 'market', 'demand', 'supply', 'gdp', 'inflation', 'macro', 'micro'] },
+  { subject: 'Biology', keywords: ['biology', 'photosynthesis', 'cell', 'dna', 'ecosystem', 'mitochondria'] },
+  { subject: 'Physics', keywords: ['physics', 'newton', 'force', 'velocity', 'acceleration', 'energy'] },
+  { subject: 'Chemistry', keywords: ['chemistry', 'atom', 'bond', 'acid', 'base', 'molecule'] },
+  { subject: 'Mathematics', keywords: ['math', 'mathematics', 'algebra', 'geometry', 'quadratic', 'calculus'] },
+  { subject: 'English', keywords: ['english', 'grammar', 'vocabulary', 'reading', 'writing'] },
+  { subject: 'History', keywords: ['history', 'dynasty', 'war', 'revolution', 'civilization'] },
+  { subject: 'Geography', keywords: ['geography', 'climate', 'plate', 'population', 'urbanization'] },
+];
+
+const SUBJECT_TOPICS: Record<string, string[]> = {
+  Economics: ['price elasticity of demand', 'opportunity cost', 'market equilibrium', 'inflation and CPI', 'fiscal policy', 'comparative advantage'],
+  Biology: ['cellular respiration', 'photosynthesis', 'genetic inheritance', 'enzyme activity', 'ecosystem energy flow', 'natural selection'],
+  Physics: ['Newton\'s second law', 'conservation of energy', 'momentum', 'circuit current and voltage', 'wave properties', 'optics and refraction'],
+  Chemistry: ['covalent bonding', 'mole concept', 'acid-base neutralisation', 'reaction rates', 'periodic trends', 'redox reactions'],
+  Mathematics: ['quadratic functions', 'simultaneous equations', 'probability distributions', 'trigonometric ratios', 'linear functions', 'statistics interpretation'],
+  English: ['main idea inference', 'grammar tense consistency', 'argument structure', 'vocabulary in context', 'cohesion devices', 'tone and register'],
+  History: ['industrial revolution impact', 'causes of world war I', 'colonial expansion', 'cold war dynamics', 'historical source reliability', 'reform movements'],
+  Geography: ['plate tectonics', 'monsoon systems', 'urban migration', 'resource distribution', 'sustainable development', 'population pyramids'],
+};
+
+function detectSubjectFromText(text: string): string | null {
+  const normalized = text.toLowerCase();
+  for (const item of SUBJECT_KEYWORDS) {
+    if (item.keywords.some((kw) => normalized.includes(kw))) {
+      return item.subject;
+    }
+  }
+  return null;
+}
+
+function getTopic(subjectName: string, index: number): string {
+  const pool = SUBJECT_TOPICS[subjectName] ?? SUBJECT_TOPICS.Biology;
+  return pool[index % pool.length];
+}
+
+function optionWithCorrect(topic: string, subjectName: string) {
+  return [
+    { key: 'A', text: `A common misconception unrelated to ${topic}`, correct: false },
+    { key: 'B', text: `A correct explanation of ${topic} in ${subjectName}`, correct: true },
+    { key: 'C', text: `A partially true statement that misses key conditions`, correct: false },
+    { key: 'D', text: `A reversed causal claim about ${topic}`, correct: false },
+  ];
+}
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 function StepDot({ n, label, active, done, onClick }: { n: number; label: string; active: boolean; done: boolean; onClick?: () => void }) {
@@ -381,6 +504,7 @@ function IllustPlaceholder({ qIndex, style: styleName }: { qIndex: number; style
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function AssessmentGenerate() {
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [sourceTab, setSourceTab] = useState<SourceTab>('upload');
 
@@ -475,6 +599,169 @@ export default function AssessmentGenerate() {
   const [questions, setQuestions] = useState<GeneratedQ[]>([]);
   const [expandedQ, setExpandedQ] = useState<string | null>(null);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [creatingPaper, setCreatingPaper] = useState(false);
+  const [generateNonce, setGenerateNonce] = useState(0);
+
+  function inferEffectiveSubject(): string {
+    if (sourceTab === 'textbook' && tbSubject) return tbSubject;
+
+    const candidates: string[] = [];
+    if (uploadedFile?.name) candidates.push(uploadedFile.name);
+    if (textInput) candidates.push(textInput);
+    if (pastedQuestions) candidates.push(pastedQuestions);
+    if (examFiles.length > 0) candidates.push(examFiles.map((f) => f.name).join(' '));
+    if (selectedBankIds.size > 0) {
+      const fromBank = QUESTION_BANK
+        .filter((q) => selectedBankIds.has(q.id))
+        .map((q) => `${q.subject} ${q.prompt}`)
+        .join(' ');
+      candidates.push(fromBank);
+    }
+
+    const detected = detectSubjectFromText(candidates.join(' '));
+    return detected || subject || 'Biology';
+  }
+
+  function buildSourceMaterialText(): string {
+    if (sourceTab === 'upload') {
+      return uploadedFile?.name || '';
+    }
+    if (sourceTab === 'text') {
+      return textInput;
+    }
+    if (sourceTab === 'textbook') {
+      const chosenSections = Array.from(selectedSections)
+        .map((item) => item.split('::')[1])
+        .join(' ');
+      return [tbPublisher, tbGrade, tbSubject, tbSemester, tbEdition, chosenSections].filter(Boolean).join(' ');
+    }
+    if (sourceTab === 'exam') {
+      const fileNames = examFiles.map((f) => f.name).join(' ');
+      return [fileNames, examGenMode, examMatchMode, examDifficulty].filter(Boolean).join(' ');
+    }
+
+    if (qInputMode === 'paste') {
+      return pastedQuestions;
+    }
+    return QUESTION_BANK
+      .filter((q) => selectedBankIds.has(q.id))
+      .map((q) => `${q.subject} ${q.prompt} ${q.tags.join(' ')}`)
+      .join(' ');
+  }
+
+  function buildGeneratedQuestions(effectiveSubject: string, topicPool: string[], seedKey: string): GeneratedQ[] {
+    const rand = mulberry32(hashString(seedKey));
+
+    const deriveSource = qInputMode === 'paste'
+      ? pastedQuestions.trim().split('\n').find((line) => line.trim()) || 'Provided source question'
+      : QUESTION_BANK.find((q) => selectedBankIds.has(q.id))?.prompt || 'Selected bank question';
+
+    const typeLabel: Record<string, string> = {
+      mcq: 'MCQ',
+      tf: 'True/False',
+      fill: 'Fill-blank',
+      sa: 'Short Answer',
+      essay: 'Essay',
+    };
+
+    const result: GeneratedQ[] = [];
+    let idx = 0;
+    const promptLeadPool = [
+      'Based on the provided material',
+      'According to the uploaded source',
+      'From the document context',
+      'Using evidence from the source text',
+    ];
+
+    for (const qt of qTypes) {
+      if (!qt.active) continue;
+      for (let i = 0; i < qt.count; i++) {
+        const topic = topicPool[Math.floor(rand() * topicPool.length)] || getTopic(effectiveSubject, idx);
+        const promptLead = promptLeadPool[Math.floor(rand() * promptLeadPool.length)];
+        const base: GeneratedQ = {
+          id: `gq-${idx + 1}`,
+          type: typeLabel[qt.key],
+          difficulty,
+          prompt: '',
+          explanation: '',
+          hasImage: illustEnabled && illustTypes.has(qt.key),
+          imageStyle: illustStyle,
+          derivedFrom: sourceTab === 'questions' ? deriveSource.slice(0, 90) : undefined,
+        };
+
+        if (qt.key === 'mcq') {
+          base.prompt = sourceTab === 'questions'
+            ? `Based on "${deriveSource.slice(0, 50)}...", which statement about ${topic} is most accurate?`
+            : `${promptLead}, in ${effectiveSubject} which statement best explains ${topic}?`;
+          base.options = optionWithCorrect(topic, effectiveSubject);
+          base.explanation = `${topic} was selected from the uploaded material cues and ${effectiveSubject} topic set; the correct option reflects the most supported definition/mechanism.`;
+        } else if (qt.key === 'tf') {
+          base.prompt = `True or False: ${promptLead.toLowerCase()}, a correct understanding of ${topic} in ${effectiveSubject} requires identifying assumptions and boundary conditions.`;
+          base.answer = 'True';
+          base.explanation = `Questions on ${topic} often depend on conditions; identifying assumptions prevents overgeneralized conclusions.`;
+        } else if (qt.key === 'fill') {
+          base.prompt = `Complete the statement: ${promptLead}, in ${effectiveSubject} the concept most directly used to analyze ${topic} is _______.`;
+          base.answer = topic;
+          base.explanation = `${topic} is the intended key term and anchors the analytical framework of the question.`;
+        } else if (qt.key === 'sa') {
+          base.prompt = `Use 2-3 sentences to explain ${topic} and provide one source-grounded example in ${effectiveSubject}.`;
+          base.explanation = `A strong answer defines ${topic}, explains mechanism or logic, and gives a concrete example.`;
+        } else {
+          base.prompt = `Write an essay discussing ${topic} in ${effectiveSubject}, including source evidence, argument structure, and one counterexample.`;
+          base.explanation = `High-quality essays should include precise definitions, evidence-based reasoning, and discussion of limitations.`;
+        }
+
+        result.push(base);
+        idx += 1;
+      }
+    }
+    return result;
+  }
+
+  async function handleCreateExamPaper() {
+    const selected = (savedIds.size > 0 ? questions.filter((q) => savedIds.has(q.id)) : questions);
+    if (selected.length === 0) {
+      window.alert('Please generate questions first.');
+      return;
+    }
+
+    setCreatingPaper(true);
+    try {
+      const resolvedSemester = sourceTab === 'textbook'
+        ? (tbSemester.includes('Vol.2') ? 'Vol.2' : tbSemester.includes('Vol.1') ? 'Vol.1' : null)
+        : semester;
+
+      const response = await createPaperApi({
+        title: `AI Generated ${inferEffectiveSubject()} Paper ${new Date().toISOString().slice(0, 10)}`,
+        grade: grade || tbGrade || 'Grade 7',
+        subject: inferEffectiveSubject(),
+        semester: resolvedSemester,
+        exam_type: sourceTab === 'exam' ? 'simulation' : 'ai_generated',
+        duration_min: 45,
+        total_score: 100,
+        questions: selected.map((q) => ({
+          type: q.type,
+          prompt: q.prompt,
+          difficulty: q.difficulty,
+          explanation: q.explanation,
+          answer: q.answer,
+          options: (q.options || []).map((opt) => ({
+            key: opt.key,
+            text: opt.text,
+            is_correct: !!opt.correct,
+          })),
+        })),
+      });
+
+      window.alert(`Paper #${response.paper_id} created successfully. Redirecting to Exam Papers.`);
+      navigate('/teacher/assessment/papers');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'unknown error';
+      window.alert(`Create Exam Paper failed: ${message}`);
+    } finally {
+      setCreatingPaper(false);
+    }
+  }
 
   // Helpers
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -518,6 +805,8 @@ export default function AssessmentGenerate() {
   }
 
   async function handleGenerate() {
+    const nextNonce = generateNonce + 1;
+    setGenerateNonce(nextNonce);
     setGenerating(true); setGenProgress(0); setIllustProgress(0);
     setGenDone(false); setQuestions([]); setGenPhase('questions');
 
@@ -527,11 +816,13 @@ export default function AssessmentGenerate() {
       await new Promise(r => setTimeout(r, 380));
       setGenProgress(p);
     }
-    const qs = (sourceTab === 'questions' ? MOCK_DERIVED_QUESTIONS : MOCK_QUESTIONS).map((q, i) => ({
-      ...q,
-      hasImage: illustEnabled && illustTypes.has(q.type === 'MCQ' ? 'mcq' : q.type === 'True/False' ? 'tf' : q.type === 'Fill-blank' ? 'fill' : 'sa'),
-      imageStyle: illustStyle,
-    }));
+    const effectiveSubject = inferEffectiveSubject();
+    const sourceMaterial = buildSourceMaterialText();
+    const materialKeywords = extractKeywords(sourceMaterial);
+    const subjectDefaults = SUBJECT_TOPICS[effectiveSubject] ?? SUBJECT_TOPICS.Biology;
+    const topicPool = uniqueKeepOrder([...materialKeywords, ...subjectDefaults]).slice(0, 20);
+    const seedKey = `${effectiveSubject}|${sourceMaterial}|${difficulty}|${sourceTab}|${nextNonce}`;
+    const qs = buildGeneratedQuestions(effectiveSubject, topicPool, seedKey);
     setQuestions(qs);
     await new Promise(r => setTimeout(r, 200));
 
@@ -806,7 +1097,7 @@ export default function AssessmentGenerate() {
                   <div style={{ flex: 1, height: '1px', background: '#e8eaed' }} />
                 </div>
                 <div style={{ display: 'flex', gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
-                  {['Ch.3 Photosynthesis.pdf', "Newton's Laws.docx", 'Quadratic Functions.pdf'].map(f => (
+                  {['WFN_19-20 Economics Paper 2.pdf', 'Ch.3 Photosynthesis.pdf', "Newton's Laws.docx", 'Quadratic Functions.pdf'].map(f => (
                     <button key={f} onClick={() => setUploadedFile({ name: f, size: Math.floor(Math.random() * 500000 + 50000) })}
                       style={{ padding: '5px 12px', borderRadius: '20px', border: '1px solid #e8eaed', background: '#fff', fontSize: '12px', color: '#374151', cursor: 'pointer' }}>
                       📄 {f}
@@ -2025,9 +2316,10 @@ export default function AssessmentGenerate() {
                       style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e8eaed', background: '#fff', color: '#374151', fontSize: '13px', cursor: 'pointer' }}>
                       Save All
                     </button>
-                    <button
+                    <button onClick={handleCreateExamPaper}
+                      disabled={creatingPaper}
                       style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 18px', borderRadius: '8px', border: 'none', background: '#3b5bdb', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-                      <FileText size={13} /> Create Exam Paper
+                      <FileText size={13} /> {creatingPaper ? 'Creating...' : 'Create Exam Paper'}
                     </button>
                   </div>
                 </div>

@@ -1,6 +1,24 @@
 type UserRole = "student" | "teacher" | "admin";
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || "http://127.0.0.1:8000/api/v1";
+function inferCodespacesApiBaseUrl(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const host = window.location.hostname;
+  const matched = host.match(/^(.*)-\d+\.app\.github\.dev$/);
+  if (!matched) {
+    return null;
+  }
+
+  return `https://${matched[1]}-8000.app.github.dev/api/v1`;
+}
+
+const API_BASE_URL =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() ||
+  (import.meta.env.DEV ? "/api/v1" : null) ||
+  inferCodespacesApiBaseUrl() ||
+  "http://127.0.0.1:8000/api/v1";
 
 function toNumber(value: string | null | undefined): number | null {
   if (!value) return null;
@@ -47,10 +65,17 @@ export async function apiRequest<T>(
     headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers,
-  });
+  const url = `${API_BASE_URL}${path}`;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...init,
+      headers,
+    });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : "unknown network error";
+    throw new Error(`Network error: ${detail} (url=${url})`);
+  }
 
   if (!response.ok) {
     let detail = `HTTP ${response.status}`;

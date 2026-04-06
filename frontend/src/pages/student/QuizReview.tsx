@@ -79,13 +79,47 @@ export default function QuizReview() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [review, setReview] = useState<ReviewData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [blindMode] = useState(false);
   const { speak, stop: stopSpeaking } = useTTS();
 
   useEffect(() => {
-    if (!quizId) return;
-    fetchReview(quizId, searchParams.get('attemptId')).then(setReview);
+    let active = true;
+
+    if (!quizId) {
+      setLoadError('Invalid review URL. Please open review from the quiz list.');
+      setLoading(false);
+      return;
+    }
+
+    const quizIdNum = Number(quizId);
+    if (!Number.isFinite(quizIdNum) || quizIdNum <= 0) {
+      setLoadError('Invalid quiz id in URL. Please open a real quiz review page.');
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setLoadError(null);
+    fetchReview(quizId, searchParams.get('attemptId'))
+      .then((data) => {
+        if (!active) return;
+        setReview(data);
+      })
+      .catch((err) => {
+        if (!active) return;
+        const detail = err instanceof Error ? err.message : 'Unknown error';
+        setLoadError(`Failed to load review: ${detail}`);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, [quizId, searchParams]);
 
   const currentItem = review?.items[currentIndex];
@@ -118,11 +152,39 @@ export default function QuizReview() {
     setCurrentIndex(index);
   };
 
-  if (!review) {
+  if (loading) {
     return (
       <StudentLayout>
         <div style={{ padding: '32px', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
           <div style={{ fontSize: '14px', color: '#9ca3af' }}>Loading review...</div>
+        </div>
+      </StudentLayout>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <StudentLayout>
+        <div style={{ padding: '32px', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '14px', color: '#ef4444', marginBottom: '12px' }}>{loadError}</div>
+            <button
+              onClick={() => navigate('/student/quiz')}
+              style={{ padding: '10px 16px', background: '#0f0f23', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', cursor: 'pointer' }}
+            >
+              Back to quiz list
+            </button>
+          </div>
+        </div>
+      </StudentLayout>
+    );
+  }
+
+  if (!review) {
+    return (
+      <StudentLayout>
+        <div style={{ padding: '32px', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+          <div style={{ fontSize: '14px', color: '#9ca3af' }}>No review data available.</div>
         </div>
       </StudentLayout>
     );
