@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,8 +16,20 @@ class Settings(BaseSettings):
 
     ohmygpt_api_key: str = ""
     ohmygpt_base_url: str = "https://api.ohmygpt.com/v1"
+    ohmygpt_model: str = "gpt-5.4-mini"  # 可配置模型
+    ohmygpt_temperature: float = 0.7  # 可配置温度
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    # Diagnostics
+    # 默认不落盘保存 LLM 原始会话（避免在 api/v1 下生成 llm_raw_session_*.txt）
+    dump_llm_raw_sessions: bool = False
+
+    # 固定从 backend/.env 加载，避免受启动工作目录影响
+    _env_path = Path(__file__).resolve().parent.parent / ".env"
+    model_config = SettingsConfigDict(
+        env_file=str(_env_path),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
 
 settings = Settings()

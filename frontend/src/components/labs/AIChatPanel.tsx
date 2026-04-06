@@ -4,6 +4,7 @@
  *   full  — show the full panel (LabsManagement right panel)
  *   locked — locked to generate_lab mode, compact (LabsDrafts sidebar)
  */
+import React from 'react';
 import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
 import {
   Send, Sparkles, Bot, User, Zap, Plus, ChevronDown, ChevronUp,
@@ -11,8 +12,8 @@ import {
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { ChatMessage, LabCommand, LabComponentDefinition } from './types';
-import { fromBackend, labsApi } from '@/api/labs';
-import { parseLabDefinitionJson, tryParseLabDefinitionFromText } from './parseLabDefinition';
+import { fromBackend, labsApi } from '../../api/labs';
+import { parseLabDefinitionJson } from './parseLabDefinition';
 import { useChat, type ChatMode, type LabGeneratedOptions } from './ChatContext';
 
 // ── Quick Idea definitions ───────────────────────────────────────────────────
@@ -151,6 +152,10 @@ function AIChatPanelInner({
     messages, mode, loading,
     setMode, widgetType, applyCommands, setMessages,
     generateBaseRegistryKey,
+    generateBaseTitle,
+    isGenerating,
+    registerActiveStream,
+    unregisterActiveStream,
   } = useChat();
 
   const [input, setInput] = useState('');
@@ -163,6 +168,8 @@ function AIChatPanelInner({
 
   // Persist SSE session id across sends within the same chat
   const sessionIdRef = useRef<number | null>(null);
+  const esRef = useRef<EventSource | null>(null);
+  const busy = loading || isGenerating;
 
   // Locked variant forces generate_lab（仅当某页需要隐藏切换时使用）
   const effectiveMode: ChatMode = variant === 'locked' ? 'generate_lab' : mode;
@@ -178,7 +185,7 @@ function AIChatPanelInner({
 
   // ── Send ────────────────────────────────────────────────────────────────────
   const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim() || loading) return;
+    if (!text.trim() || busy) return;
     setInput('');
     setSelectedIdeas([]);
 
@@ -187,6 +194,11 @@ function AIChatPanelInner({
     const asstMsg: ChatMessage = { id: asstId, role: 'assistant', content: '', timestamp: Date.now(), streaming: true };
 
     setMessages(prev => [...prev, userMsg, asstMsg]);
+    // Ensure any previous stream is closed before opening a new one.
+    if (esRef.current) {
+      try { esRef.current.close(); } catch { /* ignore */ }
+      esRef.current = null;
+    }
 
     try {
       // Step 1: ensure session exists
@@ -200,15 +212,30 @@ function AIChatPanelInner({
 
       const sessionId = sessionIdRef.current;
       const es = labsApi.streamChat(sessionId, text);
+      esRef.current = es;
+      registerActiveStream(es, asstId);
 
-      let accumulatedText = '';
+      const anchorToSelectedDraft = (def: LabComponentDefinition): LabComponentDefinition => {
+        // Draft 多轮 Generate：不创建新条目，强制覆盖当前选中实验 registry_key
+        if (effectiveMode === 'generate_lab' && generateBaseRegistryKey) {
+          return { ...def, registryKey: generateBaseRegistryKey };
+        }
+        return def;
+      };
+
       let pendingDefinition: LabComponentDefinition | undefined;
       let pendingCommands: LabCommand[] = [];
 
-      es.addEventListener('text', (e: MessageEvent) => {
-        accumulatedText += e.data;
+      es.addEventListener('generating', () => {
         setMessages(prev =>
-          prev.map(m => m.id === asstId ? { ...m, content: accumulatedText } : m)
+          prev.map(m => m.id === asstId ? { ...m, content: '正在生成…', streaming: true } : m)
+        );
+      });
+
+      es.addEventListener('text', (e: MessageEvent) => {
+        const finalText = e.data || '处理完成。';
+        setMessages(prev =>
+          prev.map(m => m.id === asstId ? { ...m, content: finalText, streaming: false } : m)
         );
       });
 
@@ -227,52 +254,77 @@ function AIChatPanelInner({
           const raw = JSON.parse(e.data);
           const res = parseLabDefinitionJson(raw);
           if (res.ok) {
-            pendingDefinition = res.definition;
+            pendingDefinition = anchorToSelectedDraft(res.definition);
           } else {
-            // Show the parse error in the message bubble so the user knows saving is unavailable
+            console.error('[AIChatPanel] definition event parse error:', res.error, '| raw data:', e.data);
+          }
+        } catch (err) {
+          console.error('[AIChatPanel] definition event JSON.parse error:', err, '| e.data:', e.data);
+        }
+      });
+
+      es.addEventListener('definitions', (e: MessageEvent) => {
+        try {
+          const raw = JSON.parse(e.data);
+          if (Array.isArray(raw)) {
+            const parsed = raw.map((item) => parseLabDefinitionJson(item));
+            const valid = parsed.filter((r): r is { ok: true; definition: LabComponentDefinition } => r.ok);
+            if (valid.length > 0) {
+              const candidates = valid.map((r) => anchorToSelectedDraft(r.definition));
+              pendingDefinition = candidates[0];
+              setMessages(prev =>
+                prev.map(m => m.id === asstId
+                  ? {
+                      ...m,
+                      definitionCandidates: candidates,
+                      selectedCandidateIndex: 0,
+                      pendingDefinition: candidates[0],
+                    }
+                  : m
+                )
+              );
+              return;
+            }
+          }
+          // Fallback: single definition
+          if (pendingDefinition) {
             setMessages(prev =>
               prev.map(m => m.id === asstId
-                ? { ...m, content: (m.content || '') + `\n[解析错误] ${res.error}` }
+                ? { ...m, pendingDefinition }
                 : m
               )
             );
           }
-        } catch { /* ignore malformed JSON */ }
+        } catch (err) {
+          console.error('[AIChatPanel] definitions event JSON.parse error:', err, '| e.data:', e.data);
+        }
       });
 
       es.addEventListener('done', () => {
         es.close();
-        setMessages(prev =>
-          prev.map(m => m.id === asstId ? { ...m, streaming: false } : m)
-        );
-        let def = pendingDefinition;
-        if (!def && effectiveMode === 'generate_lab' && accumulatedText.trim()) {
-          const fromText = tryParseLabDefinitionFromText(accumulatedText);
-          if (fromText.ok) def = fromText.definition;
-          else if (/registry_?key|initial_?state|lab_definition|```/i.test(accumulatedText)) {
-            setMessages(prev =>
-              prev.map(m =>
-                m.id === asstId && !m.content?.includes('[解析错误]')
-                  ? { ...m, content: `${m.content || ''}\n[提示] 未从回复中解析出可保存的 Lab JSON：${fromText.error}` }
-                  : m
-              )
-            );
-          }
-        }
-        if (def) {
-          onLabGenerated?.(def,
-            effectiveMode === 'generate_lab'
-              ? { status: 'draft' }
-              : undefined
+        if (esRef.current === es) esRef.current = null;
+        unregisterActiveStream(es);
+        const def = pendingDefinition;
+        setMessages(prev => {
+          const withDone = prev.map(m => (m.id === asstId ? { ...m, streaming: false } : m));
+          if (!def) return withDone;
+          return withDone.map(m =>
+            m.id === asstId ? { ...m, pendingDefinition: def } : m,
           );
-          setMessages(prev =>
-            prev.map(m => m.id === asstId ? { ...m, pendingDefinition: def } : m)
-          );
+        });
+        // 生成结束即合并到前端 Workspace / WidgetRegistry，便于 Drafts 中间区域立刻预览；
+        // 同步数据库仅在用户点击「保存草稿 / 发布」或 Drafts 页「保存到服务器」。
+        if (def && effectiveMode === 'generate_lab') {
+          onLabGenerated?.(def, { status: 'draft' });
+        } else if (def && effectiveMode === 'drive_lab') {
+          onLabGenerated?.(def, undefined);
         }
       });
 
       es.addEventListener('lab_error', (e: MessageEvent) => {
         es.close();
+        if (esRef.current === es) esRef.current = null;
+        unregisterActiveStream(es);
         const detail = typeof e.data === 'string' && e.data.trim() ? e.data : 'Unknown error';
         setMessages(prev =>
           prev.map(m => m.id === asstId
@@ -284,6 +336,9 @@ function AIChatPanelInner({
 
       es.addEventListener('error', () => {
         es.close();
+        // EventSource error can fire on disconnect / CORS / proxy hiccups.
+        if (esRef.current === es) esRef.current = null;
+        unregisterActiveStream(es);
         setMessages(prev =>
           prev.map(m => m.id === asstId
             ? {
@@ -297,6 +352,7 @@ function AIChatPanelInner({
       });
 
     } catch (err) {
+      unregisterActiveStream(undefined);
       setMessages(prev =>
         prev.map(m => m.id === asstId
           ? { ...m, content: `Error: ${err instanceof Error ? err.message : String(err)}`, streaming: false }
@@ -304,18 +360,35 @@ function AIChatPanelInner({
         )
       );
     }
-  }, [loading, effectiveMode, widgetType, generateBaseRegistryKey, applyCommands, onLabGenerated, setMessages]);
+  }, [busy, effectiveMode, generateBaseRegistryKey, widgetType, applyCommands, onLabGenerated, setMessages]);
+
+  // When caller requests cancellation (e.g. nav guard), close this panel's SSE too.
+  // cancelGeneration() will update shared chat state; we just ensure the transport is closed.
+  useEffect(() => {
+    return () => {
+      if (esRef.current) {
+        try { esRef.current.close(); } catch { /* ignore */ }
+        unregisterActiveStream(esRef.current);
+        esRef.current = null;
+      }
+    };
+  }, []);
 
   const commitGeneratedLab = useCallback(
-    async (msgId: string, def: LabComponentDefinition, status: 'draft' | 'published') => {
+    async (msgId: string, def: LabComponentDefinition, status: 'draft' | 'published', candidateIndex?: number) => {
       const action = status === 'draft' ? 'save_draft' : 'publish';
       let contentUnchanged = false;
       let saved: LabComponentDefinition;
       try {
-        const { contentUnchanged: unchanged, raw } = await labsApi.saveLabDefinition(def, action);
+        // 若已选中基准实验：后续迭代必须覆盖同一 registry_key（避免生成“新实验”）
+        const anchoredDef =
+          effectiveMode === 'generate_lab' && generateBaseRegistryKey
+            ? { ...def, registryKey: generateBaseRegistryKey }
+            : def;
+        const { contentUnchanged: unchanged, raw } = await labsApi.saveLabDefinition(anchoredDef, action);
         contentUnchanged = unchanged;
         const { content_unchanged: _c, ...row } = raw;
-        saved = fromBackend(row as Parameters<typeof fromBackend>[0]);
+        saved = fromBackend(row as unknown as Parameters<typeof fromBackend>[0]);
       } catch (err) {
         alert(err instanceof Error ? err.message : String(err));
         return;
@@ -332,6 +405,8 @@ function AIChatPanelInner({
             ? {
                 ...m,
                 pendingDefinition: undefined,
+                definitionCandidates: undefined,
+                selectedCandidateIndex: undefined,
                 definition: saved,
                 commitNotice,
               }
@@ -340,7 +415,7 @@ function AIChatPanelInner({
       );
       onLabGenerated?.(saved, { status });
     },
-    [onLabGenerated, setMessages]
+    [effectiveMode, generateBaseRegistryKey, onLabGenerated, setMessages]
   );
 
   function handleSend() {
@@ -490,30 +565,73 @@ function AIChatPanelInner({
                 </div>
               )}
 
-              {msg.pendingDefinition && (
+              {msg.pendingDefinition && (() => {
+                const candidates = msg.definitionCandidates ?? [msg.pendingDefinition];
+                const selectedIndex = msg.selectedCandidateIndex ?? 0;
+                const selectedDef = candidates[selectedIndex] ?? msg.pendingDefinition;
+                const hasMultiple = candidates.length > 1;
+
+                function handleCandidateSelect(idx: number) {
+                  const next = candidates[idx];
+                  setMessages(prev =>
+                    prev.map(m => m.id === msg.id
+                      ? { ...m, selectedCandidateIndex: idx, pendingDefinition: next }
+                      : m
+                    )
+                  );
+                  onLabGenerated?.(next, { status: 'draft' });
+                }
+
+                return (
                 <div style={{
                   display: 'flex', flexDirection: 'column', gap: '8px',
                   padding: '10px 12px', background: '#1a1040', border: '1px solid #5b21b6',
                   borderRadius: '8px', maxWidth: '100%',
                 }}>
+                  {/* Candidate selector tabs */}
+                  {hasMultiple && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '10px', color: '#a78bfa', fontWeight: 600 }}>方案:</span>
+                      {candidates.map((cand, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => handleCandidateSelect(idx)}
+                          style={{
+                            padding: '3px 8px', borderRadius: '4px',
+                            border: `1px solid ${idx === selectedIndex ? '#a78bfa' : '#3b2a80'}`,
+                            background: idx === selectedIndex ? 'rgba(167,139,250,0.2)' : 'transparent',
+                            color: idx === selectedIndex ? '#e9d5ff' : '#6b7280',
+                            fontSize: '10px', fontWeight: idx === selectedIndex ? 700 : 400,
+                            cursor: 'pointer',
+                          }}>
+                          {cand.title?.slice(0, 30) || cand.registryKey?.slice(0, 30) || `#${idx + 1}`}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                   <div style={{ fontSize: '11px', color: '#e9d5ff', lineHeight: 1.5 }}>
-                    Lab definition ready: <strong style={{ color: '#fff' }}>{msg.pendingDefinition.registryKey}</strong>
-                    <br />Choose how to save:
+                    Lab definition ready: <strong style={{ color: '#fff' }}>{selectedDef.registryKey}</strong>
+                    {hasMultiple && <span style={{ color: '#6b7280' }}> ({selectedIndex + 1}/{candidates.length})</span>}
+                    <br />
+                    左侧 Drafts 预览已更新；你可以继续在对话中提出修改来<strong style={{ color: '#fcd34d' }}>迭代改进当前方案</strong>。需要持久化时，点击下方将当前方案同步到服务器：
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
                     <button type="button"
-                      onClick={() => commitGeneratedLab(msg.id, msg.pendingDefinition, 'draft')}
+                      onClick={() => commitGeneratedLab(msg.id, selectedDef, 'draft', selectedIndex)}
                       style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #fbbf24', background: 'rgba(251,191,36,0.12)', color: '#fcd34d', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                      Save as draft
+                      保存草稿（同步服务器）
                     </button>
                     <button type="button"
-                      onClick={() => commitGeneratedLab(msg.id, msg.pendingDefinition, 'published')}
+                      onClick={() => commitGeneratedLab(msg.id, selectedDef, 'published', selectedIndex)}
                       style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #34d399', background: 'rgba(52,211,153,0.15)', color: '#6ee7b7', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                       Publish now
                     </button>
                   </div>
                 </div>
-              )}
+                );
+              })()}
 
               {msg.definition && !msg.pendingDefinition && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -548,8 +666,17 @@ function AIChatPanelInner({
       }}>
         {effectiveMode === 'generate_lab'
           ? generateBaseRegistryKey
-            ? <><Sparkles size={10} /> Generate (iterate) — based on selected lab <strong style={{ color: th.hintText }}>{generateBaseRegistryKey}</strong>; then Save as draft or Publish</>
-            : <><Sparkles size={10} /> Generate mode — after generation, choose Save as draft or Publish in the chat</>
+            ? (
+              <>
+                <Sparkles size={10} />
+                Generate — 基于已选实验「
+                <strong style={{ color: th.hintText }}>
+                  {generateBaseTitle?.trim() || generateBaseRegistryKey}
+                </strong>
+                」（<code style={{ fontSize: '9px', opacity: 0.9 }}>{generateBaseRegistryKey}</code>）迭代；生成后 Drafts 可立即预览，需持久化时再点对话内保存或 Drafts 页「保存到服务器」
+              </>
+              )
+            : <><Sparkles size={10} /> Generate — 未选中实验时从零生成；选中左侧实验后生成将围绕该实验展开</>
           : <><Zap size={10} /> Drive mode — AI will control the current Lab's state</>}
       </div>
 

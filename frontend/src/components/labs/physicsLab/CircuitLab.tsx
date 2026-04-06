@@ -1,3 +1,7 @@
+/**
+ * Built-in series-circuit SVG lab. AI labs with flat state (voltage, r1, r2, …) use
+ * `app.utils.ohm_law_circuit_svg_render_code` in DB as `render_code` for a matching look.
+ */
 import { useEffect, useRef, useState } from 'react';
 import type { LabWidgetProps, LabCommand } from '../types';
 

@@ -1,4 +1,24 @@
-import type { LabComponentDefinition } from '@/components/labs/types';
+import type { LabComponentDefinition, RendererProfile } from '@/components/labs/types';
+
+/** 后端 / LLM 可能写入前端 RendererProfile 联合类型之外的别名 */
+const API_RENDERER_PROFILE_ALIASES: Record<string, RendererProfile> = {
+  optics_2d: 'generic_2d',
+  optics: 'generic_2d',
+  bio_2d: 'generic_2d',
+  biology_2d: 'generic_2d',
+};
+
+function normalizeRendererProfileFromApi(raw: string): RendererProfile {
+  const k = raw.trim().toLowerCase().replace(/-/g, '_');
+  return API_RENDERER_PROFILE_ALIASES[k] ?? (raw as RendererProfile);
+}
+
+/** DB / LLM 偶发写入字面量 "null"；空串也不应走 AILabRuntime */
+export function isUsableRenderCode(v: string | null | undefined): boolean {
+  if (v == null) return false;
+  const t = v.trim();
+  return t.length > 0 && t.toLowerCase() !== 'null';
+}
 
 interface LabListParams {
   subject?: string;
@@ -28,23 +48,34 @@ interface BackendLabDefinition {
   lab_type: string;
   status: string;
   visual_profile?: string;
+  visual_hint?: Record<string, unknown>;
+  render_code?: string;
 }
 
 function toBackend(def: LabComponentDefinition): BackendLabDefinition {
-  return {
+  // 仅序列化「前端确有」的可选字段，避免 JSON.stringify 误传 null 把库里整列清空。
+  // render_code 始终带键（可为 null），与保存/指纹一致。
+  const out: Record<string, unknown> = {
     registry_key: def.registryKey,
     title: def.title,
-    description: def.description,
     subject_lab: def.subjectLab,
     renderer_profile: def.rendererProfile,
     dimension: '2d',
     initial_state: def.initialState,
-    reducer_spec: def.reducerSpec,
-    lab_metadata: def.metadata,
     lab_type: 'ai_generated',
     status: def.status,
-    ...(def.visualProfile ? { visual_profile: def.visualProfile } : {}),
+    render_code: (def as { renderCode?: string | null }).renderCode ?? null,
   };
+  if (def.description !== undefined) out.description = def.description ?? null;
+  if (def.reducerSpec !== undefined) out.reducer_spec = def.reducerSpec ?? null;
+  if (def.metadata !== undefined) out.lab_metadata = def.metadata ?? null;
+  // 使用 hasOwnProperty：避免「省略键」导致后端不更新 visual_hint；仅在有该字段时序列化
+  if (Object.prototype.hasOwnProperty.call(def, 'visual_hint')) {
+    out.visual_hint = (def.visual_hint as Record<string, unknown> | undefined) ?? null;
+  }
+  const vp = (def as { visualProfile?: string }).visualProfile;
+  if (vp !== undefined) out.visual_profile = vp;
+  return out as BackendLabDefinition;
 }
 
 /** 开发环境下 EventSource 经 Vite 代理常不稳定，SSE 直连后端（需 CORS） */
@@ -57,17 +88,21 @@ function sseOrigin(): string {
 }
 
 export function fromBackend(def: BackendLabDefinition): LabComponentDefinition {
+  const rc = (def as { render_code?: string | null }).render_code;
+  const vp = (def as { visual_profile?: string | null }).visual_profile;
   return {
     registryKey: def.registry_key,
     title: def.title,
     description: def.description,
     subjectLab: def.subject_lab as LabComponentDefinition['subjectLab'],
-    rendererProfile: def.renderer_profile as LabComponentDefinition['rendererProfile'],
+    rendererProfile: normalizeRendererProfileFromApi(def.renderer_profile),
     initialState: def.initial_state,
     reducerSpec: def.reducer_spec,
     metadata: def.lab_metadata,
     status: def.status as LabComponentDefinition['status'],
-    ...(def.visual_profile ? { visualProfile: def.visual_profile } : {}),
+    visual_hint: def.visual_hint as LabComponentDefinition['visual_hint'],
+    ...(typeof rc === 'string' && isUsableRenderCode(rc) ? { renderCode: rc } : {}),
+    ...(typeof vp === 'string' ? { visualProfile: vp } : {}),
   };
 }
 

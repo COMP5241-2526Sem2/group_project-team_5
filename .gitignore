@@ -22,6 +22,9 @@ backend/build/
 backend/.env
 backend/.env.local
 
+# LLM diagnostics (should not be committed)
+backend/app/api/v1/llm_raw_session_*.txt
+
 # ============ IDE / OS ============
 .idea/
 .vscode/

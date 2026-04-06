@@ -2,14 +2,16 @@ import { useState, useEffect, useTransition, useMemo } from 'react';
 import TeacherLayout from '../../components/teacher/TeacherLayout';
 import LabHost from '../../components/labs/LabHost';
 import AIChatPanel, { type LabGeneratedOptions } from '../../components/labs/AIChatPanel';
-import { useChat } from '../../components/labs/ChatContext';
+import { useChat, hasGenerateLabProgress } from '../../components/labs/ChatContext';
+import { ConfirmGenerateResetModal } from '../../components/labs/ConfirmGenerateResetModal';
 import { useLabs } from '../../components/labs/LabsContext';
 import type { LabEntry } from '../../components/labs/LabsContext';
 import type { LabComponentDefinition } from '../../components/labs/types';
-import { parseLabDefinitionJson } from '../../components/labs/parseLabDefinition';
+import { parseLabDefinitionJson, sanitizeLabDefinitionFileText } from '../../components/labs/parseLabDefinition';
+import { labsApi, fromBackend } from '@/api/labs';
 import {
   FlaskConical, Upload, Sparkles, FileJson,
-  Trash2, Send, Search, X, Eye, Tag, Cpu, Layers, ChevronRight,
+  Trash2, Send, Search, X, Eye, Tag, Cpu, Layers, ChevronRight, Save,
 } from 'lucide-react';
 
 const SOURCE_META: Record<string, { emoji: string; label: string; color: string; bg: string }> = {
@@ -17,6 +19,9 @@ const SOURCE_META: Record<string, { emoji: string; label: string; color: string;
   ai:      { emoji: '✨', label: 'AI',    color: '#7c3aed', bg: '#fdf4ff' },
   builtin: { emoji: '⚙️',  label: 'Built-in', color: '#374151', bg: '#f3f4f6' },
 };
+
+/** 非法 registry_key，仅作 pending 状态：表示需在确认后「取消选择」 */
+const PENDING_DESELECT = '__pending_deselect__';
 
 const SUBJ: Record<string, { bg: string; color: string; dot: string; emoji: string }> = {
   Math:      { bg: '#eff6ff', color: '#1e40af', dot: '#3b5bdb', emoji: '📐' },
@@ -109,7 +114,7 @@ function UploadZone({
   onParsed,
   compact,
 }: {
-  onParsed: (def: LabComponentDefinition) => void;
+  onParsed: (def: LabComponentDefinition) => void | Promise<void>;
   compact?: boolean;
 }) {
   const [hover, setHover] = useState(false);
@@ -119,7 +124,8 @@ function UploadZone({
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const raw = JSON.parse(String(reader.result ?? '')) as unknown;
+        const cleaned = sanitizeLabDefinitionFileText(String(reader.result ?? ''));
+        const raw = JSON.parse(cleaned) as unknown;
         const res = parseLabDefinitionJson(raw);
         if (!res.ok) { setError(res.error); return; }
         onParsed(res.definition);
@@ -196,8 +202,11 @@ function UploadZone({
 }
 
 export default function LabsDrafts() {
-  const { workspaceLabs, publishLab, deleteLab, saveDraft, mergeLab } = useLabs();
-  const { setWidgetType, mode: chatMode, pendingCommands, consumeCommands, setGenerateBaseRegistryKey } = useChat();
+  const { workspaceLabs, publishLab, deleteLab, mergeLab } = useLabs();
+  const {
+    setWidgetType, mode: chatMode, pendingCommands, consumeCommands, setGenerateBaseRegistryKey,
+    messages, loading: chatLoading, resetChat, clearLabChatBinding,
+  } = useChat();
   const [, startTransition] = useTransition();
 
   const [search, setSearch] = useState('');
@@ -205,6 +214,8 @@ export default function LabsDrafts() {
   const [deleteTarget, setDeleteTarget] = useState<LabEntry | null>(null);
   const [showChat, setShowChat] = useState(true);
   const [selectedKey, setSelectedKey] = useState<string>('');
+  const [pendingDraftSelectKey, setPendingDraftSelectKey] = useState<string | null>(null);
+  const [savingToServer, setSavingToServer] = useState(false);
 
   const filtered = useMemo(() => workspaceLabs.filter(e => {
     const q = search.toLowerCase();
@@ -227,9 +238,8 @@ export default function LabsDrafts() {
   );
 
   const selectedEntry = useMemo(() => {
-    if (filtered.length === 0) return null;
-    const byKey = filtered.find(e => e.def.registryKey === selectedKey);
-    return byKey ?? filtered[0];
+    if (!selectedKey) return null;
+    return filtered.find(e => e.def.registryKey === selectedKey) ?? null;
   }, [filtered, selectedKey]);
 
   useEffect(() => {
@@ -237,8 +247,8 @@ export default function LabsDrafts() {
       startTransition(() => setSelectedKey(''));
       return;
     }
-    if (!filtered.some(e => e.def.registryKey === selectedKey)) {
-      startTransition(() => setSelectedKey(filtered[0].def.registryKey));
+    if (selectedKey && !filtered.some(e => e.def.registryKey === selectedKey)) {
+      startTransition(() => setSelectedKey(''));
     }
   }, [filtered, selectedKey, startTransition]);
 
@@ -252,14 +262,38 @@ export default function LabsDrafts() {
     }
   }, [chatMode, selectedEntry?.def.registryKey, setWidgetType]);
 
-  /** Generate 模式：把左侧选中的草稿 registry_key 传给后端，用于基于该实验迭代 */
+  /** Generate 模式：把左侧选中的草稿 registry_key + 标题 传给 Chat / 后端，用于基于该实验迭代 */
   useEffect(() => {
-    setGenerateBaseRegistryKey(selectedEntry?.def.registryKey);
-    return () => setGenerateBaseRegistryKey(undefined);
-  }, [selectedEntry?.def.registryKey, setGenerateBaseRegistryKey]);
+    setGenerateBaseRegistryKey(
+      selectedEntry?.def.registryKey,
+      selectedEntry?.def.title,
+    );
+  }, [selectedEntry?.def.registryKey, selectedEntry?.def.title, setGenerateBaseRegistryKey]);
+
+  function applyDraftSelection(registryKey: string) {
+    startTransition(() => setSelectedKey(registryKey));
+  }
+
+  /** 取消列表选择，并解除 Chat 中 Drive / Generate 对该实验的绑定 */
+  function clearDraftSelection() {
+    startTransition(() => setSelectedKey(''));
+    clearLabChatBinding();
+  }
 
   function selectDraft(registryKey: string) {
-    startTransition(() => setSelectedKey(registryKey));
+    if (registryKey === selectedKey) {
+      if (hasGenerateLabProgress(chatMode, messages, chatLoading)) {
+        setPendingDraftSelectKey(PENDING_DESELECT);
+        return;
+      }
+      clearDraftSelection();
+      return;
+    }
+    if (hasGenerateLabProgress(chatMode, messages, chatLoading)) {
+      setPendingDraftSelectKey(registryKey);
+      return;
+    }
+    applyDraftSelection(registryKey);
   }
 
   async function handlePublish(registryKey: string) {
@@ -283,8 +317,33 @@ export default function LabsDrafts() {
     }
   }
 
-  function handleUploadParsed(def: LabComponentDefinition) {
-    saveDraft(def, 'uploaded');
+  /** 将当前选中实验同步到数据库（与对话内「Save as draft」等价） */
+  async function handleSaveSelectedToServer() {
+    if (!selectedEntry) return;
+    setSavingToServer(true);
+    try {
+      const { raw } = await labsApi.saveLabDefinition(
+        { ...selectedEntry.def, status: 'draft' },
+        'save_draft',
+      );
+      const { content_unchanged: _c, ...row } = raw;
+      mergeLab(fromBackend(row as Parameters<typeof fromBackend>[0]), selectedEntry.source);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSavingToServer(false);
+    }
+  }
+
+  async function handleUploadParsed(def: LabComponentDefinition) {
+    try {
+      const { raw } = await labsApi.saveLabDefinition({ ...def, status: 'draft' }, 'save_draft');
+      const { content_unchanged: _cu, ...row } = raw;
+      mergeLab(fromBackend(row as Parameters<typeof fromBackend>[0]), 'uploaded');
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+      return;
+    }
     startTransition(() => setSelectedKey(def.registryKey));
   }
 
@@ -630,6 +689,22 @@ export default function LabsDrafts() {
                     </button>
                     <button
                       type="button"
+                      disabled={savingToServer || selectedEntry.def.status === 'published'}
+                      onClick={() => void handleSaveSelectedToServer()}
+                      title="将当前草稿同步到服务器（生成后本地已可预览，点此持久化）"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 14px',
+                        border: '1px solid #cbd5e1', borderRadius: '7px',
+                        background: selectedEntry.def.status === 'published' ? '#f3f4f6' : '#fff',
+                        color: selectedEntry.def.status === 'published' ? '#9ca3af' : '#334155',
+                        fontSize: '12px', fontWeight: 600,
+                        cursor: selectedEntry.def.status === 'published' || savingToServer ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      <Save size={12} /> {savingToServer ? '保存中…' : '保存到服务器'}
+                    </button>
+                    <button
+                      type="button"
                       disabled={selectedEntry.def.status === 'published'}
                       onClick={() => void handlePublish(selectedEntry.def.registryKey)}
                       style={{
@@ -720,6 +795,32 @@ export default function LabsDrafts() {
           onCancel={() => setDeleteTarget(null)}
         />
       )}
+
+      <ConfirmGenerateResetModal
+        open={pendingDraftSelectKey !== null}
+        intent={pendingDraftSelectKey === PENDING_DESELECT ? 'deselect' : 'switch_lab'}
+        targetTitle={
+          pendingDraftSelectKey === PENDING_DESELECT
+            ? (selectedEntry?.def.title ?? '当前实验')
+            : (pendingDraftSelectKey
+              ? (filtered.find(e => e.def.registryKey === pendingDraftSelectKey)?.def.title
+                ?? pendingDraftSelectKey)
+              : '')
+        }
+        onCancel={() => setPendingDraftSelectKey(null)}
+        onConfirm={() => {
+          const key = pendingDraftSelectKey;
+          setPendingDraftSelectKey(null);
+          if (key === PENDING_DESELECT) {
+            clearDraftSelection();
+            return;
+          }
+          if (key) {
+            resetChat(undefined);
+            applyDraftSelection(key);
+          }
+        }}
+      />
     </TeacherLayout>
   );
 }

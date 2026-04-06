@@ -61,6 +61,8 @@ class LabDefinition(Base):
         String(20), nullable=False, default=LabStatus.DRAFT, index=True
     )
     visual_profile: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    visual_hint: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    render_code: Mapped[str | None] = mapped_column(Text, nullable=True)
     teacher_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

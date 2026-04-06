@@ -1,10 +1,11 @@
-import { useState, useTransition, useEffect } from 'react';
+import { useState, useTransition, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import TeacherLayout from '../../components/teacher/TeacherLayout';
 import LabHost, { STATIC_WIDGETS } from '../../components/labs/LabHost';
 import AIChatPanel, { type LabGeneratedOptions } from '../../components/labs/AIChatPanel';
 import { useLabs } from '../../components/labs/LabsContext';
-import { useChat } from '../../components/labs/ChatContext';
+import { useChat, hasGenerateLabProgress } from '../../components/labs/ChatContext';
+import { ConfirmGenerateResetModal } from '../../components/labs/ConfirmGenerateResetModal';
 import type { LabEntry } from '../../components/labs/LabsContext';
 import type { LabComponentDefinition } from '../../components/labs/types';
 import {
@@ -128,15 +129,21 @@ export default function LabsManagement() {
   const navigate = useNavigate();
   const [, startTransition] = useTransition();
   const { allLabs, deleteLab, saveDraft, publishLab } = useLabs();
-  const { setWidgetType, setMode, pendingCommands, consumeCommands, setGenerateBaseRegistryKey } = useChat();
+  const {
+    setWidgetType, setMode, pendingCommands, consumeCommands, setGenerateBaseRegistryKey,
+    messages, mode: chatMode, loading: chatLoading, clearLabChatBinding,
+  } = useChat();
 
   const [search, setSearch] = useState('');
   const [filterSubject, setFilterSubject] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'builtin' | 'uploaded' | 'ai'>('all');
   const [filterDimension, setFilterDimension] = useState<'' | '2d' | '3d'>('');
-  const [selectedId, setSelectedId] = useState<string>(STATIC_WIDGETS[0]?.widgetType ?? '');
+  const [selectedId, setSelectedId] = useState<string>('');
   const [deleteTarget, setDeleteTarget] = useState<LabItem | null>(null);
   const [showChat, setShowChat] = useState(true);
+  const [pendingCatalogSelect, setPendingCatalogSelect] = useState<LabItem | null>(null);
+  /** Generate 有进度时，重复点击已选实验需确认后再取消选择 */
+  const [pendingCatalogDeselect, setPendingCatalogDeselect] = useState(false);
 
   const allEntries = Array.from(allLabs.values());
   const catalog = buildCatalog(allEntries);
@@ -161,26 +168,62 @@ export default function LabsManagement() {
     (!filterDimension || lab.dimension === filterDimension)
   );
 
-  const selected = filtered.find(l => l.id === selectedId) ?? filtered[0];
+  const selected = useMemo(() => {
+    if (!selectedId) return null;
+    return filtered.find(l => l.id === selectedId) ?? null;
+  }, [filtered, selectedId]);
   const selectedSty = selected ? ss(selected.subject) : ss('Dynamic');
+
+  useEffect(() => {
+    if (filtered.length === 0) {
+      if (selectedId) startTransition(() => setSelectedId(''));
+      return;
+    }
+    if (selectedId && !filtered.some(l => l.id === selectedId)) {
+      startTransition(() => setSelectedId(''));
+    }
+  }, [filtered, selectedId, startTransition]);
 
   /** Generate 模式：当前目录选中的实验作为迭代基准（与 Drive 的 widgetType 对齐） */
   useEffect(() => {
-    setGenerateBaseRegistryKey(selected?.widgetType);
-    return () => setGenerateBaseRegistryKey(undefined);
-  }, [selected?.widgetType, setGenerateBaseRegistryKey]);
+    setGenerateBaseRegistryKey(selected?.widgetType, selected?.label);
+  }, [selected?.widgetType, selected?.label, setGenerateBaseRegistryKey]);
 
-  function selectLab(id: string) {
-    startTransition(() => setSelectedId(id));
-    setWidgetType(id);
+  function applyCatalogSelection(lab: LabItem) {
+    startTransition(() => setSelectedId(lab.id));
+    setWidgetType(lab.widgetType);
     setMode('drive_lab');
+  }
+
+  /** 取消列表选择，并解除 Chat 中 Drive / Generate 对该实验的绑定 */
+  function clearCatalogSelection() {
+    startTransition(() => setSelectedId(''));
+    clearLabChatBinding();
+  }
+
+  function selectLab(lab: LabItem) {
+    if (lab.id === selectedId) {
+      if (hasGenerateLabProgress(chatMode, messages, chatLoading)) {
+        setPendingCatalogDeselect(true);
+        return;
+      }
+      clearCatalogSelection();
+      return;
+    }
+    if (
+      hasGenerateLabProgress(chatMode, messages, chatLoading)
+    ) {
+      setPendingCatalogSelect(lab);
+      return;
+    }
+    applyCatalogSelection(lab);
   }
 
   async function handleDelete(lab: LabItem) {
     if (lab.type === 'builtin') return;
     await deleteLab(lab.widgetType);
     if (selectedId === lab.id) {
-      startTransition(() => setSelectedId(STATIC_WIDGETS[0]?.widgetType ?? ''));
+      startTransition(() => setSelectedId(''));
     }
     setDeleteTarget(null);
   }
@@ -345,7 +388,7 @@ export default function LabsManagement() {
                 const sty = ss(lab.subject);
                 const isActive = lab.id === selectedId;
                 return (
-                  <button key={lab.id} onClick={() => selectLab(lab.id)}
+                  <button key={lab.id} onClick={() => selectLab(lab)}
                     style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 10px', borderRadius: '8px', border: `1px solid ${isActive ? '#3b5bdb' : 'transparent'}`, background: isActive ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', marginBottom: '3px', transition: 'all 0.12s' }}
                     onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = '#f3f4f6'; }}
                     onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
@@ -555,6 +598,31 @@ export default function LabsManagement() {
           onCancel={() => setDeleteTarget(null)}
         />
       )}
+
+      <ConfirmGenerateResetModal
+        open={pendingCatalogSelect !== null || pendingCatalogDeselect}
+        intent={pendingCatalogDeselect ? 'deselect' : 'switch_lab'}
+        targetTitle={
+          pendingCatalogDeselect
+            ? (selected?.label ?? '当前实验')
+            : (pendingCatalogSelect?.label ?? '')
+        }
+        onCancel={() => {
+          setPendingCatalogSelect(null);
+          setPendingCatalogDeselect(false);
+        }}
+        onConfirm={() => {
+          if (pendingCatalogDeselect) {
+            setPendingCatalogDeselect(false);
+            clearCatalogSelection();
+            setPendingCatalogSelect(null);
+            return;
+          }
+          const lab = pendingCatalogSelect;
+          setPendingCatalogSelect(null);
+          if (lab) applyCatalogSelection(lab);
+        }}
+      />
     </TeacherLayout>
   );
 }

@@ -3,7 +3,7 @@
  * Default states are defined inline here so the heavy lab files (R3F etc.)
  * are ONLY loaded lazily when the component is actually rendered.
  */
-import { lazy, Suspense, useState, useCallback, useTransition, useEffect } from 'react';
+import { lazy, Suspense, useState, useCallback, useTransition, useEffect, useMemo } from 'react';
 import type { LabWidgetProps, LabState } from './types';
 import { WidgetRegistry, MOCK_DYNAMIC_DEFS } from './LabRegistry';
 import { normalizeDriveCommandsForLabHost } from './normalizeDriveCommands';
@@ -134,6 +134,18 @@ export default function LabHost({
 
   const baseState = initialState ?? staticMeta?.defaultState ?? dynamicDef?.initialState ?? {};
   const [state, setState] = useState<LabState>(baseState);
+
+  /** 同一 registryKey 下迭代生成（render_code / initialState 变化）时需重置运行时 state，否则预览仍用旧参数 */
+  const dynamicRevision = useMemo(() => {
+    if (!dynamicDef) return '';
+    const rc = (dynamicDef as { renderCode?: string }).renderCode?.length ?? 0;
+    return `${dynamicDef.registryKey}:${rc}:${JSON.stringify(dynamicDef.initialState)}`;
+  }, [dynamicDef]);
+
+  useEffect(() => {
+    if (!dynamicDef || widgetType !== activeType) return;
+    setState(initialState ?? staticMeta?.defaultState ?? dynamicDef.initialState ?? {});
+  }, [dynamicRevision, widgetType, activeType, dynamicDef, initialState, staticMeta]);
 
   // Apply AI commands from ChatContext（含 LLM 非标准 JSON 的兜底规范化）
   useEffect(() => {

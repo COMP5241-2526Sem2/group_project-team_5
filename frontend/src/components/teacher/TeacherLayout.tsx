@@ -1,5 +1,9 @@
-import { ReactNode, useState, useEffect } from 'react';
+import { ReactNode, useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router';
+import { useChat } from '../labs/ChatContext';
+
+/** 跨 Labs 页面实例保留：用于检测 Lab Catalog ↔ Drafts 切换（TeacherLayout 会随路由重挂载） */
+let prevTeacherLabsSection: 'catalog' | 'drafts' | null = null;
 import {
   ClipboardList, BookOpen, LogOut, Settings,
   ChevronDown, PanelLeftClose, PanelLeftOpen, FlaskConical,
@@ -37,10 +41,12 @@ const LABS_SUB_ITEMS: SubNavItem[] = [
 export default function TeacherLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { clearLabChatBinding, isGenerating, cancelGeneration } = useChat();
   const [activeMenu, setActiveMenu] = useState('lessons');
   const [activeSub, setActiveSub] = useState('generate');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
 
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -73,6 +79,29 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
     if (p.startsWith('/teacher/lessons') || p.startsWith('/teacher/lesson-')) { setActiveMenu('lessons'); return; }
     setActiveMenu('lessons');
   }, [location.pathname]);
+
+  /** Lab Catalog ↔ Drafts：解除 Chat 与实验绑定并重置为 Generate 欢迎态 */
+  useEffect(() => {
+    const p = location.pathname;
+    if (!p.startsWith('/teacher/labs')) {
+      prevTeacherLabsSection = null;
+      return;
+    }
+    const section: 'catalog' | 'drafts' = p.includes('/drafts') ? 'drafts' : 'catalog';
+    if (prevTeacherLabsSection !== null && prevTeacherLabsSection !== section) {
+      clearLabChatBinding();
+    }
+    prevTeacherLabsSection = section;
+  }, [location.pathname, clearLabChatBinding]);
+
+  const guardedNavigate = useCallback((path: string) => {
+    if (!path || path === location.pathname) return;
+    if (isGenerating) {
+      setPendingNavPath(path);
+      return;
+    }
+    navigate(path);
+  }, [isGenerating, location.pathname, navigate]);
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#ffffff', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
@@ -148,7 +177,7 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
                       <button
                         onClick={() => {
                           setActiveMenu(item.id);
-                          navigate(isAssessment ? '/teacher/assessment/generate' : item.path);
+                          guardedNavigate(isAssessment ? '/teacher/assessment/generate' : item.path);
                         }}
                         style={{
                           width: '100%', display: 'flex', alignItems: 'center', gap: '8px',
@@ -188,7 +217,7 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
                                     return (
                                       <button
                                         key={sub.id}
-                                        onClick={() => { setActiveSub(sub.id); navigate(sub.path); }}
+                                        onClick={() => { setActiveSub(sub.id); guardedNavigate(sub.path); }}
                                         style={{
                                           width: '100%', display: 'flex', alignItems: 'center', gap: '7px',
                                           padding: '6px 10px', borderRadius: '7px', border: 'none', cursor: 'pointer',
@@ -238,7 +267,7 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
                                     return (
                                       <button
                                         key={sub.id}
-                                        onClick={() => { setActiveSub(sub.id); navigate(sub.path); }}
+                                        onClick={() => { setActiveSub(sub.id); guardedNavigate(sub.path); }}
                                         style={{
                                           width: '100%', display: 'flex', alignItems: 'center', gap: '7px',
                                           padding: '6px 10px', borderRadius: '7px', border: 'none', cursor: 'pointer',
@@ -286,6 +315,17 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
           {children}
         </main>
       </div>
+
+      <InterruptGenerationModal
+        open={pendingNavPath !== null}
+        onCancel={() => setPendingNavPath(null)}
+        onConfirm={() => {
+          const path = pendingNavPath;
+          setPendingNavPath(null);
+          cancelGeneration('已中断生成（用户切换页面）');
+          if (path) navigate(path);
+        }}
+      />
     </div>
   );
 }
@@ -299,5 +339,84 @@ function DropBtn({ icon, label, onClick, danger }: { icon: React.ReactNode; labe
     >
       {icon}{label}
     </button>
+  );
+}
+
+function InterruptGenerationModal({
+  open,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  if (!open) return null;
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.45)',
+        zIndex: 95,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+      onClick={onCancel}
+      role="presentation"
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: '#fff',
+          borderRadius: '14px',
+          padding: '26px',
+          maxWidth: '420px',
+          width: '92%',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+        }}
+      >
+        <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f0f23', marginBottom: '10px' }}>
+          正在生成中，切换页面会中断生成
+        </div>
+        <div style={{ fontSize: '13px', color: '#6b7280', lineHeight: 1.65, marginBottom: '20px' }}>
+          当前有一条 AI 生成/流式响应仍在进行。继续跳转将<strong style={{ color: '#111827' }}>终止本次生成</strong>，并可能导致未保存的输出丢失。
+        </div>
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+          <button
+            type="button"
+            onClick={onCancel}
+            style={{
+              padding: '8px 18px',
+              border: '1px solid #e8eaed',
+              borderRadius: '8px',
+              background: '#fff',
+              fontSize: '13px',
+              cursor: 'pointer',
+              color: '#374151',
+            }}
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            style={{
+              padding: '8px 18px',
+              border: 'none',
+              borderRadius: '8px',
+              background: '#ef4444',
+              color: '#fff',
+              fontSize: '13px',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            继续并中断生成
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
