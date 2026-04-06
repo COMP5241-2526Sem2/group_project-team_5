@@ -8,9 +8,20 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Course, User
-from app.models.assessment import Paper, PaperQuestion, PaperQuestionOption, PaperSection, PaperStatus
+from app.models.assessment import (
+    Paper,
+    PaperQuestion,
+    PaperQuestionOption,
+    PaperSection,
+    PaperStatus,
+    QuestionBankItem,
+    QuestionBankOption,
+)
 from app.models.user import AccountType
 from app.schemas.paper import (
+    PaperCreateQuestion,
+    PaperCreateRequest,
+    PaperCreateResponse,
     PaperDetailResponse,
     PaperListItem,
     PaperListResponse,
@@ -32,6 +43,132 @@ class _PaperQueryFilters:
 
 
 class PaperService:
+    @staticmethod
+    async def create_paper(
+        db: AsyncSession,
+        actor_id: int,
+        payload: PaperCreateRequest,
+    ) -> PaperCreateResponse:
+        actor = await PaperService._require_teacher_or_admin(db, actor_id)
+        course = await PaperService._resolve_course_for_create(db, actor, payload.course_id)
+
+        question_count = len(payload.questions)
+        if question_count <= 0:
+            raise HTTPException(status_code=400, detail="questions must not be empty")
+
+        paper = Paper(
+            title=payload.title,
+            course_id=course.id,
+            grade=payload.grade,
+            subject=payload.subject,
+            semester=payload.semester,
+            exam_type=payload.exam_type,
+            total_score=payload.total_score,
+            duration_min=payload.duration_min,
+            question_count=question_count,
+            quality_score=None,
+            status=PaperStatus.DRAFT,
+            created_by=actor_id,
+        )
+        db.add(paper)
+        await db.flush()
+
+        sections_by_type: dict[str, list[PaperCreateQuestion]] = {}
+        for item in payload.questions:
+            normalized_type = PaperService._normalize_question_type(item.type)
+            sections_by_type.setdefault(normalized_type, []).append(item)
+
+        section_order = 1
+        question_order = 1
+        default_score_each = round(payload.total_score / max(1, question_count), 2)
+
+        for question_type, items in sections_by_type.items():
+            score_each = round(sum((q.score if q.score is not None else default_score_each) for q in items) / len(items), 2)
+            section = PaperSection(
+                paper_id=paper.id,
+                title=PaperService._section_title(question_type),
+                section_order=section_order,
+                question_type=question_type,
+                question_count=len(items),
+                score_each=score_each,
+                total_score=round(sum((q.score if q.score is not None else default_score_each) for q in items), 2),
+            )
+            db.add(section)
+            await db.flush()
+
+            for item in items:
+                score = round(item.score if item.score is not None else default_score_each, 2)
+                answer_text = PaperService._resolve_answer_text(item)
+
+                bank = QuestionBankItem(
+                    publisher="generated",
+                    grade=payload.grade,
+                    subject=payload.subject,
+                    semester=payload.semester,
+                    question_type=question_type,
+                    prompt=item.prompt,
+                    difficulty=item.difficulty,
+                    answer_text=answer_text,
+                    explanation=item.explanation,
+                    chapter=None,
+                    source_type="ai_generated",
+                    source_id=paper.id,
+                    created_by=actor_id,
+                )
+                db.add(bank)
+                await db.flush()
+
+                for opt in item.options:
+                    db.add(
+                        QuestionBankOption(
+                            bank_question_id=bank.id,
+                            option_key=opt.key,
+                            option_text=opt.text,
+                            is_correct=opt.is_correct,
+                        )
+                    )
+
+                paper_question = PaperQuestion(
+                    paper_id=paper.id,
+                    section_id=section.id,
+                    order_num=question_order,
+                    question_type=question_type,
+                    prompt=item.prompt,
+                    difficulty=item.difficulty,
+                    score=score,
+                    bank_question_id=bank.id,
+                    answer_text=answer_text,
+                    explanation=item.explanation,
+                    chapter=None,
+                )
+                db.add(paper_question)
+                await db.flush()
+
+                for opt in item.options:
+                    db.add(
+                        PaperQuestionOption(
+                            question_id=paper_question.id,
+                            option_key=opt.key,
+                            option_text=opt.text,
+                            is_correct=opt.is_correct,
+                        )
+                    )
+
+                question_order += 1
+
+            section_order += 1
+
+        await db.commit()
+        await db.refresh(paper)
+
+        return PaperCreateResponse(
+            paper_id=paper.id,
+            title=paper.title,
+            status=PaperService._map_status(paper.status),
+            question_count=paper.question_count,
+            created_at=paper.created_at,
+        )
+
     @staticmethod
     async def publish_paper(db: AsyncSession, actor_id: int, paper_id: int) -> PaperStatusMutationResponse:
         paper = await PaperService._get_paper_for_teacher_or_admin(db, actor_id, paper_id)
@@ -304,3 +441,58 @@ class PaperService:
             published_at=paper.published_at,
             created_at=paper.created_at,
         )
+
+    @staticmethod
+    async def _resolve_course_for_create(db: AsyncSession, actor: User, course_id: int | None) -> Course:
+        if course_id is not None:
+            course = await db.get(Course, course_id)
+            if course is None:
+                raise HTTPException(status_code=404, detail="course not found")
+            PaperService._assert_scope(actor, course)
+            return course
+
+        stmt = select(Course).order_by(Course.id.asc())
+        if actor.account_type == AccountType.TEACHER:
+            stmt = stmt.where(Course.teacher_id == actor.id)
+
+        course = (await db.execute(stmt.limit(1))).scalars().first()
+        if course is None:
+            raise HTTPException(status_code=400, detail="no available course for actor")
+        return course
+
+    @staticmethod
+    def _normalize_question_type(question_type: str) -> str:
+        raw = (question_type or "").strip().upper().replace("/", "_").replace("-", "_").replace(" ", "_")
+        mapping = {
+            "MCQ": "MCQ_SINGLE",
+            "MCQ_SINGLE": "MCQ_SINGLE",
+            "MCQ_MULTI": "MCQ_MULTI",
+            "TRUE_FALSE": "TRUE_FALSE",
+            "TF": "TRUE_FALSE",
+            "FILL_BLANK": "FILL_BLANK",
+            "FILL_IN_THE_BLANK": "FILL_BLANK",
+            "SHORT_ANSWER": "SHORT_ANSWER",
+            "ESSAY": "ESSAY",
+        }
+        return mapping.get(raw, "SHORT_ANSWER")
+
+    @staticmethod
+    def _section_title(question_type: str) -> str:
+        mapping = {
+            "MCQ_SINGLE": "Multiple Choice",
+            "MCQ_MULTI": "Multiple Choice (Multi)",
+            "TRUE_FALSE": "True / False",
+            "FILL_BLANK": "Fill in the Blank",
+            "SHORT_ANSWER": "Short Answer",
+            "ESSAY": "Essay",
+        }
+        return mapping.get(question_type, "Mixed")
+
+    @staticmethod
+    def _resolve_answer_text(item: PaperCreateQuestion) -> str | None:
+        if item.answer:
+            return item.answer
+        correct_keys = [opt.key for opt in item.options if opt.is_correct]
+        if not correct_keys:
+            return None
+        return ",".join(correct_keys)

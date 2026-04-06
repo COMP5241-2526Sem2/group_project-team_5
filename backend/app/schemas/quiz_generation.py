@@ -71,3 +71,36 @@ class QuizGenerateResponse(BaseModel):
     reused_count: int
     generated_count: int
     items: list[GeneratedQuizItem]
+
+
+class AIQuestionGenOption(BaseModel):
+    key: str
+    text: str
+    correct: bool = False
+
+
+class AIQuestionGenQuestion(BaseModel):
+    type: Literal["MCQ", "True/False", "Fill-blank", "Short Answer", "Essay"]
+    prompt: str
+    options: list[AIQuestionGenOption] = []
+    answer: str | None = None
+    difficulty: Difficulty
+    explanation: str
+
+
+class AIQuestionGenPreviewRequest(BaseModel):
+    source_text: str = Field(min_length=1)
+    subject: str = Field(min_length=1)
+    grade: str = Field(min_length=1)
+    difficulty: Difficulty
+    question_count: int = Field(ge=1)
+    type_targets: dict[str, int] | None = None
+
+
+class AIQuestionGenPreviewResponse(BaseModel):
+    questions: list[AIQuestionGenQuestion]
+
+
+class AIQuestionGenExtractTextResponse(BaseModel):
+    source_text: str
+    chars: int

@@ -26,6 +26,7 @@ from app.schemas.paper_ai_scoring import (
     PaperAISuggestionsResponse,
 )
 from app.schemas.paper import PaperDetailResponse, PaperListResponse, PaperStatusMutationResponse
+from app.schemas.paper import PaperCreateRequest, PaperCreateResponse
 from app.services.paper_ai_scoring_service import PaperAIScoringService
 from app.services.paper_attempt_service import PaperAttemptService
 from app.services.paper_service import PaperService
@@ -65,6 +66,16 @@ async def list_papers(
         page=page,
         page_size=page_size,
     )
+
+
+@router.post("/papers", response_model=PaperCreateResponse)
+async def create_paper(
+    payload: PaperCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    x_user_id: int | None = Header(default=None, alias="X-User-Id"),
+) -> PaperCreateResponse:
+    actor_id = _require_user_id(x_user_id)
+    return await PaperService.create_paper(db=db, actor_id=actor_id, payload=payload)
 
 
 @router.get("/papers/{paper_id}", response_model=PaperDetailResponse)

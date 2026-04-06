@@ -251,3 +251,25 @@
 方案文档：
 
 - `AI_PAPER_SCORING_IMPLEMENTATION_PLAN_V1.md`
+
+---
+
+## 10. Quiz 生成（AI 接入）
+
+当前状态：已支持 LLM 生成，失败自动回退模板题生成。
+
+行为说明：
+
+1. 生成流程仍遵循“优先复用题库，不足时生成并入库”。
+2. 当 `QUIZ_GENERATION_PROVIDER=openai|ohmygpt` 且配置了 `OHMYGPT_API_KEY` 时，启用 LLM 生成题干/答案/解析。
+3. 若 LLM 调用失败、返回格式异常、或生成题目与现有题目过于相似，则自动降级为模板生成，不中断接口返回。
+
+配置项（环境变量）：
+
+- `QUIZ_GENERATION_PROVIDER`：默认 `heuristic`
+- `QUIZ_GENERATION_MODEL`：默认 `gpt-4o-mini`
+- `QUIZ_GENERATION_TEMPERATURE`：默认 `0.4`
+- `QUIZ_GENERATION_TIMEOUT_SEC`：默认 `25`
+- `QUIZ_GENERATION_MAX_TOKENS`：默认 `800`
+- `OHMYGPT_API_KEY`：当 provider 为 `openai/ohmygpt` 时必填
+- `OHMYGPT_BASE_URL`：默认 `https://api.ohmygpt.com/v1`

@@ -10,7 +10,9 @@ import {
   PenLine, Copy,
 } from 'lucide-react';
 import { CustomSelect, SelectField } from '../../../components/teacher/CustomSelect';
+import { previewGenerateQuestionsApi } from '../../../utils/aiQuestionGenApi';
 import { createPaperApi } from '../../../utils/paperApi';
+import { extractSourceTextApi } from '../../../utils/sourceExtractionApi';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type SourceTab = 'upload' | 'text' | 'textbook' | 'exam' | 'questions';
@@ -509,7 +511,7 @@ export default function AssessmentGenerate() {
   const [sourceTab, setSourceTab] = useState<SourceTab>('upload');
 
   // Step 1 state
-  const [uploadedFile, setUploadedFile] = useState<{ name: string; size: number } | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<{ name: string; size: number; file?: File; extractedText?: string } | null>(null);
   const [textInput, setTextInput] = useState('');
   const [pastedQuestions, setPastedQuestions] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -624,7 +626,7 @@ export default function AssessmentGenerate() {
 
   function buildSourceMaterialText(): string {
     if (sourceTab === 'upload') {
-      return uploadedFile?.name || '';
+      return uploadedFile?.extractedText || uploadedFile?.name || '';
     }
     if (sourceTab === 'text') {
       return textInput;
@@ -667,10 +669,10 @@ export default function AssessmentGenerate() {
     const result: GeneratedQ[] = [];
     let idx = 0;
     const promptLeadPool = [
-      'Based on the provided material',
-      'According to the uploaded source',
-      'From the document context',
-      'Using evidence from the source text',
+      'In this topic',
+      'From core concept analysis',
+      'Within the syllabus scope',
+      'In exam-style reasoning',
     ];
 
     for (const qt of qTypes) {
@@ -696,11 +698,11 @@ export default function AssessmentGenerate() {
           base.options = optionWithCorrect(topic, effectiveSubject);
           base.explanation = `${topic} was selected from the uploaded material cues and ${effectiveSubject} topic set; the correct option reflects the most supported definition/mechanism.`;
         } else if (qt.key === 'tf') {
-          base.prompt = `True or False: ${promptLead.toLowerCase()}, a correct understanding of ${topic} in ${effectiveSubject} requires identifying assumptions and boundary conditions.`;
+          base.prompt = `True or False: a correct understanding of ${topic} in ${effectiveSubject} requires identifying assumptions and boundary conditions.`;
           base.answer = 'True';
           base.explanation = `Questions on ${topic} often depend on conditions; identifying assumptions prevents overgeneralized conclusions.`;
         } else if (qt.key === 'fill') {
-          base.prompt = `Complete the statement: ${promptLead}, in ${effectiveSubject} the concept most directly used to analyze ${topic} is _______.`;
+          base.prompt = `Complete the statement: in ${effectiveSubject} the concept most directly used to analyze ${topic} is _______.`;
           base.answer = topic;
           base.explanation = `${topic} is the intended key term and anchors the analytical framework of the question.`;
         } else if (qt.key === 'sa') {
@@ -767,12 +769,12 @@ export default function AssessmentGenerate() {
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); setIsDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file) setUploadedFile({ name: file.name, size: file.size });
+    if (file) setUploadedFile({ name: file.name, size: file.size, file, extractedText: '' });
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) setUploadedFile({ name: file.name, size: file.size });
+    if (file) setUploadedFile({ name: file.name, size: file.size, file, extractedText: '' });
   };
 
   function handleExamFiles(files: FileList | null) {
@@ -817,12 +819,58 @@ export default function AssessmentGenerate() {
       setGenProgress(p);
     }
     const effectiveSubject = inferEffectiveSubject();
-    const sourceMaterial = buildSourceMaterialText();
+    let sourceMaterial = buildSourceMaterialText();
+    if (sourceTab === 'upload' && uploadedFile?.file) {
+      try {
+        const extracted = await extractSourceTextApi(uploadedFile.file);
+        sourceMaterial = extracted.source_text;
+        setUploadedFile((prev) => prev ? { ...prev, extractedText: extracted.source_text } : prev);
+      } catch {
+        // fallback to filename when extraction fails
+      }
+    }
     const materialKeywords = extractKeywords(sourceMaterial);
     const subjectDefaults = SUBJECT_TOPICS[effectiveSubject] ?? SUBJECT_TOPICS.Biology;
     const topicPool = uniqueKeepOrder([...materialKeywords, ...subjectDefaults]).slice(0, 20);
     const seedKey = `${effectiveSubject}|${sourceMaterial}|${difficulty}|${sourceTab}|${nextNonce}`;
-    const qs = buildGeneratedQuestions(effectiveSubject, topicPool, seedKey);
+    const typeTargets = qTypes
+      .filter((qt) => qt.active)
+      .reduce<Record<string, number>>((acc, qt) => {
+        if (qt.key === 'mcq') acc.MCQ = qt.count;
+        else if (qt.key === 'tf') acc['True/False'] = qt.count;
+        else if (qt.key === 'fill') acc['Fill-blank'] = qt.count;
+        else if (qt.key === 'sa') acc['Short Answer'] = qt.count;
+        else if (qt.key === 'essay') acc.Essay = qt.count;
+        return acc;
+      }, {});
+
+    let qs = buildGeneratedQuestions(effectiveSubject, topicPool, seedKey);
+    try {
+      const preview = await previewGenerateQuestionsApi({
+        source_text: sourceMaterial || `${effectiveSubject} ${grade || tbGrade || 'Grade 7'} ${difficulty}`,
+        subject: effectiveSubject,
+        grade: grade || tbGrade || 'Grade 7',
+        difficulty,
+        question_count: totalQ(),
+        type_targets: typeTargets,
+      });
+      if (preview.questions.length > 0) {
+        qs = preview.questions.map((q, idx) => ({
+          id: `gq-${idx + 1}`,
+          type: q.type,
+          prompt: q.prompt,
+          options: q.options.map((opt) => ({ key: opt.key, text: opt.text, correct: opt.correct })),
+          answer: q.answer || undefined,
+          difficulty: q.difficulty,
+          explanation: q.explanation,
+          hasImage: illustEnabled && illustTypes.has(q.type === 'MCQ' ? 'mcq' : q.type === 'True/False' ? 'tf' : q.type === 'Fill-blank' ? 'fill' : q.type === 'Essay' ? 'essay' : 'sa'),
+          imageStyle: illustStyle,
+        }));
+      }
+    } catch {
+      // keep local fallback generation when preview API is unavailable
+    }
+
     setQuestions(qs);
     await new Promise(r => setTimeout(r, 200));
 
@@ -1098,7 +1146,7 @@ export default function AssessmentGenerate() {
                 </div>
                 <div style={{ display: 'flex', gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
                   {['WFN_19-20 Economics Paper 2.pdf', 'Ch.3 Photosynthesis.pdf', "Newton's Laws.docx", 'Quadratic Functions.pdf'].map(f => (
-                    <button key={f} onClick={() => setUploadedFile({ name: f, size: Math.floor(Math.random() * 500000 + 50000) })}
+                    <button key={f} onClick={() => setUploadedFile({ name: f, size: Math.floor(Math.random() * 500000 + 50000), extractedText: '' })}
                       style={{ padding: '5px 12px', borderRadius: '20px', border: '1px solid #e8eaed', background: '#fff', fontSize: '12px', color: '#374151', cursor: 'pointer' }}>
                       📄 {f}
                     </button>

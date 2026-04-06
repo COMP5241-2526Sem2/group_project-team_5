@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 PaperStatusView = Literal["draft", "published", "closed"]
@@ -83,3 +83,39 @@ class PaperStatusMutationResponse(BaseModel):
     paper_id: int
     status: PaperStatusView
     changed_at: datetime
+
+
+class PaperCreateQuestionOption(BaseModel):
+    key: str
+    text: str
+    is_correct: bool = False
+
+
+class PaperCreateQuestion(BaseModel):
+    type: str
+    prompt: str = Field(min_length=1)
+    difficulty: str | None = None
+    explanation: str | None = None
+    answer: str | None = None
+    options: list[PaperCreateQuestionOption] = []
+    score: float | None = Field(default=None, ge=0)
+
+
+class PaperCreateRequest(BaseModel):
+    title: str = Field(min_length=1)
+    grade: str = Field(min_length=1)
+    subject: str = Field(min_length=1)
+    semester: str | None = None
+    exam_type: str = "ai_generated"
+    duration_min: int = Field(default=45, ge=1)
+    total_score: int = Field(default=100, ge=1)
+    course_id: int | None = None
+    questions: list[PaperCreateQuestion] = Field(min_length=1)
+
+
+class PaperCreateResponse(BaseModel):
+    paper_id: int
+    title: str
+    status: PaperStatusView
+    question_count: int
+    created_at: datetime

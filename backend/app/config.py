@@ -28,16 +28,29 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 1440
 
+    # Preferred alias for direct OpenAI-style key naming.
+    gpt_api_key: str = ""
     ohmygpt_api_key: str = ""
     ohmygpt_base_url: str = "https://api.ohmygpt.com/v1"
     ai_scoring_provider: str = "heuristic"
-    ai_scoring_model: str = "gpt-4o-mini"
+    ai_scoring_model: str = "gpt-5.4-mini"
     ai_scoring_temperature: float = 0.1
     ai_scoring_timeout_sec: float = 20.0
     ai_scoring_max_tokens: int = 600
+    quiz_generation_provider: str = "heuristic"
+    quiz_generation_model: str = "gpt-5.4-mini"
+    quiz_generation_temperature: float = 0.4
+    quiz_generation_timeout_sec: float = 25.0
+    quiz_generation_max_tokens: int = 800
     quiz_audio_max_bytes: int = 8 * 1024 * 1024
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @model_validator(mode="after")
+    def normalize_ai_key_aliases(self) -> "Settings":
+        if not self.ohmygpt_api_key.strip() and self.gpt_api_key.strip():
+            self.ohmygpt_api_key = self.gpt_api_key.strip()
+        return self
 
     @model_validator(mode="after")
     def assemble_database_url(self) -> "Settings":

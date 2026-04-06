@@ -1,15 +1,27 @@
 from __future__ import annotations
 
+import json
+from dataclasses import dataclass
 from datetime import datetime
 from difflib import SequenceMatcher
 from typing import cast
 from uuid import uuid4
 
+from openai import AsyncOpenAI
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models import Question, QuestionBankItem, QuestionBankOption, QuestionItem, QuestionStatus
 from app.schemas.quiz_generation import GeneratedQuizItem, QuizGenerateRequest, QuizGenerateResponse
+
+
+@dataclass(slots=True)
+class _GeneratedQuestionContent:
+    prompt: str
+    answer_text: str
+    explanation: str
+    options: list[tuple[str, str]]
 
 
 class QuizGenerationService:
@@ -21,6 +33,7 @@ class QuizGenerationService:
         "SHORT_ANSWER",
         "ESSAY",
     ]
+    _client: AsyncOpenAI | None = None
 
     @staticmethod
     async def generate(db: AsyncSession, payload: QuizGenerateRequest, actor_id: int = 1) -> QuizGenerateResponse:
@@ -206,30 +219,17 @@ class QuizGenerationService:
         count: int,
         seen_prompts: list[str],
     ) -> list[QuestionBankItem]:
-        # 首版占位：无 AI 客户端时，使用模板题补齐，仍严格先入题库再组题
+        # LLM 优先，失败时降级模板，确保生成链路稳定可用。
         created: list[QuestionBankItem] = []
 
         for i in range(count):
-            prompt = QuizGenerationService._template_prompt(
-                payload.subject,
-                payload.difficulty,
-                question_type,
-                i + 1,
-                unique_token=uuid4().hex[:8],
+            content = await QuizGenerationService._build_question_content(
+                db=db,
+                payload=payload,
+                question_type=question_type,
+                index=i + 1,
+                seen_prompts=seen_prompts,
             )
-
-            attempt = 0
-            while await QuizGenerationService._is_similar_to_existing(db, prompt, payload, seen_prompts):
-                attempt += 1
-                if attempt >= 5:
-                    break
-                prompt = QuizGenerationService._template_prompt(
-                    payload.subject,
-                    payload.difficulty,
-                    question_type,
-                    i + 1,
-                    unique_token=uuid4().hex[:8],
-                )
 
             source_id = payload.textbook_id if payload.mode == "textbook" else payload.source_paper_id
             item = QuestionBankItem(
@@ -238,10 +238,10 @@ class QuizGenerationService:
                 subject=payload.subject,
                 semester=None,
                 question_type=question_type,
-                prompt=prompt,
+                prompt=content.prompt,
                 difficulty=payload.difficulty,
-                answer_text=QuizGenerationService._template_answer(question_type),
-                explanation="TBD",
+                answer_text=content.answer_text,
+                explanation=content.explanation,
                 chapter=payload.chapter,
                 source_type="ai_generated",
                 source_id=source_id,
@@ -252,8 +252,8 @@ class QuizGenerationService:
             await db.flush()
 
             if question_type in {"MCQ_SINGLE", "MCQ_MULTI"}:
-                correct_keys = {"A"} if question_type == "MCQ_SINGLE" else {"A", "C"}
-                for key, text in [("A", "Option A"), ("B", "Option B"), ("C", "Option C"), ("D", "Option D")]:
+                correct_keys = QuizGenerationService._parse_choice_answer_keys(question_type, content.answer_text)
+                for key, text in content.options:
                     db.add(
                         QuestionBankOption(
                             bank_question_id=item.id,
@@ -263,20 +263,209 @@ class QuizGenerationService:
                         )
                     )
             elif question_type == "TRUE_FALSE":
-                for key, text in [("T", "True"), ("F", "False")]:
+                correct = QuizGenerationService._normalize_true_false_answer(content.answer_text)
+                for key, text in content.options:
                     db.add(
                         QuestionBankOption(
                             bank_question_id=item.id,
                             option_key=key,
                             option_text=text,
-                            is_correct=key == "T",
+                            is_correct=key == correct,
                         )
                     )
 
             created.append(item)
-            seen_prompts.append(prompt)
+            seen_prompts.append(content.prompt)
 
         return created
+
+    @staticmethod
+    async def _build_question_content(
+        db: AsyncSession,
+        payload: QuizGenerateRequest,
+        question_type: str,
+        index: int,
+        seen_prompts: list[str],
+    ) -> _GeneratedQuestionContent:
+        if QuizGenerationService._llm_enabled():
+            try:
+                candidate = await QuizGenerationService._llm_generate_question_content(
+                    payload=payload,
+                    question_type=question_type,
+                    index=index,
+                )
+                if not await QuizGenerationService._is_similar_to_existing(db, candidate.prompt, payload, seen_prompts):
+                    return candidate
+            except Exception:
+                # fallback to template generation
+                pass
+
+        prompt = QuizGenerationService._template_prompt(
+            payload.subject,
+            payload.difficulty,
+            question_type,
+            index,
+            unique_token=uuid4().hex[:8],
+        )
+        attempt = 0
+        while await QuizGenerationService._is_similar_to_existing(db, prompt, payload, seen_prompts):
+            attempt += 1
+            if attempt >= 5:
+                break
+            prompt = QuizGenerationService._template_prompt(
+                payload.subject,
+                payload.difficulty,
+                question_type,
+                index,
+                unique_token=uuid4().hex[:8],
+            )
+
+        return _GeneratedQuestionContent(
+            prompt=prompt,
+            answer_text=QuizGenerationService._template_answer(question_type),
+            explanation="TBD",
+            options=QuizGenerationService._default_options(question_type),
+        )
+
+    @staticmethod
+    def _llm_enabled() -> bool:
+        provider = settings.quiz_generation_provider.strip().lower()
+        return provider in {"openai", "ohmygpt"} and bool(settings.ohmygpt_api_key.strip())
+
+    @staticmethod
+    def _get_client() -> AsyncOpenAI:
+        if QuizGenerationService._client is None:
+            QuizGenerationService._client = AsyncOpenAI(
+                api_key=settings.ohmygpt_api_key,
+                base_url=settings.ohmygpt_base_url,
+                timeout=settings.quiz_generation_timeout_sec,
+            )
+        return QuizGenerationService._client
+
+    @staticmethod
+    async def _llm_generate_question_content(
+        payload: QuizGenerateRequest,
+        question_type: str,
+        index: int,
+    ) -> _GeneratedQuestionContent:
+        client = QuizGenerationService._get_client()
+        response = await client.chat.completions.create(
+            model=settings.quiz_generation_model,
+            temperature=settings.quiz_generation_temperature,
+            max_tokens=settings.quiz_generation_max_tokens,
+            response_format={"type": "json_object"},
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You generate school quiz items. Return strict JSON only with keys: "
+                        "prompt, answer_text, explanation, options. "
+                        "For MCQ_SINGLE/MCQ_MULTI return exactly 4 options A-D. "
+                        "For TRUE_FALSE return T/F options. "
+                        "For SHORT_ANSWER/ESSAY/FILL_BLANK options should be empty array."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"mode={payload.mode}\n"
+                        f"subject={payload.subject}\n"
+                        f"grade={payload.grade}\n"
+                        f"difficulty={payload.difficulty}\n"
+                        f"question_type={question_type}\n"
+                        f"index={index}\n"
+                        f"chapter={payload.chapter or ''}\n"
+                        "Rules:\n"
+                        "1) Prompt must be concise and clear.\n"
+                        "2) answer_text must match type: single key(A-D)/multi keys(A,C)/T|F/text.\n"
+                        "3) No markdown, JSON only."
+                    ),
+                },
+            ],
+        )
+
+        raw = response.choices[0].message.content if response.choices else None
+        if not raw:
+            raise RuntimeError("empty LLM response")
+
+        parsed = json.loads(raw)
+        prompt = str(parsed.get("prompt", "")).strip()
+        if not prompt:
+            raise RuntimeError("LLM prompt is empty")
+
+        answer_text = str(parsed.get("answer_text", "")).strip() or QuizGenerationService._template_answer(question_type)
+        explanation = str(parsed.get("explanation", "")).strip() or "Generated by LLM"
+
+        options = QuizGenerationService._normalize_options(question_type, parsed.get("options"))
+
+        return _GeneratedQuestionContent(
+            prompt=prompt,
+            answer_text=answer_text,
+            explanation=explanation,
+            options=options,
+        )
+
+    @staticmethod
+    def _normalize_options(question_type: str, raw_options: object) -> list[tuple[str, str]]:
+        defaults = QuizGenerationService._default_options(question_type)
+        if question_type not in {"MCQ_SINGLE", "MCQ_MULTI", "TRUE_FALSE"}:
+            return []
+        if not isinstance(raw_options, list):
+            return defaults
+
+        normalized: list[tuple[str, str]] = []
+        for i, raw in enumerate(raw_options):
+            if not isinstance(raw, dict):
+                continue
+            key = str(raw.get("key", "")).strip().upper()
+            text = str(raw.get("text", "")).strip()
+            if not key:
+                key = "ABCD"[i] if question_type in {"MCQ_SINGLE", "MCQ_MULTI"} and i < 4 else ("T" if i == 0 else "F")
+            if not text:
+                continue
+            normalized.append((key, text))
+
+        if question_type in {"MCQ_SINGLE", "MCQ_MULTI"}:
+            if len(normalized) < 4:
+                return defaults
+            ordered = []
+            by_key = {k: t for k, t in normalized}
+            for key in ["A", "B", "C", "D"]:
+                ordered.append((key, by_key.get(key, f"Option {key}")))
+            return ordered
+
+        by_key = {k: t for k, t in normalized}
+        if "T" not in by_key or "F" not in by_key:
+            return defaults
+        return [("T", by_key["T"]), ("F", by_key["F"])]
+
+    @staticmethod
+    def _default_options(question_type: str) -> list[tuple[str, str]]:
+        if question_type in {"MCQ_SINGLE", "MCQ_MULTI"}:
+            return [("A", "Option A"), ("B", "Option B"), ("C", "Option C"), ("D", "Option D")]
+        if question_type == "TRUE_FALSE":
+            return [("T", "True"), ("F", "False")]
+        return []
+
+    @staticmethod
+    def _parse_choice_answer_keys(question_type: str, answer_text: str) -> set[str]:
+        allowed = {"A", "B", "C", "D"}
+        cleaned = answer_text.replace("，", ",").replace(" ", "").upper()
+        parts = [part for part in cleaned.split(",") if part]
+        keys = {part for part in parts if part in allowed}
+        if question_type == "MCQ_SINGLE":
+            key = next(iter(keys), None)
+            return {key} if key else {"A"}
+        return keys or {"A", "C"}
+
+    @staticmethod
+    def _normalize_true_false_answer(answer_text: str) -> str:
+        token = answer_text.strip().upper()
+        if token in {"T", "TRUE", "1", "YES"}:
+            return "T"
+        if token in {"F", "FALSE", "0", "NO"}:
+            return "F"
+        return "T"
 
     @staticmethod
     async def _is_similar_to_existing(
