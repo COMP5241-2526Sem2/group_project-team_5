@@ -27,7 +27,7 @@
 
 后端：
 
-- Python 3.11+
+- Python 3.12+
 - FastAPI（Web API 框架）
 - SQLAlchemy 2.x（异步 ORM）
 - Alembic（数据库迁移）
