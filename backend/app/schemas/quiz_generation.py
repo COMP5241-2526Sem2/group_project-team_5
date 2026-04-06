@@ -99,6 +99,8 @@ class AIQuestionGenPreviewRequest(BaseModel):
 
 class AIQuestionGenPreviewResponse(BaseModel):
     questions: list[AIQuestionGenQuestion]
+    generation_mode: Literal["llm", "heuristic"] = "heuristic"
+    warning: str | None = None
 
 
 class AIQuestionGenExtractTextResponse(BaseModel):

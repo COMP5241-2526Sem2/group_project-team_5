@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     quiz_generation_temperature: float = 0.4
     quiz_generation_timeout_sec: float = 25.0
     quiz_generation_max_tokens: int = 800
+    quiz_generation_llm_max_retries: int = 2
     quiz_audio_max_bytes: int = 8 * 1024 * 1024
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
