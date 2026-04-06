@@ -1,4 +1,4 @@
-import { ReactNode, useState, useEffect, useCallback } from 'react';
+import React, { type ElementType, type ReactNode, useCallback, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { useChat } from '../labs/ChatContext';
 
@@ -7,30 +7,30 @@ let prevTeacherLabsSection: 'catalog' | 'drafts' | null = null;
 import {
   ClipboardList, BookOpen, LogOut, Settings,
   ChevronDown, PanelLeftClose, PanelLeftOpen, FlaskConical,
-  Wand2, FileText, CheckSquare, ScrollText, FileJson,
+  FileJson,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
 interface NavItem {
   id: string;
-  icon: React.ElementType;
+  icon: ElementType;
   label: string;
   path: string;
 }
 
 interface SubNavItem {
   id: string;
-  icon: React.ElementType;
+  icon?: ElementType;
   label: string;
   path: string;
 }
 
 const ASSESSMENT_SUB_ITEMS: SubNavItem[] = [
-  { id: 'generate',  icon: Wand2,        label: 'AI Question Gen',  path: '/teacher/assessment/generate'  },
-  { id: 'ai-paper',  icon: ScrollText,   label: 'AI Paper',         path: '/teacher/assessment/ai-paper'  },
-  { id: 'library',   icon: BookOpen,     label: 'Question Bank',    path: '/teacher/assessment/library'   },
-  { id: 'papers',    icon: FileText,     label: 'Exam Papers',      path: '/teacher/assessment/papers'    },
-  { id: 'grading',   icon: CheckSquare,  label: 'Grading',          path: '/teacher/assessment/grading'   },
+  { id: 'generate',  label: 'AI Question Gen',  path: '/teacher/assessment/generate'  },
+  { id: 'ai-paper',  label: 'AI Paper',         path: '/teacher/assessment/ai-paper'  },
+  { id: 'library',   label: 'Question Bank',    path: '/teacher/assessment/library'   },
+  { id: 'papers',    label: 'Exam Papers',      path: '/teacher/assessment/papers'    },
+  { id: 'grading',   label: 'Grading',          path: '/teacher/assessment/grading'   },
 ];
 
 const LABS_SUB_ITEMS: SubNavItem[] = [
@@ -262,14 +262,13 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
                                 {/* Items */}
                                 <div style={{ flex: 1, padding: '2px 0 4px' }}>
                                   {ASSESSMENT_SUB_ITEMS.map(sub => {
-                                    const SubIcon = sub.icon;
                                     const isSubActive = activeSub === sub.id && activeMenu === 'assessment';
                                     return (
                                       <button
                                         key={sub.id}
                                         onClick={() => { setActiveSub(sub.id); guardedNavigate(sub.path); }}
                                         style={{
-                                          width: '100%', display: 'flex', alignItems: 'center', gap: '7px',
+                                          width: '100%', display: 'flex', alignItems: 'center',
                                           padding: '6px 10px', borderRadius: '7px', border: 'none', cursor: 'pointer',
                                           marginBottom: '1px', fontSize: '13px',
                                           fontWeight: isSubActive ? 600 : 400,
@@ -280,8 +279,7 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
                                         onMouseEnter={e => { if (!isSubActive) { (e.currentTarget as HTMLElement).style.background = '#f9fafb'; (e.currentTarget as HTMLElement).style.color = '#374151'; } }}
                                         onMouseLeave={e => { if (!isSubActive) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#6b7280'; } }}
                                       >
-                                        <SubIcon size={13} style={{ flexShrink: 0, color: isSubActive ? '#3b5bdb' : '#9ca3af' }} />
-                                        <span>{sub.label}</span>
+                                        {sub.label}
                                       </button>
                                     );
                                   })}

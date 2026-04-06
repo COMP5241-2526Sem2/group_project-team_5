@@ -46,7 +46,7 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_papers_course_id'), 'papers', ['course_id'], unique=False)
     op.create_index(op.f('ix_papers_created_by'), 'papers', ['created_by'], unique=False)
-    op.create_table('exercises',
+    op.create_table('questions',
     sa.Column('id', sa.BigInteger(), autoincrement=True, nullable=False),
     sa.Column('title', sa.Text(), nullable=False),
     sa.Column('course_id', sa.BigInteger(), nullable=False),
@@ -54,17 +54,17 @@ def upgrade() -> None:
     sa.Column('due_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('duration_min', sa.Integer(), nullable=True),
     sa.Column('total_score', sa.Integer(), nullable=False),
-    sa.Column('status', sa.Enum('DRAFT', 'PUBLISHED', 'CLOSED', name='exercise_status'), nullable=False),
+    sa.Column('status', sa.Enum('DRAFT', 'PUBLISHED', 'CLOSED', name='question_status'), nullable=False),
     sa.Column('created_by', sa.BigInteger(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
-    sa.CheckConstraint('duration_min IS NULL OR duration_min >= 0', name='ck_exercises_duration_non_negative'),
-    sa.CheckConstraint('total_score >= 0', name='ck_exercises_total_score_non_negative'),
+    sa.CheckConstraint('duration_min IS NULL OR duration_min >= 0', name='ck_questions_duration_non_negative'),
+    sa.CheckConstraint('total_score >= 0', name='ck_questions_total_score_non_negative'),
     sa.ForeignKeyConstraint(['paper_id'], ['papers.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_exercises_course_id'), 'exercises', ['course_id'], unique=False)
-    op.create_index(op.f('ix_exercises_created_by'), 'exercises', ['created_by'], unique=False)
-    op.create_index(op.f('ix_exercises_paper_id'), 'exercises', ['paper_id'], unique=False)
+    op.create_index(op.f('ix_questions_course_id'), 'questions', ['course_id'], unique=False)
+    op.create_index(op.f('ix_questions_created_by'), 'questions', ['created_by'], unique=False)
+    op.create_index(op.f('ix_questions_paper_id'), 'questions', ['paper_id'], unique=False)
     op.create_table('paper_sections',
     sa.Column('id', sa.BigInteger(), autoincrement=True, nullable=False),
     sa.Column('paper_id', sa.BigInteger(), nullable=False),
@@ -83,21 +83,21 @@ def upgrade() -> None:
     sa.UniqueConstraint('paper_id', 'section_order', name='uq_paper_sections_paper_order')
     )
     op.create_index(op.f('ix_paper_sections_paper_id'), 'paper_sections', ['paper_id'], unique=False)
-    op.create_table('exercise_attempts',
+    op.create_table('question_attempts',
     sa.Column('id', sa.BigInteger(), autoincrement=True, nullable=False),
-    sa.Column('exercise_id', sa.BigInteger(), nullable=False),
+    sa.Column('question_id', sa.BigInteger(), nullable=False),
     sa.Column('student_id', sa.BigInteger(), nullable=False),
     sa.Column('started_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('submitted_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('score', sa.Numeric(precision=8, scale=2), nullable=True),
     sa.Column('status', sa.Enum('IN_PROGRESS', 'SUBMITTED', 'GRADED', name='attempt_status'), nullable=False),
-    sa.CheckConstraint('score IS NULL OR score >= 0', name='ck_exercise_attempts_score_non_negative'),
-    sa.ForeignKeyConstraint(['exercise_id'], ['exercises.id'], ondelete='CASCADE'),
+    sa.CheckConstraint('score IS NULL OR score >= 0', name='ck_question_attempts_score_non_negative'),
+    sa.ForeignKeyConstraint(['question_id'], ['questions.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('exercise_id', 'student_id', name='uq_exercise_attempts_exercise_student')
+    sa.UniqueConstraint('question_id', 'student_id', name='uq_question_attempts_question_student')
     )
-    op.create_index(op.f('ix_exercise_attempts_exercise_id'), 'exercise_attempts', ['exercise_id'], unique=False)
-    op.create_index(op.f('ix_exercise_attempts_student_id'), 'exercise_attempts', ['student_id'], unique=False)
+    op.create_index(op.f('ix_question_attempts_question_id'), 'question_attempts', ['question_id'], unique=False)
+    op.create_index(op.f('ix_question_attempts_student_id'), 'question_attempts', ['student_id'], unique=False)
     op.create_table('paper_questions',
     sa.Column('id', sa.BigInteger(), autoincrement=True, nullable=False),
     sa.Column('paper_id', sa.BigInteger(), nullable=False),
@@ -119,7 +119,7 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_paper_questions_paper_id'), 'paper_questions', ['paper_id'], unique=False)
     op.create_index(op.f('ix_paper_questions_section_id'), 'paper_questions', ['section_id'], unique=False)
-    op.create_table('exercise_attempt_answers',
+    op.create_table('question_attempt_answers',
     sa.Column('id', sa.BigInteger(), autoincrement=True, nullable=False),
     sa.Column('attempt_id', sa.BigInteger(), nullable=False),
     sa.Column('question_id', sa.BigInteger(), nullable=False),
@@ -129,13 +129,13 @@ def upgrade() -> None:
     sa.Column('awarded_score', sa.Numeric(precision=6, scale=2), nullable=True),
     sa.Column('teacher_feedback', sa.Text(), nullable=True),
     sa.CheckConstraint('awarded_score IS NULL OR awarded_score >= 0', name='ck_attempt_answers_awarded_score_non_negative'),
-    sa.ForeignKeyConstraint(['attempt_id'], ['exercise_attempts.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['attempt_id'], ['question_attempts.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['question_id'], ['paper_questions.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('attempt_id', 'question_id', name='uq_exercise_attempt_answers_attempt_question')
+    sa.UniqueConstraint('attempt_id', 'question_id', name='uq_question_attempt_answers_attempt_question')
     )
-    op.create_index(op.f('ix_exercise_attempt_answers_attempt_id'), 'exercise_attempt_answers', ['attempt_id'], unique=False)
-    op.create_index(op.f('ix_exercise_attempt_answers_question_id'), 'exercise_attempt_answers', ['question_id'], unique=False)
+    op.create_index(op.f('ix_question_attempt_answers_attempt_id'), 'question_attempt_answers', ['attempt_id'], unique=False)
+    op.create_index(op.f('ix_question_attempt_answers_question_id'), 'question_attempt_answers', ['question_id'], unique=False)
     op.create_table('paper_question_options',
     sa.Column('id', sa.BigInteger(), autoincrement=True, nullable=False),
     sa.Column('question_id', sa.BigInteger(), nullable=False),
@@ -155,21 +155,21 @@ def downgrade() -> None:
     # ### commands auto generated by Alembic - please adjust! ###
     op.drop_index(op.f('ix_paper_question_options_question_id'), table_name='paper_question_options')
     op.drop_table('paper_question_options')
-    op.drop_index(op.f('ix_exercise_attempt_answers_question_id'), table_name='exercise_attempt_answers')
-    op.drop_index(op.f('ix_exercise_attempt_answers_attempt_id'), table_name='exercise_attempt_answers')
-    op.drop_table('exercise_attempt_answers')
+    op.drop_index(op.f('ix_question_attempt_answers_question_id'), table_name='question_attempt_answers')
+    op.drop_index(op.f('ix_question_attempt_answers_attempt_id'), table_name='question_attempt_answers')
+    op.drop_table('question_attempt_answers')
     op.drop_index(op.f('ix_paper_questions_section_id'), table_name='paper_questions')
     op.drop_index(op.f('ix_paper_questions_paper_id'), table_name='paper_questions')
     op.drop_table('paper_questions')
-    op.drop_index(op.f('ix_exercise_attempts_student_id'), table_name='exercise_attempts')
-    op.drop_index(op.f('ix_exercise_attempts_exercise_id'), table_name='exercise_attempts')
-    op.drop_table('exercise_attempts')
+    op.drop_index(op.f('ix_question_attempts_student_id'), table_name='question_attempts')
+    op.drop_index(op.f('ix_question_attempts_question_id'), table_name='question_attempts')
+    op.drop_table('question_attempts')
     op.drop_index(op.f('ix_paper_sections_paper_id'), table_name='paper_sections')
     op.drop_table('paper_sections')
-    op.drop_index(op.f('ix_exercises_paper_id'), table_name='exercises')
-    op.drop_index(op.f('ix_exercises_created_by'), table_name='exercises')
-    op.drop_index(op.f('ix_exercises_course_id'), table_name='exercises')
-    op.drop_table('exercises')
+    op.drop_index(op.f('ix_questions_paper_id'), table_name='questions')
+    op.drop_index(op.f('ix_questions_created_by'), table_name='questions')
+    op.drop_index(op.f('ix_questions_course_id'), table_name='questions')
+    op.drop_table('questions')
     op.drop_index(op.f('ix_papers_created_by'), table_name='papers')
     op.drop_index(op.f('ix_papers_course_id'), table_name='papers')
     op.drop_table('papers')

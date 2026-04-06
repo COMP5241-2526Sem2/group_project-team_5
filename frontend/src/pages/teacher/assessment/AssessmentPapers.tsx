@@ -1,9 +1,15 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   Filter, Search, Eye, Download, FileText, Clock,
   Star, Calendar, BookOpen, ChevronDown, X, Target, BarChart2,
 } from 'lucide-react';
 import { CustomSelect } from '../../../components/teacher/CustomSelect';
+import {
+  fetchPaperDetailApi,
+  fetchPaperListApi,
+  type PaperDetailDto,
+  type PaperListItemDto,
+} from '../../../utils/paperApi';
 
 /* ─── Types ────────────────────────────────────────────────────── */
 interface Paper {
@@ -18,7 +24,7 @@ interface Paper {
   durationMin: number;
   questionCount: number;
   quality: number;   // 0-100
-  status: 'published' | 'draft';
+  status: 'published' | 'draft' | 'closed';
   createdAt: string;
   textbook: string;
   sections: Section[];
@@ -37,6 +43,62 @@ interface MockQuestion {
   text: string;
   options?: string[];
   answer?: string;
+}
+
+function formatDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('en-US');
+}
+
+function mapListItemToPaper(item: PaperListItemDto): Paper {
+  return {
+    id: String(item.paper_id),
+    title: item.title,
+    publisher: item.course_name,
+    grade: item.grade,
+    subject: item.subject,
+    semester: item.semester || '-',
+    type: item.exam_type,
+    totalScore: item.total_score,
+    durationMin: item.duration_min,
+    questionCount: item.question_count,
+    quality: item.quality_score ?? 0,
+    status: item.status,
+    createdAt: formatDate(item.created_at),
+    textbook: '-',
+    sections: [],
+  };
+}
+
+function mapDetailToPaper(detail: PaperDetailDto): Paper {
+  return {
+    id: String(detail.paper_id),
+    title: detail.title,
+    publisher: detail.course_name,
+    grade: detail.grade,
+    subject: detail.subject,
+    semester: detail.semester || '-',
+    type: detail.exam_type,
+    totalScore: detail.total_score,
+    durationMin: detail.duration_min,
+    questionCount: detail.question_count,
+    quality: detail.quality_score ?? 0,
+    status: detail.status,
+    createdAt: formatDate(detail.created_at),
+    textbook: '-',
+    sections: detail.sections.map((sec) => ({
+      title: sec.title,
+      type: sec.question_type,
+      count: sec.question_count,
+      scoreEach: sec.score_each,
+      questions: sec.questions.map((q) => ({
+        n: q.order,
+        text: q.prompt,
+        options: q.options?.map((o) => `${o.key}. ${o.text}`),
+      })),
+    })),
+  };
 }
 
 /* ─── Mock Data ─────────────────────────────────────────────────── */
@@ -293,10 +355,10 @@ function PaperDetailPanel({ paper, onClose }: { paper: Paper; onClose: () => voi
             <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0f0f23', margin: 0, flex: 1, lineHeight: 1.3 }}>{paper.title}</h2>
             <span style={{
               fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '20px', flexShrink: 0,
-              background: paper.status === 'published' ? '#eff6ff' : '#f3f4f6',
-              color: paper.status === 'published' ? '#1d4ed8' : '#6b7280',
+              background: paper.status === 'published' ? '#eff6ff' : paper.status === 'closed' ? '#fef2f2' : '#f3f4f6',
+              color: paper.status === 'published' ? '#1d4ed8' : paper.status === 'closed' ? '#dc2626' : '#6b7280',
             }}>
-              {paper.status === 'published' ? 'Published' : 'Draft'}
+              {paper.status === 'published' ? 'Published' : paper.status === 'closed' ? 'Closed' : 'Draft'}
             </span>
             <button onClick={onClose}
               style={{ width: '28px', height: '28px', borderRadius: '7px', border: '1px solid #e8eaed', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6b7280', cursor: 'pointer', flexShrink: 0 }}>
@@ -412,10 +474,54 @@ export default function AssessmentPapers() {
   const [grade, setGrade]         = useState('All Grades');
   const [semester, setSemester]   = useState('All Semesters');
   const [type, setType]           = useState('All Types');
+  const [papers, setPapers]       = useState<Paper[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [previewPaper, setPreviewPaper] = useState<Paper | null>(null);
 
+  useEffect(() => {
+    let active = true;
+
+    (async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const result = await fetchPaperListApi({ page: 1, page_size: 100 });
+        if (!active) return;
+        setPapers(result.items.map(mapListItemToPaper));
+      } catch (err) {
+        if (!active) return;
+        const message = err instanceof Error ? err.message : 'Failed to load papers';
+        setLoadError(message);
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const allSubjects = useMemo(
+    () => ['All Subjects', ...Array.from(new Set(papers.map(p => p.subject)))],
+    [papers],
+  );
+  const allGrades = useMemo(
+    () => ['All Grades', ...Array.from(new Set(papers.map(p => p.grade)))],
+    [papers],
+  );
+  const allSemesters = useMemo(
+    () => ['All Semesters', ...Array.from(new Set(papers.map(p => p.semester))).filter(Boolean)],
+    [papers],
+  );
+  const allTypes = useMemo(
+    () => ['All Types', ...Array.from(new Set(papers.map(p => p.type)))],
+    [papers],
+  );
+
   const filtered = useMemo(() => {
-    return MOCK_PAPERS.filter(p => {
+    return papers.filter(p => {
       if (search && !p.title.toLowerCase().includes(search.toLowerCase())) return false;
       if (subject  !== 'All Subjects'  && p.subject  !== subject)  return false;
       if (grade    !== 'All Grades'    && p.grade    !== grade)    return false;
@@ -423,7 +529,16 @@ export default function AssessmentPapers() {
       if (type     !== 'All Types'     && p.type     !== type)     return false;
       return true;
     });
-  }, [search, subject, grade, semester, type]);
+  }, [papers, search, subject, grade, semester, type]);
+
+  async function handleView(paper: Paper) {
+    try {
+      const detail = await fetchPaperDetailApi(Number(paper.id));
+      setPreviewPaper(mapDetailToPaper(detail));
+    } catch {
+      setPreviewPaper(paper);
+    }
+  }
 
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 48px)', overflow: 'hidden', background: '#fafafa' }}>
@@ -466,10 +581,10 @@ export default function AssessmentPapers() {
         </div>
 
         {/* Dropdowns */}
-        <FilterSelect label="Subject"  options={ALL_SUBJECTS}  value={subject}  onChange={setSubject} />
-        <FilterSelect label="Grade"    options={ALL_GRADES}    value={grade}    onChange={setGrade} />
-        <FilterSelect label="Semester" options={ALL_SEMESTERS} value={semester} onChange={setSemester} />
-        <FilterSelect label="Type"     options={ALL_TYPES}     value={type}     onChange={setType} />
+        <FilterSelect label="Subject"  options={allSubjects}  value={subject}  onChange={setSubject} />
+        <FilterSelect label="Grade"    options={allGrades}    value={grade}    onChange={setGrade} />
+        <FilterSelect label="Semester" options={allSemesters} value={semester} onChange={setSemester} />
+        <FilterSelect label="Type"     options={allTypes}     value={type}     onChange={setType} />
 
         {/* Reset */}
         {(search || subject !== 'All Subjects' || grade !== 'All Grades' || semester !== 'All Semesters' || type !== 'All Types') && (
@@ -485,8 +600,14 @@ export default function AssessmentPapers() {
       </div>
 
       {/* ── Right Content ────────────────────────────────────────── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '14px' }}>
-        {filtered.length === 0 ? (
+      <div style={{ flex: 1, overflowY: 'auto', padding: '22px 24px' }}>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '80px 0', color: '#9ca3af' }}>Loading papers...</div>
+        ) : loadError ? (
+          <div style={{ textAlign: 'center', padding: '80px 0', color: '#dc2626' }}>
+            Failed to load papers: {loadError}
+          </div>
+        ) : filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '80px 0' }}>
             <FileText size={40} style={{ color: '#d1d5db', marginBottom: '12px' }} />
             <p style={{ fontSize: '15px', color: '#9ca3af' }}>No papers match your filters.</p>
@@ -498,7 +619,7 @@ export default function AssessmentPapers() {
             gap: '12px',
           }}>
             {filtered.map(paper => (
-              <PaperCard key={paper.id} paper={paper} onView={() => setPreviewPaper(paper)} />
+              <PaperCard key={paper.id} paper={paper} onView={() => handleView(paper)} />
             ))}
           </div>
         )}
@@ -536,10 +657,19 @@ function PaperCard({ paper, onView }: { paper: Paper; onView: () => void }) {
       <div style={{ padding: '14px' }}>
         {/* Title + status badge */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', marginBottom: '6px' }}>
-          <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#111827', margin: 0, lineHeight: 1.4 }}>{paper.title}</h3>
-          {paper.status === 'published' && (
-            <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '12px', background: '#f3f4f6', color: '#6b7280', flexShrink: 0, marginTop: '2px' }}>Published</span>
-          )}
+          <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#0f0f23', margin: 0, lineHeight: 1.4 }}>{paper.title}</h3>
+          <span style={{
+            fontSize: '10px',
+            fontWeight: 600,
+            padding: '2px 8px',
+            borderRadius: '20px',
+            background: paper.status === 'published' ? '#eff6ff' : paper.status === 'closed' ? '#fef2f2' : '#f3f4f6',
+            color: paper.status === 'published' ? '#1d4ed8' : paper.status === 'closed' ? '#dc2626' : '#6b7280',
+            flexShrink: 0,
+            marginTop: '2px',
+          }}>
+            {paper.status === 'published' ? 'Published' : paper.status === 'closed' ? 'Closed' : 'Draft'}
+          </span>
         </div>
 
         {/* Subtitle breadcrumb */}

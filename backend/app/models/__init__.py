@@ -1,54 +1,95 @@
+from sqlalchemy import BigInteger
+from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import DeclarativeBase
 
 
 class Base(DeclarativeBase):
-	pass
+    pass
 
 
-from app.models.assessment import Exercise, ExerciseAttempt, ExerciseAttemptAnswer
-from app.models.assessment import (
-    AttemptStatus,
-    ExerciseStatus,
+@compiles(BigInteger, "sqlite")
+def _compile_bigint_for_sqlite(_type, _compiler, **_kw) -> str:
+    # SQLite auto-increment only works reliably with INTEGER PK affinity.
+    return "INTEGER"
+
+
+from app.models.assessment import (  # noqa: E402
     Paper,
+    PaperAIAdoptionAudit,
+    PaperAttempt,
+    PaperAttemptAIScore,
+    PaperAttemptAnswer,
     PaperQuestion,
     PaperQuestionOption,
     PaperSection,
-    PaperStatus,
+    Question,
+    QuestionAttempt,
+    QuestionAttemptAnswer,
+    QuestionBankItem,
+    QuestionBankOption,
+    QuestionItem,
+    QuestionStatus,
+    QuizAudioPlaybackAudit,
+    QuizAudioRecord,
 )
-from app.models.lab import (
+from app.models.course import Course, Enrollment  # noqa: E402
+from app.models.lab import (  # noqa: E402
+    Dimension,
     LabChatMessage,
     LabDefinition,
     LabGenerationSession,
+    LabRegistry,
     LabStatus,
     LabType,
-    SubjectLab,
-    Dimension,
-    SessionMode,
     MessageRole,
+    SessionMode,
+    SubjectLab,
 )
+from app.models.lesson import LessonDeck, Slide, SlideBlock  # noqa: E402
+from app.models.textbook import Textbook  # noqa: E402
+from app.models.user import StudentProfile, TeacherProfile, User  # noqa: E402
 
 
 __all__ = [
     "Base",
     # assessment
     "Paper",
-    "PaperStatus",
     "PaperSection",
     "PaperQuestion",
     "PaperQuestionOption",
-    "Exercise",
-    "ExerciseStatus",
-    "ExerciseAttempt",
-    "ExerciseAttemptAnswer",
-    "AttemptStatus",
+    "PaperAttempt",
+    "PaperAttemptAnswer",
+    "PaperAttemptAIScore",
+    "PaperAIAdoptionAudit",
+    "QuestionBankItem",
+    "QuestionBankOption",
+    "QuestionItem",
+    "Question",
+    "QuestionStatus",
+    "QuestionAttempt",
+    "QuestionAttemptAnswer",
+    "QuizAudioRecord",
+    "QuizAudioPlaybackAudit",
+    # user/course/lesson/textbook
+    "User",
+    "StudentProfile",
+    "TeacherProfile",
+    "Course",
+    "Enrollment",
+    "LessonDeck",
+    "Slide",
+    "SlideBlock",
+    "Textbook",
     # lab
     "LabDefinition",
     "LabGenerationSession",
     "LabChatMessage",
+    "LabRegistry",
     "LabStatus",
     "LabType",
     "SubjectLab",
     "Dimension",
     "SessionMode",
     "MessageRole",
+]
 ]

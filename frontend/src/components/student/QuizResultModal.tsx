@@ -76,7 +76,7 @@ export function QuizResultModal({ quiz, onClose, onReview }: QuizResultModalProp
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '14px', color: '#065f46', fontWeight: 500 }}>Correct:</span>
                   <span style={{ fontSize: '16px', color: '#10b981', fontWeight: 600 }}>
-                    {quiz.mcqCorrect} / 5 (MCQ)
+                    {quiz.mcqCorrect} / {quiz.mcqCount} (MCQ)
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

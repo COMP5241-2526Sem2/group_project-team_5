@@ -7,6 +7,12 @@ import { toast } from 'sonner@2.0.3';
 import StudentLayout from '../../components/student/StudentLayout';
 import { AIVisionSidebar } from '../../components/student/AIVisionSidebar';
 import treeImage from 'figma:asset/b0a6cbbe3eabb8bf3e2e753c39d530fc9a0838da.png';
+import {
+  createOrGetAttemptApi,
+  fetchQuizDetailApi,
+  saveAttemptAnswersApi,
+  submitAttemptApi,
+} from '../../utils/quizApi';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -18,6 +24,7 @@ interface Question {
   prompt: string;
   image?: string;
   options?: { key: 'A' | 'B' | 'C' | 'D'; text: string }[];
+  score?: number;
 }
 
 interface Answer {
@@ -26,55 +33,11 @@ interface Answer {
   saText?: string;
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-const mockQuestions: Question[] = [
-  {
-    questionId: 'q1', quizId: 'quiz1', order: 1, type: 'MCQ_SINGLE',
-    prompt: 'Given the binary tree shown above, what is the result of a preorder traversal?',
-    image: treeImage,
-    options: [
-      { key: 'A', text: 'A B D C E G F' },
-      { key: 'B', text: 'A B D C E F G' },
-      { key: 'C', text: 'D B A G E C F' },
-      { key: 'D', text: 'A C F E G B D' },
-    ],
-  },
-  {
-    questionId: 'q2', quizId: 'quiz1', order: 2, type: 'MCQ_SINGLE',
-    prompt: 'Which data structure uses LIFO principle?',
-    options: [{ key: 'A', text: 'Queue' }, { key: 'B', text: 'Stack' }, { key: 'C', text: 'Tree' }, { key: 'D', text: 'Graph' }],
-  },
-  {
-    questionId: 'q3', quizId: 'quiz1', order: 3, type: 'MCQ_SINGLE',
-    prompt: 'Which data structure provides the fastest average lookup?',
-    options: [{ key: 'A', text: 'Array' }, { key: 'B', text: 'Hash Table' }, { key: 'C', text: 'Linked List' }, { key: 'D', text: 'Stack' }],
-  },
-  {
-    questionId: 'q4', quizId: 'quiz1', order: 4, type: 'MCQ_SINGLE',
-    prompt: 'Which sorting algorithm is stable?',
-    options: [{ key: 'A', text: 'Quick sort' }, { key: 'B', text: 'Heap sort' }, { key: 'C', text: 'Merge sort' }, { key: 'D', text: 'Selection sort' }],
-  },
-  {
-    questionId: 'q5', quizId: 'quiz1', order: 5, type: 'MCQ_SINGLE',
-    prompt: 'What is the space complexity of DFS traversal?',
-    options: [{ key: 'A', text: 'O(1)' }, { key: 'B', text: 'O(log n)' }, { key: 'C', text: 'O(n)' }, { key: 'D', text: 'O(n²)' }],
-  },
-  {
-    questionId: 'q6', quizId: 'quiz1', order: 6, type: 'SHORT_ANSWER',
-    prompt: 'Explain the difference between a stack and a queue, and provide one real-world example for each.',
-  },
-];
-
-async function fetchQuestions(_quizId: string): Promise<Question[]> {
-  return new Promise(r => setTimeout(() => r(mockQuestions), 300));
-}
-async function saveDraft(_quizId: string, _answers: Answer[]): Promise<void> {
-  return new Promise(r => setTimeout(r, 200));
-}
-async function submitQuiz(_quizId: string, _answers: Answer[]): Promise<void> {
-  return new Promise(r => setTimeout(r, 500));
-}
+type QuizHeader = {
+  title: string;
+  courseName: string;
+  dueAt: string | null;
+};
 
 const KEY_TO_OPTION: Record<string, 'A' | 'B' | 'C' | 'D'> = { '1': 'A', '2': 'B', '3': 'C', '4': 'D' };
 const OPTION_TO_NUM: Record<string, number> = { A: 1, B: 2, C: 3, D: 4 };
@@ -112,6 +75,10 @@ export default function QuizTaking() {
   const [submitting, setSubmitting] = useState(false);
   const [showAISidebar, setShowAISidebar] = useState(false);
   const [screenshotFlash, setScreenshotFlash] = useState(false);
+  const [attemptId, setAttemptId] = useState<number | null>(null);
+  const [header, setHeader] = useState<QuizHeader | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const { speak, stop: stopSpeaking, ttsStatus } = useTTS();
   const { recordings, startRecording, stopRecording } = useAudioRecorder();
@@ -128,9 +95,84 @@ export default function QuizTaking() {
   const prevRecordingsLenRef = useRef(0);
 
   useEffect(() => {
-    if (!quizId) return;
-    fetchQuestions(quizId).then(setQuestions);
+    let active = true;
+    if (!quizId) {
+      setLoadError('Invalid quiz URL. Please go back to the quiz list and retry.');
+      setLoading(false);
+      return;
+    }
+
+    const numericQuizId = Number(quizId);
+    if (!Number.isFinite(numericQuizId) || numericQuizId <= 0) {
+      setLoadError('Invalid quiz id in URL. Please open a real quiz from the list page.');
+      setLoading(false);
+      return;
+    }
+
+    (async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const [detail, attempt] = await Promise.all([
+          fetchQuizDetailApi(numericQuizId),
+          createOrGetAttemptApi(numericQuizId),
+        ]);
+
+        if (!active) return;
+        setHeader({
+          title: detail.title,
+          courseName: detail.course_name,
+          dueAt: detail.due_at,
+        });
+        setAttemptId(attempt.attempt_id);
+
+        const mapped: Question[] = detail.items.map((item) => ({
+          questionId: String(item.question_id),
+          quizId: String(detail.quiz_id),
+          order: item.order,
+          type: item.type === 'SHORT_ANSWER' || item.type === 'ESSAY' ? 'SHORT_ANSWER' : 'MCQ_SINGLE',
+          prompt: item.prompt,
+          image: item.order === 1 ? treeImage : undefined,
+          score: item.score,
+          options: (item.options || []).map((opt, idx) => {
+            const optionKey = String(opt.key || opt.option_key || ['A', 'B', 'C', 'D'][idx] || 'A') as 'A' | 'B' | 'C' | 'D';
+            const optionText = String(opt.text || opt.option_text || '').trim();
+            return { key: optionKey, text: optionText || optionKey };
+          }),
+        }));
+
+        setQuestions(mapped);
+      } catch (err) {
+        if (!active) return;
+        const detail = err instanceof Error ? err.message : 'Unknown error';
+        setLoadError(`Failed to load quiz: ${detail}`);
+        toast.error('Failed to load quiz.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
   }, [quizId]);
+
+  async function saveDraft(_quizId: string, payload: Answer[]): Promise<void> {
+    if (!attemptId) return;
+    const answersPayload = payload.map((ans) => ({
+      question_id: Number(ans.questionId),
+      selected_option: ans.mcqChoice,
+      text_answer: ans.saText,
+    }));
+    await saveAttemptAnswersApi(attemptId, answersPayload);
+  }
+
+  async function submitQuiz(_quizId: string, _answers: Answer[]): Promise<void> {
+    if (!attemptId) {
+      throw new Error('attempt not ready');
+    }
+    await submitAttemptApi(attemptId);
+  }
 
   const currentQuestion = questions[currentIndex];
   const isSAPage = currentQuestion?.type === 'SHORT_ANSWER';
@@ -495,7 +537,7 @@ export default function QuizTaking() {
       await submitQuiz(quizId!, Array.from(answers.values()));
       if (blindMode) speak('Quiz submitted successfully. Returning to quiz list.');
       toast.success('Submitted successfully.');
-      navigate('/student/quiz');
+      navigate(`/student/quiz/${quizId}/review?attemptId=${attemptId ?? ''}`);
     } catch {
       if (blindMode) speak('Submission failed. Please try again.');
       toast.error('Submission failed. Please try again.');
@@ -505,11 +547,39 @@ export default function QuizTaking() {
 
   // ─── Loading ──────────────────────────────────────────────────────────────
 
-  if (questions.length === 0) {
+  if (loading) {
     return (
       <StudentLayout>
         <div style={{ padding: '32px', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
           <div style={{ fontSize: '14px', color: '#9ca3af' }}>Loading quiz...</div>
+        </div>
+      </StudentLayout>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <StudentLayout>
+        <div style={{ padding: '32px', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '14px', color: '#ef4444', marginBottom: '12px' }}>{loadError}</div>
+            <button
+              onClick={() => navigate('/student/quiz')}
+              style={{ padding: '10px 16px', background: '#0f0f23', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', cursor: 'pointer' }}
+            >
+              Back to quiz list
+            </button>
+          </div>
+        </div>
+      </StudentLayout>
+    );
+  }
+
+  if (questions.length === 0) {
+    return (
+      <StudentLayout>
+        <div style={{ padding: '32px', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+          <div style={{ fontSize: '14px', color: '#9ca3af' }}>No questions available for this quiz.</div>
         </div>
       </StudentLayout>
     );
@@ -527,10 +597,10 @@ export default function QuizTaking() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
               <div>
                 <h1 style={{ fontSize: '20px', fontWeight: 600, color: '#0f0f23', margin: '0 0 4px' }}>
-                  Data Structures Quiz 1
+                  {header?.title || 'Quiz'}
                 </h1>
                 <p style={{ fontSize: '13px', color: '#9ca3af', margin: 0 }}>
-                  Data Structures · Due: Mar 5, 2026 11:59 PM
+                  {header?.courseName || '-'} · Due: {header?.dueAt ? new Date(header.dueAt).toLocaleString() : '-'}
                 </p>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

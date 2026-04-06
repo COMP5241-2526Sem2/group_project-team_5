@@ -223,7 +223,7 @@ export function QuizPreviewModal({ quiz, onClose, onStart }: QuizPreviewModalPro
                     {quiz.status || 'Not started'}
                   </span>
                 </div>
-                <InfoRow label="Questions" value="6 (5 MCQ + 1 Short answer)" />
+                <InfoRow label="Questions" value={`${quiz.questionCount} (${quiz.mcqCount} MCQ + ${quiz.saCount} Short answer)`} />
               </div>
             </div>
 
