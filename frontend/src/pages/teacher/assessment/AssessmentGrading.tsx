@@ -1,10 +1,18 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router';
+import {
+  fetchPaperListApi,
+  fetchPaperDetailApi,
+  type PaperListItemDto,
+  type PaperDetailDto,
+} from '../../../utils/paperApi';
+import { listQuestionBankSetsApi, type QuestionBankSetDto } from '../../../utils/questionBankApi';
 import {
   Search, Plus, X, Check, ChevronDown, ChevronLeft, ChevronRight,
   FileText, Clock, Award, AlertCircle, CheckCircle2,
   Send, Edit3, Trash2, Save, Users, Calendar,
   MessageSquare, Zap, Layers, Star, BookOpen,
-  Eye, ArrowLeftRight, RotateCcw, Pencil,
+  Eye, ArrowLeftRight, RotateCcw, Pencil, Loader2,
 } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -60,6 +68,77 @@ interface ExamPaperEntry {
   totalScore: number; durationMin: number; questions: LibQ[];
 }
 
+function detailTypeToQType(t: string): QType {
+  const raw = (t || '').trim().toUpperCase().replace(/[\s/-]/g, '_');
+  if (raw === 'MCQ_SINGLE' || raw === 'MCQ_MULTI') return 'MCQ';
+  if (raw === 'TRUE_FALSE') return 'True/False';
+  if (raw === 'FILL_BLANK') return 'Fill-blank';
+  if (raw === 'SHORT_ANSWER') return 'Short Answer';
+  if (raw === 'ESSAY') return 'Essay';
+  return 'Short Answer';
+}
+
+function normDiffFromApi(d: string | null | undefined): Diff {
+  const v = (d || 'medium').toLowerCase();
+  if (v === 'easy' || v === 'medium' || v === 'hard') return v;
+  return 'medium';
+}
+
+function mapDetailToExamPaperEntry(detail: PaperDetailDto): ExamPaperEntry {
+  const questions: LibQ[] = [];
+  const sections = [...detail.sections].sort((a, b) => a.order - b.order);
+  for (const sec of sections) {
+    const qs = [...sec.questions].sort((a, b) => a.order - b.order);
+    for (const q of qs) {
+      const qt = detailTypeToQType(q.type);
+      const options =
+        q.options && q.options.length > 0 ? q.options.map((o) => `${o.key}. ${o.text}`) : undefined;
+      questions.push({
+        id: `pq_${detail.paper_id}_${q.paper_question_id}`,
+        type: qt,
+        diff: normDiffFromApi(q.difficulty),
+        subject: detail.subject,
+        grade: detail.grade,
+        chapter: sec.title,
+        prompt: q.prompt,
+        options,
+        answer: q.answer ?? undefined,
+        source: String(detail.paper_id),
+      });
+    }
+  }
+  return {
+    id: String(detail.paper_id),
+    title: detail.title,
+    grade: detail.grade,
+    subject: detail.subject,
+    totalScore: detail.total_score,
+    durationMin: detail.duration_min,
+    questions,
+  };
+}
+
+function flattenQuestionBankSetsToLibQ(sets: QuestionBankSetDto[]): LibQ[] {
+  const out: LibQ[] = [];
+  for (const s of sets) {
+    for (const q of s.questions) {
+      out.push({
+        id: q.id,
+        type: q.type as QType,
+        diff: normDiffFromApi(q.difficulty),
+        subject: s.subject,
+        grade: s.grade,
+        chapter: s.chapter,
+        prompt: q.prompt,
+        options: q.options && q.options.length > 0 ? q.options : undefined,
+        answer: q.answer ?? undefined,
+        source: s.source,
+      });
+    }
+  }
+  return out;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    CONSTANTS
 ═══════════════════════════════════════════════════════════════════════════ */
@@ -89,115 +168,24 @@ const SUBJECTS = ['Biology','Physics','Chemistry','Math','English','History'];
 const Q_TYPES: QType[] = ['MCQ','True/False','Fill-blank','Short Answer','Essay'];
 const ROMAN = ['I','II','III','IV','V','VI','VII','VIII'];
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   MOCK DATA — Question Bank
-═══════════════════════════════════════════════════════════════════════════ */
-const LIB_QS: LibQ[] = [
-  { id:'lq1',  type:'MCQ',          diff:'easy',   subject:'Biology',   grade:'Grade 10', chapter:'Ch.3 Photosynthesis', prompt:'Which organelle is primarily responsible for photosynthesis?', options:['A. Mitochondria','B. Chloroplast','C. Ribosome','D. Vacuole'], answer:'B' },
-  { id:'lq2',  type:'MCQ',          diff:'medium', subject:'Biology',   grade:'Grade 10', chapter:'Ch.3 Photosynthesis', prompt:'In the Calvin cycle, which molecule is the first CO₂ acceptor?', options:['A. RuBP','B. G3P','C. ATP','D. NADPH'], answer:'A' },
-  { id:'lq3',  type:'MCQ',          diff:'hard',   subject:'Biology',   grade:'Grade 10', chapter:'Ch.3 Photosynthesis', prompt:'In the Z-scheme, the final electron acceptor is:', options:['A. Ferredoxin','B. NADP⁺','C. Plastocyanin','D. O₂'], answer:'B' },
-  { id:'lq4',  type:'True/False',   diff:'easy',   subject:'Biology',   grade:'Grade 10', chapter:'Ch.3 Photosynthesis', prompt:'The Calvin cycle is also called the "light-independent" reactions.', answer:'True' },
-  { id:'lq5',  type:'True/False',   diff:'medium', subject:'Biology',   grade:'Grade 10', chapter:'Ch.3 Photosynthesis', prompt:'Chlorophyll a absorbs light most strongly in the green region.', answer:'False' },
-  { id:'lq6',  type:'Fill-blank',   diff:'medium', subject:'Biology',   grade:'Grade 10', chapter:'Ch.3 Photosynthesis', prompt:'The splitting of water during photosynthesis is called _______.', answer:'Photolysis' },
-  { id:'lq7',  type:'Fill-blank',   diff:'hard',   subject:'Biology',   grade:'Grade 10', chapter:'Ch.3 Photosynthesis', prompt:'In PS I, the primary electron acceptor is _______.', answer:'Ferredoxin' },
-  { id:'lq8',  type:'Short Answer', diff:'medium', subject:'Biology',   grade:'Grade 10', chapter:'Ch.3 Photosynthesis', prompt:'Explain why a leaf appears green. What happens to the absorbed wavelengths?' },
-  { id:'lq9',  type:'Short Answer', diff:'hard',   subject:'Biology',   grade:'Grade 10', chapter:'Ch.3 Photosynthesis', prompt:'Compare the roles of Photosystem I and Photosystem II in the light-dependent reactions.' },
-  { id:'lq10', type:'Essay',        diff:'hard',   subject:'Biology',   grade:'Grade 10', chapter:'Ch.3 Photosynthesis', prompt:'Describe the complete process of photosynthesis, covering both the light-dependent and light-independent reactions.' },
-  { id:'lq11', type:'MCQ',          diff:'medium', subject:'Physics',   grade:'Grade 11', chapter:"Newton's Laws",       prompt:"If net force doubles while mass stays constant, acceleration:", options:['A. Halves','B. Same','C. Doubles','D. Quadruples'], answer:'C' },
-  { id:'lq12', type:'MCQ',          diff:'hard',   subject:'Physics',   grade:'Grade 11', chapter:"Newton's Laws",       prompt:'A 5 kg block: 20 N east + 15 N north. Magnitude of acceleration:', options:['A. 5.0 m/s²','B. 7.0 m/s²','C. 4.0 m/s²','D. 6.0 m/s²'], answer:'A' },
-  { id:'lq13', type:'Short Answer', diff:'medium', subject:'Physics',   grade:'Grade 11', chapter:"Newton's Laws",       prompt:"State Newton's three laws of motion with a real-world example for each." },
-  { id:'lq14', type:'MCQ',          diff:'medium', subject:'Math',      grade:'Grade 9',  chapter:'Quadratic Functions', prompt:'Vertex form of f(x) = x²−6x+5?', options:['A. (x−3)²−4','B. (x+3)²−4','C. (x−3)²+4','D. (x−6)²+5'], answer:'A' },
-  { id:'lq15', type:'Short Answer', diff:'hard',   subject:'Math',      grade:'Grade 9',  chapter:'Quadratic Functions', prompt:'h(t)=−5t²+20t+2. Find max height and the time at which it occurs.' },
-  { id:'lq16', type:'MCQ',          diff:'medium', subject:'Chemistry', grade:'Grade 11', chapter:'Electrochemistry',    prompt:'In a galvanic cell, oxidation occurs at the:', options:['A. Anode','B. Cathode','C. Salt bridge','D. External circuit'], answer:'A' },
-  { id:'lq17', type:'Essay',        diff:'hard',   subject:'Chemistry', grade:'Grade 11', chapter:'Organic Reactions',   prompt:'Compare SN1 and SN2 reaction mechanisms, including substrate structure and solvent polarity.' },
-  { id:'lq18', type:'MCQ',          diff:'easy',   subject:'Biology',   grade:'Grade 10', chapter:'Ch.3 Photosynthesis', prompt:'Which gas is released as a byproduct of the light-dependent reactions?', options:['A. CO₂','B. N₂','C. O₂','D. H₂'], answer:'C' },
-  { id:'lq19', type:'Fill-blank',   diff:'easy',   subject:'Biology',   grade:'Grade 10', chapter:'Ch.3 Photosynthesis', prompt:'ATP and NADPH produced in the light reactions are used to power the _______ cycle.', answer:'Calvin' },
-  { id:'lq20', type:'True/False',   diff:'hard',   subject:'Biology',   grade:'Grade 10', chapter:'Ch.3 Photosynthesis', prompt:'Cyclic photophosphorylation produces both ATP and NADPH.', answer:'False' },
-];
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   MOCK DATA — Exam Papers
-═══════════════════════════════════════════════════════════════════════════ */
-function makeEPQ(paperId: string, n: number, type: QType, diff: Diff, prompt: string, opts?: string[], ans?: string, subject='Biology', grade='Grade 10', chapter='General'): LibQ {
-  return { id:`ep_${paperId}_${n}`, type, diff, subject, grade, chapter, prompt, options:opts, answer:ans, source:paperId };
+function mapApiItemToGradingPaper(item: PaperListItemDto): Paper {
+  const et = (item.exam_type || '').toLowerCase();
+  const kind: PaperKind =
+    et.includes('homework') ? 'homework' : et.includes('quiz') ? 'quiz' : 'exam';
+  return {
+    id: String(item.paper_id),
+    title: item.title,
+    kind,
+    grade: item.grade,
+    subject: item.subject,
+    status: item.status,
+    duration: item.duration_min,
+    totalPts: item.total_score,
+    qCount: item.question_count,
+    sections: [],
+    createdAt: item.created_at,
+  };
 }
-const EXAM_PAPERS: ExamPaperEntry[] = [
-  {
-    id:'ep1', title:'Grade 10 Biology Midterm — Spring 2026', grade:'Grade 10', subject:'Biology', totalScore:120, durationMin:90,
-    questions:[
-      makeEPQ('ep1',1,'MCQ','easy',   'The powerhouse of the cell is the:', ['A. Nucleus','B. Ribosome','C. Mitochondria','D. Vacuole'],'C','Biology','Grade 10','Cell Biology'),
-      makeEPQ('ep1',2,'MCQ','medium', 'Which process converts glucose into pyruvate?', ['A. Krebs cycle','B. Glycolysis','C. Oxidative phosphorylation','D. Beta-oxidation'],'B','Biology','Grade 10','Cellular Respiration'),
-      makeEPQ('ep1',3,'MCQ','hard',   'During oxidative phosphorylation, electrons pass from NADH to:', ['A. O₂','B. FAD','C. NAD⁺','D. Pyruvate'],'A','Biology','Grade 10','Cellular Respiration'),
-      makeEPQ('ep1',4,'True/False','easy',   'Mitosis produces four genetically distinct daughter cells.', undefined,'False','Biology','Grade 10','Cell Division'),
-      makeEPQ('ep1',5,'True/False','medium', 'Crossing over occurs during prophase I of meiosis.', undefined,'True','Biology','Grade 10','Cell Division'),
-      makeEPQ('ep1',6,'Fill-blank','medium', 'The stage of mitosis where chromosomes align at the cell equator is called _______.', undefined,'Metaphase','Biology','Grade 10','Cell Division'),
-      makeEPQ('ep1',7,'Fill-blank','hard',   'The enzyme that unwinds the DNA double helix during replication is called _______.', undefined,'Helicase','Biology','Grade 10','DNA Replication'),
-      makeEPQ('ep1',8,'Short Answer','medium','Explain the difference between mitosis and meiosis in terms of chromosome number and genetic variation.'),
-      makeEPQ('ep1',9,'Short Answer','hard',  'Describe how enzymes lower the activation energy of a reaction and how temperature affects enzyme activity.'),
-      makeEPQ('ep1',10,'Essay','hard',        'Explain the complete process of cellular respiration, including glycolysis, the Krebs cycle, and oxidative phosphorylation.'),
-    ],
-  },
-  {
-    id:'ep2', title:"Grade 11 Physics Unit Test — Newton's Laws", grade:'Grade 11', subject:'Physics', totalScore:100, durationMin:75,
-    questions:[
-      makeEPQ('ep2',1,'MCQ','easy',   "Newton's first law is also called the law of:", ['A. Acceleration','B. Inertia','C. Gravity','D. Reaction'],'B','Physics','Grade 11','Mechanics'),
-      makeEPQ('ep2',2,'MCQ','medium', 'A 10 kg object accelerates at 3 m/s². The net force is:', ['A. 13 N','B. 0.3 N','C. 30 N','D. 3 N'],'C','Physics','Grade 11','Mechanics'),
-      makeEPQ('ep2',3,'MCQ','hard',   'Two objects of mass m and 2m are in free fall. Their accelerations are:', ['A. Equal','B. m/s and 2m/s','C. Ratio 1:2','D. Ratio 2:1'],'A','Physics','Grade 11','Gravity'),
-      makeEPQ('ep2',4,'True/False','easy',   'Weight is a measure of the amount of matter in an object.', undefined,'False','Physics','Grade 11','Mechanics'),
-      makeEPQ('ep2',5,'Fill-blank','medium', "The unit of force in SI is the _______, defined as 1 kg·m/s².", undefined,'Newton','Physics','Grade 11','Mechanics'),
-      makeEPQ('ep2',6,'Short Answer','medium',"Explain why a rocket can accelerate in the vacuum of space using Newton's third law."),
-      makeEPQ('ep2',7,'Short Answer','hard',  "A car skids to a stop. Analyze the forces involved using Newton's laws and explain what determines stopping distance."),
-      makeEPQ('ep2',8,'Essay','hard',         "Design an experiment to verify Newton's second law. Include hypothesis, variables, method, expected results, and sources of error."),
-    ],
-  },
-  {
-    id:'ep3', title:'Grade 9 Math Review — Quadratics', grade:'Grade 9', subject:'Math', totalScore:80, durationMin:60,
-    questions:[
-      makeEPQ('ep3',1,'MCQ','easy',   'The solutions to x² − 5x + 6 = 0 are:', ['A. x=2,3','B. x=1,6','C. x=−2,−3','D. x=−1,6'],'A','Math','Grade 9','Quadratic Equations'),
-      makeEPQ('ep3',2,'MCQ','medium', 'Which quadratic has vertex (2, −1)?', ['A. (x−2)²−1','B. (x+2)²−1','C. (x−2)²+1','D. x²−4x+3'],'A','Math','Grade 9','Quadratic Functions'),
-      makeEPQ('ep3',3,'Fill-blank','medium', 'The discriminant of ax²+bx+c=0 is _______.', undefined,'b²−4ac','Math','Grade 9','Quadratic Equations'),
-      makeEPQ('ep3',4,'True/False','easy',   'A quadratic function always has exactly two real roots.', undefined,'False','Math','Grade 9','Quadratic Equations'),
-      makeEPQ('ep3',5,'Short Answer','hard',  'A ball is thrown with h(t)=−4.9t²+19.6t+2. Find the maximum height and when it hits the ground.'),
-      makeEPQ('ep3',6,'Short Answer','medium','Solve 2x²+3x−2=0 by factoring. Show all steps.'),
-    ],
-  },
-];
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   MOCK DATA — Papers
-═══════════════════════════════════════════════════════════════════════════ */
-const INIT_PAPERS: Paper[] = [
-  { id:'p1', title:'Grade 10 Biology Midterm — Spring 2026', kind:'exam', grade:'Grade 10', subject:'Biology', status:'published', duration:90, totalPts:120, qCount:29, sections:[], createdAt:'2026-03-28T14:22:00Z', publishCfg:{ assignKind:'exam', classes:['Grade 10-A','Grade 10-B'], startDate:'2026-04-05', endDate:'2026-04-05', timeLimit:90, showResults:true, allowLate:false } },
-  { id:'p2', title:'Grade 9 Chemistry Unit Test — Acids & Bases', kind:'quiz', grade:'Grade 9', subject:'Chemistry', status:'draft', duration:60, totalPts:80, qCount:22, sections:[], createdAt:'2026-03-31T09:05:00Z', note:'Review Section III difficulty before publishing.' },
-  { id:'p3', title:'Grade 11 Math Review — Sequences & Derivatives', kind:'exam', grade:'Grade 11', subject:'Math', status:'draft', duration:120, totalPts:150, qCount:35, sections:[], createdAt:'2026-04-01T17:40:00Z' },
-  { id:'p4', title:'Grade 10 Biology Quiz — Cell Structure', kind:'quiz', grade:'Grade 10', subject:'Biology', status:'closed', duration:30, totalPts:50, qCount:15, sections:[], createdAt:'2026-02-10T11:00:00Z', publishCfg:{ assignKind:'quiz', classes:['Grade 10-A'], startDate:'2026-02-14', endDate:'2026-02-20', timeLimit:30, showResults:true, allowLate:true } },
-];
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   MOCK DATA — Student Submissions
-═══════════════════════════════════════════════════════════════════════════ */
-const BASE_RESPONSES: QResp[] = [
-  { qId:'lq1', prompt:'Which organelle is primarily responsible for photosynthesis?', type:'MCQ', maxPts:3, studentAns:'B. Chloroplast', isCorrect:true, aiPts:3, aiNote:'Correct. Chloroplast contains the photosynthetic machinery.' },
-  { qId:'lq2', prompt:'In the Calvin cycle, which molecule is the first CO₂ acceptor?', type:'MCQ', maxPts:3, studentAns:'A. RuBP', isCorrect:true, aiPts:3, aiNote:'Correct. RuBP is the primary CO₂ acceptor in the Calvin cycle.' },
-  { qId:'lq3', prompt:'In the Z-scheme, the final electron acceptor is:', type:'MCQ', maxPts:3, studentAns:'A. Ferredoxin', isCorrect:false, aiPts:0, aiNote:'Incorrect. The final acceptor is NADP⁺ (B).' },
-  { qId:'lq4', prompt:'The Calvin cycle is also called the "light-independent" reactions.', type:'True/False', maxPts:2, studentAns:'True', isCorrect:true, aiPts:2, aiNote:'Correct.' },
-  { qId:'lq5', prompt:'Chlorophyll a absorbs light most strongly in the green region.', type:'True/False', maxPts:2, studentAns:'False', isCorrect:true, aiPts:2, aiNote:'Correct. Chlorophyll a absorbs red and blue most strongly.' },
-  { qId:'lq8', prompt:'Explain why a leaf appears green. What happens to the absorbed wavelengths?', type:'Short Answer', maxPts:6, studentAns:'Leaves appear green because chlorophyll pigments absorb red and blue light for photosynthesis but reflect green wavelengths back. The absorbed red (~680 nm) and blue (~450 nm) light excites electrons in the photosystems, driving the light-dependent reactions to produce ATP and NADPH.', aiPts:5, aiNote:'Strong coverage. Correctly mentions wavelengths. Could elaborate on energy conversion. −1 pt.' },
-  { qId:'lq9', prompt:'Compare the roles of Photosystem I and Photosystem II in the light-dependent reactions.', type:'Short Answer', maxPts:6, studentAns:'PSII (P680) splits water releasing O₂. Electrons flow through ETC generating a proton gradient for ATP. PSI (P700) re-energises electrons to reduce NADP⁺ → NADPH for the Calvin cycle.', aiPts:6, aiNote:'Excellent. Identifies both photosystems, wavelengths, electron flow, ATP and NADPH production.' },
-];
-
-function makeSub(id: string, name: string, sid: string, av: string, status: SubStatus, aiTotal: number, teacherTotal: number | null): StudentSub {
-  return { id, name, studentId:sid, avatar:av, paperId:'p1', submittedAt:`2026-04-05T10:${id.slice(-2).padStart(2,'0')}:00Z`, status, aiTotal, teacherTotal, maxPts:120, responses:BASE_RESPONSES };
-}
-const INIT_SUBS: StudentSub[] = [
-  makeSub('ss1','Alice Chen',  '2024001','👩‍🎓','fully_graded', 95, 96),
-  makeSub('ss2','Bob Zhang',   '2024002','👨‍🎓','pending_sa',   78, null),
-  makeSub('ss3','Carol Liu',   '2024003','👩‍🎓','fully_graded',102,104),
-  makeSub('ss4','David Wang',  '2024004','👨‍🎓','pending_sa',   65, null),
-  makeSub('ss5','Wang Black',  '2024007','🦯', 'pending_sa',   71, null),
-  makeSub('ss6','Emma Wright', '2024005','👩‍🎓','ai_graded',    88, null),
-  makeSub('ss7','Liam Park',   '2024008','👨‍🎓','pending_sa',   60, null),
-];
 
 /* ═══════════════════════════════════════════════════════════════════════════
    HELPERS
@@ -287,17 +275,36 @@ function StudioTabBar({ tab, setTab, draftCount, pendingCount }: {
    MODE 1 — QUESTION BANK BROWSER
 ═══════════════════════════════════════════════════════════════════════════ */
 interface BrowserProps {
+  grade: string;
+  subject: string;
   addedIds: Set<string>;
   replaceMode: boolean;
   replaceTargetType: QType | null;
   onAdd: (q: LibQ) => void;
   onReplace: (q: LibQ) => void;
 }
-function QuestionBankBrowser({ addedIds, replaceMode, replaceTargetType, onAdd, onReplace }: BrowserProps) {
-  const [qSearch,      setQSearch]      = useState('');
-  const [typeFilters,  setTypeFilters]  = useState<QType[]>([]);
+function QuestionBankBrowser({
+  grade,
+  subject,
+  addedIds,
+  replaceMode,
+  replaceTargetType,
+  onAdd,
+  onReplace,
+}: BrowserProps) {
+  const [qSearch, setQSearch] = useState('');
+  const [debouncedQ, setDebouncedQ] = useState('');
+  const [typeFilters, setTypeFilters] = useState<QType[]>([]);
   const [typeDropOpen, setTypeDropOpen] = useState(false);
+  const [bankRows, setBankRows] = useState<LibQ[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const typeRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedQ(qSearch.trim()), 300);
+    return () => window.clearTimeout(t);
+  }, [qSearch]);
 
   useEffect(() => {
     function h(e: MouseEvent) { if (typeRef.current && !typeRef.current.contains(e.target as Node)) setTypeDropOpen(false); }
@@ -310,12 +317,39 @@ function QuestionBankBrowser({ addedIds, replaceMode, replaceTargetType, onAdd, 
     else if (!replaceMode) setTypeFilters([]);
   }, [replaceMode, replaceTargetType]);
 
-  const filtered = LIB_QS.filter(q =>
-    (typeFilters.length===0 || typeFilters.includes(q.type)) &&
-    (!qSearch || q.prompt.toLowerCase().includes(qSearch.toLowerCase()))
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const res = await listQuestionBankSetsApi({
+          grade,
+          subject,
+          q: debouncedQ || undefined,
+        });
+        if (cancelled) return;
+        setBankRows(flattenQuestionBankSetsToLibQ(res.sets));
+      } catch (e) {
+        if (!cancelled) {
+          setBankRows([]);
+          setLoadError(e instanceof Error ? e.message : 'Failed to load question bank');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [grade, subject, debouncedQ]);
+
+  const filtered = useMemo(
+    () => bankRows.filter(
+      (q) => (typeFilters.length === 0 || typeFilters.includes(q.type)),
+    ),
+    [bankRows, typeFilters],
   );
-  const byType: Partial<Record<QType,LibQ[]>> = {};
-  filtered.forEach(q=>{ (byType[q.type]??=[]).push(q); });
+  const byType: Partial<Record<QType, LibQ[]>> = {};
+  filtered.forEach((q) => { (byType[q.type] ??= []).push(q); });
 
   function toggleType(t: QType) { setTypeFilters(prev=>prev.includes(t)?prev.filter(x=>x!==t):[...prev,t]); }
   const typeLabel = typeFilters.length===0 ? 'All Types'
@@ -380,7 +414,7 @@ function QuestionBankBrowser({ addedIds, replaceMode, replaceTargetType, onAdd, 
                       </div>
                       <span style={{ fontSize:'13px', flexShrink:0 }}>{tc.emoji}</span>
                       <span style={{ flex:1, fontSize:'12px', fontWeight:checked?600:400, color:checked?'#1d4ed8':'#374151' }}>{t}</span>
-                      <span style={{ fontSize:'10px', color:'#9ca3af', flexShrink:0 }}>{LIB_QS.filter(q=>q.type===t).length}</span>
+                      <span style={{ fontSize:'10px', color:'#9ca3af', flexShrink:0 }}>{bankRows.filter(q=>q.type===t).length}</span>
                     </button>
                   );
                 })}
@@ -391,11 +425,23 @@ function QuestionBankBrowser({ addedIds, replaceMode, replaceTargetType, onAdd, 
       </div>
       {/* Question list */}
       <div style={{ flex:1, overflowY:'auto', padding:'0 8px 8px' }}>
-        {filtered.length===0 ? (
-          <div style={{ textAlign:'center', padding:'36px 12px', color:'#9ca3af' }}>
-            <BookOpen size={26} style={{ opacity:0.18, display:'block', margin:'0 auto 8px' }}/>
-            <div style={{ fontSize:'12px' }}>No questions found</div>
+        {loadError && (
+          <div style={{ padding:'12px 10px', marginBottom:'8px', borderRadius:'8px', background:'#fef2f2', color:'#b91c1c', fontSize:'11px', lineHeight:1.45 }}>
+            {loadError}
           </div>
+        )}
+        {loading ? (
+          <div style={{ textAlign:'center', padding:'36px 12px', color:'#9ca3af', display:'flex', flexDirection:'column', alignItems:'center', gap:8 }}>
+            <Loader2 size={22} style={{ animation:'spin 0.8s linear infinite' }} />
+            <span style={{ fontSize:'12px' }}>Loading question bank…</span>
+          </div>
+        ) : filtered.length===0 ? (
+          loadError ? null : (
+            <div style={{ textAlign:'center', padding:'36px 12px', color:'#9ca3af' }}>
+              <BookOpen size={26} style={{ opacity:0.18, display:'block', margin:'0 auto 8px' }}/>
+              <div style={{ fontSize:'12px' }}>当前年级学科下暂无题目</div>
+            </div>
+          )
         ) : Q_TYPES.map(t=>{
           const qs=byType[t]; if(!qs?.length) return null;
           const tc=TYPE_C[t];
@@ -442,89 +488,280 @@ function QuestionBankBrowser({ addedIds, replaceMode, replaceTargetType, onAdd, 
    MODE 2 — EXAM PAPER PICKER
 ═══════════════════════════════════════════════════════════════════════════ */
 interface PaperPickerProps {
+  grade: string;
+  subject: string;
   onLoad: (ep: ExamPaperEntry) => void;
   canvasHasContent: boolean;
   loadedPaperId: string | null;
 }
-function ExamPaperPicker({ onLoad, canvasHasContent, loadedPaperId }: PaperPickerProps) {
-  const [expandId,  setExpandId]  = useState<string|null>(null);
-  const [confirmId, setConfirmId] = useState<string|null>(null);
+function ExamPaperPicker({ grade, subject, onLoad, canvasHasContent, loadedPaperId }: PaperPickerProps) {
+  const [expandId, setExpandId] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [pendingEp, setPendingEp] = useState<ExamPaperEntry | null>(null);
+  const [papers, setPapers] = useState<PaperListItemDto[]>([]);
+  const [listLoading, setListLoading] = useState(true);
+  const [listError, setListError] = useState<string | null>(null);
+  const [detailById, setDetailById] = useState<Record<string, ExamPaperEntry>>({});
+  const detailByIdRef = useRef<Record<string, ExamPaperEntry>>({});
+  detailByIdRef.current = detailById;
+  const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
-  function tryLoad(ep: ExamPaperEntry) {
-    if (canvasHasContent && loadedPaperId!==ep.id) { setConfirmId(ep.id); return; }
-    onLoad(ep); setExpandId(ep.id);
-  }
+  useEffect(() => {
+    setExpandId(null);
+    setDetailById({});
+    let cancelled = false;
+    (async () => {
+      setListLoading(true);
+      setListError(null);
+      try {
+        const res = await fetchPaperListApi({ grade, subject, page: 1, page_size: 50 });
+        if (!cancelled) setPapers(res.items);
+      } catch (e) {
+        if (!cancelled) {
+          setPapers([]);
+          setListError(e instanceof Error ? e.message : 'Failed to load papers');
+        }
+      } finally {
+        if (!cancelled) setListLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [grade, subject]);
+
+  useEffect(() => {
+    if (!expandId) return;
+    if (detailByIdRef.current[expandId]) return;
+    const id = Number(expandId);
+    if (!Number.isFinite(id)) return;
+    let cancelled = false;
+    (async () => {
+      setDetailLoadingId(expandId);
+      try {
+        const d = await fetchPaperDetailApi(id);
+        if (cancelled) return;
+        const ep = mapDetailToExamPaperEntry(d);
+        setDetailById((prev) => ({ ...prev, [expandId]: ep }));
+      } finally {
+        if (!cancelled) setDetailLoadingId(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [expandId]);
+
   function qByType(ep: ExamPaperEntry) {
-    const m: Partial<Record<QType,number>> = {};
-    ep.questions.forEach(q=>{ m[q.type]=(m[q.type]??0)+1; });
+    const m: Partial<Record<QType, number>> = {};
+    ep.questions.forEach((q) => { m[q.type] = (m[q.type] ?? 0) + 1; });
     return m;
   }
 
+  async function tryLoad(meta: PaperListItemDto) {
+    const sid = String(meta.paper_id);
+    setActionLoadingId(sid);
+    try {
+      let ep = detailById[sid];
+      if (!ep) {
+        const d = await fetchPaperDetailApi(meta.paper_id);
+        ep = mapDetailToExamPaperEntry(d);
+        setDetailById((prev) => ({ ...prev, [sid]: ep }));
+      }
+      if (canvasHasContent && loadedPaperId !== ep.id) {
+        setConfirmId(ep.id);
+        setPendingEp(ep);
+        return;
+      }
+      onLoad(ep);
+      setExpandId(sid);
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      <div style={{ padding:'10px 11px 8px', flexShrink:0 }}>
-        <p style={{ margin:0, fontSize:'11px', color:'#6b7280', lineHeight:1.6, padding:'9px 11px', background:'#f8f9fb', borderRadius:'8px', border:'1px solid #f0f2f5' }}>
-          Pick an existing exam paper to load it into the canvas, then freely edit, reorder, or swap questions.
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ padding: '10px 11px 8px', flexShrink: 0 }}>
+        <p style={{ margin: 0, fontSize: '11px', color: '#6b7280', lineHeight: 1.6, padding: '9px 11px', background: '#f8f9fb', borderRadius: '8px', border: '1px solid #f0f2f5' }}>
+          Pick an existing exam paper to load it into the canvas, then freely edit, reorder, or swap questions. List is scoped to Grade / Subject above (all statuses).
         </p>
       </div>
-      <div style={{ flex:1, overflowY:'auto', padding:'0 8px 12px', display:'flex', flexDirection:'column', gap:'7px' }}>
-        {EXAM_PAPERS.map(ep=>{
-          const isLoaded   = loadedPaperId===ep.id;
-          const isExpanded = expandId===ep.id;
-          const confirming = confirmId===ep.id;
-          const qmap       = qByType(ep);
-          return (
-            <div key={ep.id} onClick={()=>setExpandId(v=>v===ep.id?null:ep.id)}
-              style={{ borderRadius:'10px', border:`1.5px solid ${isLoaded?'#3b5bdb':'#e8eaed'}`, background:isLoaded?'#f0f4ff':'#fff', overflow:'hidden', cursor:'pointer',
-                boxShadow:isLoaded?'0 0 0 3px rgba(59,91,219,0.09)':'none', transition:'border-color 0.15s, box-shadow 0.15s' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:'9px', padding:'10px 11px' }}>
-                <span style={{ fontSize:'18px', flexShrink:0 }}>{SUBJ_EMOJI[ep.subject]??'📄'}</span>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:'11px', fontWeight:700, color:isLoaded?'#1d4ed8':'#0f0f23', lineHeight:1.35, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{ep.title}</div>
-                  <div style={{ fontSize:'9px', color:'#9ca3af', marginTop:'2px' }}>{ep.grade} · {ep.subject} · {ep.questions.length}q · {ep.totalScore}pts · {ep.durationMin}min</div>
-                </div>
-                <div style={{ display:'flex', alignItems:'center', gap:'5px', flexShrink:0 }}>
-                  {isLoaded && <span style={{ fontSize:'9px', fontWeight:700, padding:'2px 7px', borderRadius:'20px', background:'#3b5bdb', color:'#fff' }}>Loaded</span>}
-                  <ChevronDown size={13} style={{ color:'#9ca3af', transform:isExpanded?'rotate(180deg)':'none', transition:'transform 0.18s' }}/>
-                </div>
-              </div>
-              {isExpanded && (
-                <div style={{ borderTop:'1px solid #e8eaed', padding:'9px 11px' }} onClick={e=>e.stopPropagation()}>
-                  <div style={{ display:'flex', gap:'4px', flexWrap:'wrap', marginBottom:'9px' }}>
-                    {Q_TYPES.map(t=>{ const c=qmap[t]; if(!c) return null; const tc=TYPE_C[t]; return (
-                      <span key={t} style={{ fontSize:'10px', padding:'2px 8px', borderRadius:'20px', background:tc.bg, color:tc.color, fontWeight:600 }}>{tc.emoji} {t} ×{c}</span>
-                    ); })}
-                  </div>
-                  <div style={{ display:'flex', flexDirection:'column', gap:'3px', maxHeight:'130px', overflowY:'auto', marginBottom:'10px' }}>
-                    {ep.questions.map((q,i)=>{ const tc=TYPE_C[q.type]; return (
-                      <div key={q.id} style={{ display:'flex', alignItems:'flex-start', gap:'6px', padding:'4px 7px', borderRadius:'6px', background:'#f9fafb' }}>
-                        <span style={{ fontSize:'9px', fontWeight:700, color:'#9ca3af', flexShrink:0, marginTop:'1px' }}>Q{i+1}</span>
-                        <span style={{ fontSize:'10px', padding:'1px 5px', borderRadius:'4px', background:tc.bg, color:tc.color, fontWeight:600, flexShrink:0 }}>{tc.short}</span>
-                        <span style={{ fontSize:'10px', color:'#374151', lineHeight:1.4, flex:1 }}>{clamp(q.prompt, 55)}</span>
-                      </div>
-                    ); })}
-                  </div>
-                  {confirming ? (
-                    <div style={{ padding:'9px 11px', background:'#fffbeb', borderRadius:'8px', border:'1px solid #fde68a' }}>
-                      <div style={{ fontSize:'11px', color:'#92400e', fontWeight:600, marginBottom:'7px' }}>⚠️ This will replace current canvas content.</div>
-                      <div style={{ display:'flex', gap:'6px' }}>
-                        <button onClick={()=>{ onLoad(ep); setConfirmId(null); setExpandId(ep.id); }}
-                          style={{ flex:1, padding:'7px', borderRadius:'7px', border:'none', cursor:'pointer', background:'#ef4444', color:'#fff', fontSize:'11px', fontWeight:700 }}>Replace & Load</button>
-                        <button onClick={()=>setConfirmId(null)}
-                          style={{ padding:'7px 11px', borderRadius:'7px', border:'1px solid #e8eaed', cursor:'pointer', background:'#fff', color:'#374151', fontSize:'11px' }}>Cancel</button>
-                      </div>
+      {listError && (
+        <div style={{ padding: '8px 12px', margin: '0 8px 8px', borderRadius: '8px', background: '#fef2f2', color: '#b91c1c', fontSize: '11px' }}>
+          {listError}
+        </div>
+      )}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px 12px', display: 'flex', flexDirection: 'column', gap: '7px' }}>
+        {listLoading ? (
+          <div style={{ textAlign: 'center', padding: '36px 12px', color: '#9ca3af', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+            <Loader2 size={22} style={{ animation: 'spin 0.8s linear infinite' }} />
+            <span style={{ fontSize: '12px' }}>Loading papers…</span>
+          </div>
+        ) : papers.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '28px 12px', color: '#9ca3af', fontSize: '12px' }}>
+            {listError ? '' : '当前年级学科下暂无试卷'}
+          </div>
+        ) : (
+          papers.map((meta) => {
+            const sid = String(meta.paper_id);
+            const ep = detailById[sid];
+            const isLoaded = loadedPaperId === sid;
+            const isExpanded = expandId === sid;
+            const confirming = confirmId === sid;
+            const qmap = ep ? qByType(ep) : {};
+            const loadingDetail = detailLoadingId === sid && !ep;
+            return (
+              <div
+                key={sid}
+                onClick={() => setExpandId((v) => (v === sid ? null : sid))}
+                style={{
+                  borderRadius: '10px',
+                  border: `1.5px solid ${isLoaded ? '#3b5bdb' : '#e8eaed'}`,
+                  background: isLoaded ? '#f0f4ff' : '#fff',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  boxShadow: isLoaded ? '0 0 0 3px rgba(59,91,219,0.09)' : 'none',
+                  transition: 'border-color 0.15s, box-shadow 0.15s',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '10px 11px' }}>
+                  <span style={{ fontSize: '18px', flexShrink: 0 }}>{SUBJ_EMOJI[meta.subject] ?? '📄'}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: isLoaded ? '#1d4ed8' : '#0f0f23',
+                        lineHeight: 1.35,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {meta.title}
                     </div>
-                  ) : (
-                    <button onClick={()=>tryLoad(ep)}
-                      style={{ width:'100%', padding:'9px', borderRadius:'8px', border:'none', cursor:'pointer', background:isLoaded?'#dcfce7':'#3b5bdb', color:isLoaded?'#15803d':'#fff', fontSize:'12px', fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', gap:'7px' }}>
-                      {isLoaded ? <><CheckCircle2 size={13}/> Already Loaded</> : <><RotateCcw size={13}/> Load into Canvas</>}
-                    </button>
-                  )}
+                    <div style={{ fontSize: '9px', color: '#9ca3af', marginTop: '2px' }}>
+                      {meta.grade} · {meta.subject} · {meta.question_count}q · {meta.total_score}pts · {meta.duration_min}min
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                    {isLoaded && (
+                      <span style={{ fontSize: '9px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: '#3b5bdb', color: '#fff' }}>
+                        Loaded
+                      </span>
+                    )}
+                    <ChevronDown size={13} style={{ color: '#9ca3af', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s' }} />
+                  </div>
                 </div>
-              )}
-            </div>
-          );
-        })}
+                {isExpanded && (
+                  <div style={{ borderTop: '1px solid #e8eaed', padding: '9px 11px' }} onClick={(e) => e.stopPropagation()}>
+                    {loadingDetail ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 0', color: '#9ca3af', fontSize: '11px' }}>
+                        <Loader2 size={16} style={{ animation: 'spin 0.8s linear infinite' }} />
+                        Loading preview…
+                      </div>
+                    ) : ep ? (
+                      <>
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '9px' }}>
+                          {Q_TYPES.map((t) => {
+                            const c = qmap[t];
+                            if (!c) return null;
+                            const tc = TYPE_C[t];
+                            return (
+                              <span
+                                key={t}
+                                style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '20px', background: tc.bg, color: tc.color, fontWeight: 600 }}
+                              >
+                                {tc.emoji} {t} ×{c}
+                              </span>
+                            );
+                          })}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', maxHeight: '130px', overflowY: 'auto', marginBottom: '10px' }}>
+                          {ep.questions.map((q, i) => {
+                            const tc = TYPE_C[q.type];
+                            return (
+                              <div key={q.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', padding: '4px 7px', borderRadius: '6px', background: '#f9fafb' }}>
+                                <span style={{ fontSize: '9px', fontWeight: 700, color: '#9ca3af', flexShrink: 0, marginTop: '1px' }}>Q{i + 1}</span>
+                                <span style={{ fontSize: '10px', padding: '1px 5px', borderRadius: '4px', background: tc.bg, color: tc.color, fontWeight: 600, flexShrink: 0 }}>{tc.short}</span>
+                                <span style={{ fontSize: '10px', color: '#374151', lineHeight: 1.4, flex: 1 }}>{clamp(q.prompt, 55)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ fontSize: '11px', color: '#9ca3af', padding: '8px 0' }}>Could not load preview.</div>
+                    )}
+                    {confirming && pendingEp && pendingEp.id === sid ? (
+                      <div style={{ padding: '9px 11px', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fde68a' }}>
+                        <div style={{ fontSize: '11px', color: '#92400e', fontWeight: 600, marginBottom: '7px' }}>⚠️ This will replace current canvas content.</div>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onLoad(pendingEp);
+                              setConfirmId(null);
+                              setPendingEp(null);
+                              setExpandId(sid);
+                            }}
+                            style={{ flex: 1, padding: '7px', borderRadius: '7px', border: 'none', cursor: 'pointer', background: '#ef4444', color: '#fff', fontSize: '11px', fontWeight: 700 }}
+                          >
+                            Replace & Load
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setConfirmId(null);
+                              setPendingEp(null);
+                            }}
+                            style={{ padding: '7px 11px', borderRadius: '7px', border: '1px solid #e8eaed', cursor: 'pointer', background: '#fff', color: '#374151', fontSize: '11px' }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={actionLoadingId === sid}
+                        onClick={() => void tryLoad(meta)}
+                        style={{
+                          width: '100%',
+                          padding: '9px',
+                          borderRadius: '8px',
+                          border: 'none',
+                          cursor: actionLoadingId === sid ? 'wait' : 'pointer',
+                          background: isLoaded ? '#dcfce7' : '#3b5bdb',
+                          color: isLoaded ? '#15803d' : '#fff',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '7px',
+                          opacity: actionLoadingId === sid ? 0.85 : 1,
+                        }}
+                      >
+                        {actionLoadingId === sid ? (
+                          <>
+                            <Loader2 size={13} style={{ animation: 'spin 0.8s linear infinite' }} /> Loading…
+                          </>
+                        ) : isLoaded ? (
+                          <>
+                            <CheckCircle2 size={13} /> Already Loaded
+                          </>
+                        ) : (
+                          <>
+                            <RotateCcw size={13} /> Load into Canvas
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );
@@ -619,29 +856,11 @@ function AssembleView({ onSave }: { onSave:(p:Paper)=>void }) {
   const [kind,    setKind]    = useState<PaperKind>('exam');
   const [dur,     setDur]     = useState(90);
 
-  const [sections, setSections] = useState<Section[]>([
-    { id:nid(), label:'Section I: Multiple Choice', type:'MCQ', ptsEach:3, qs:[
-      { uid:nid(), libId:'lq1', type:'MCQ', diff:'easy',   pts:3, prompt:'Which organelle is primarily responsible for photosynthesis?', options:['A. Mitochondria','B. Chloroplast','C. Ribosome','D. Vacuole'], answer:'B' },
-      { uid:nid(), libId:'lq2', type:'MCQ', diff:'medium', pts:3, prompt:'In the Calvin cycle, which molecule is the first CO₂ acceptor?', options:['A. RuBP','B. G3P','C. ATP','D. NADPH'], answer:'A' },
-      { uid:nid(), libId:'lq3', type:'MCQ', diff:'hard',   pts:3, prompt:'In the Z-scheme, the final electron acceptor is:', options:['A. Ferredoxin','B. NADP⁺','C. Plastocyanin','D. O₂'], answer:'B' },
-    ]},
-    { id:nid(), label:'Section II: True / False', type:'True/False', ptsEach:2, qs:[
-      { uid:nid(), libId:'lq4', type:'True/False', diff:'easy',   pts:2, prompt:'The Calvin cycle is also called the "light-independent" reactions.', answer:'True' },
-      { uid:nid(), libId:'lq5', type:'True/False', diff:'medium', pts:2, prompt:'Chlorophyll a absorbs light most strongly in the green region.', answer:'False' },
-    ]},
-    { id:nid(), label:'Section III: Fill-blank', type:'Fill-blank', ptsEach:3, qs:[
-      { uid:nid(), libId:'lq6', type:'Fill-blank', diff:'medium', pts:3, prompt:'The splitting of water during photosynthesis is called _______.', answer:'Photolysis' },
-      { uid:nid(), libId:'lq7', type:'Fill-blank', diff:'hard',   pts:3, prompt:'In PS I, the primary electron acceptor is _______.', answer:'Ferredoxin' },
-    ]},
-    { id:nid(), label:'Section IV: Short Answer', type:'Short Answer', ptsEach:6, qs:[
-      { uid:nid(), libId:'lq8', type:'Short Answer', diff:'medium', pts:6, prompt:'Explain why a leaf appears green. What happens to the absorbed wavelengths?' },
-    ]},
-    { id:nid(), label:'Section V: Essay', type:'Essay', ptsEach:15, qs:[
-      { uid:nid(), libId:'lq10', type:'Essay', diff:'hard', pts:15, prompt:'Describe the complete process of photosynthesis, covering both the light-dependent and light-independent reactions.' },
-    ]},
-  ]);
+  // Canvas starts empty: only shows content after importing questions or loading an existing paper.
+  const [sections, setSections] = useState<Section[]>([]);
 
   const [loadedPaperId, setLoadedPaperId] = useState<string|null>(null);
+  const [loadedPaperTitle, setLoadedPaperTitle] = useState<string|null>(null);
   const [addSecOpen,    setAddSecOpen]    = useState(false);
   const [newSecType,    setNewSecType]    = useState<QType>('MCQ');
   const [saved,         setSaved]         = useState(false);
@@ -663,6 +882,7 @@ function AssembleView({ onSave }: { onSave:(p:Paper)=>void }) {
     });
     setSections(Object.values(secMap) as Section[]);
     setLoadedPaperId(ep.id);
+    setLoadedPaperTitle(ep.title);
     setGrade(ep.grade); setSubject(ep.subject); setDur(ep.durationMin);
     setTitle(ep.title + ' (edited)');
     setEditingId(null); setReplaceTarget(null);
@@ -763,6 +983,8 @@ function AssembleView({ onSave }: { onSave:(p:Paper)=>void }) {
           {/* Panel content */}
           {mode==='bank' ? (
             <QuestionBankBrowser
+              grade={grade}
+              subject={subject}
               addedIds={addedIds}
               replaceMode={!!replaceTarget}
               replaceTargetType={replaceTarget?.type??null}
@@ -771,6 +993,8 @@ function AssembleView({ onSave }: { onSave:(p:Paper)=>void }) {
             />
           ) : (
             <ExamPaperPicker
+              grade={grade}
+              subject={subject}
               onLoad={loadPaper}
               canvasHasContent={canvasHasContent}
               loadedPaperId={loadedPaperId}
@@ -783,9 +1007,9 @@ function AssembleView({ onSave }: { onSave:(p:Paper)=>void }) {
           <div style={{ padding:'8px 18px', borderBottom:'1px solid #e8eaed', background:'#fff', display:'flex', alignItems:'center', gap:'10px', flexShrink:0 }}>
             <span style={{ fontSize:'12px', fontWeight:700, color:'#0f0f23' }}>Paper Canvas</span>
             <span style={{ fontSize:'11px', color:'#9ca3af' }}>{totalQ}q · {totalPts}pts · {dur}min</span>
-            {loadedPaperId && (
+            {loadedPaperId && loadedPaperTitle && (
               <span style={{ fontSize:'10px', padding:'2px 8px', borderRadius:'20px', background:'#f0f4ff', color:'#3b5bdb', fontWeight:600 }}>
-                based on {EXAM_PAPERS.find(p=>p.id===loadedPaperId)?.title.split('—')[0].trim()}
+                based on {loadedPaperTitle.split('—')[0].trim()}
               </span>
             )}
             {replaceTarget && (
@@ -897,8 +1121,17 @@ function AssembleView({ onSave }: { onSave:(p:Paper)=>void }) {
 function PublishCard({ paper, onDelete, onSelectPublish, isSelected }: {
   paper:Paper; onDelete:(id:string)=>void; onSelectPublish:()=>void; isSelected:boolean;
 }) {
+  const navigate = useNavigate();
   const [confirmDel, setConfirmDel] = useState(false);
   const sc=STATUS_C[paper.status]; const se=SUBJ_EMOJI[paper.subject]??'📄';
+
+  function handleEdit() {
+    if (!/^\d+$/.test(paper.id)) {
+      window.alert('This draft is local-only and not synced to the server yet, so it cannot be edited via API. Please save/sync it to the server first.');
+      return;
+    }
+    navigate(`/teacher/assessment/papers/${paper.id}/edit`);
+  }
   return (
     <div style={{ background:'#fff', border:`1.5px solid ${isSelected?'#93c5fd':'#e8eaed'}`, borderRadius:'12px', overflow:'hidden', boxShadow:isSelected?'0 0 0 3px rgba(59,91,219,0.10)':'none', transition:'all 0.15s' }}>
       <div style={{ display:'flex', alignItems:'center', gap:'12px', padding:'13px 15px' }}>
@@ -928,7 +1161,7 @@ function PublishCard({ paper, onDelete, onSelectPublish, isSelected }: {
           ) : (
             <>
               <button onClick={()=>setConfirmDel(true)} style={{ display:'flex', alignItems:'center', padding:'6px 9px', borderRadius:'7px', border:'1px solid #fecaca', background:'#fff', color:'#ef4444', fontSize:'11px', cursor:'pointer' }}><Trash2 size={11}/></button>
-              <button style={{ display:'flex', alignItems:'center', gap:'3px', padding:'6px 10px', borderRadius:'7px', border:'1px solid #e8eaed', background:'#fff', color:'#374151', fontSize:'11px', cursor:'pointer' }}><Edit3 size={11}/> Edit</button>
+              <button type="button" onClick={handleEdit} style={{ display:'flex', alignItems:'center', gap:'3px', padding:'6px 10px', borderRadius:'7px', border:'1px solid #e8eaed', background:'#fff', color:'#374151', fontSize:'11px', cursor:'pointer' }}><Edit3 size={11}/> Edit</button>
               {paper.status==='draft' ? (
                 <button onClick={onSelectPublish} style={{ display:'flex', alignItems:'center', gap:'4px', padding:'6px 13px', borderRadius:'7px', border:'none', background:isSelected?'#eff6ff':'#3b5bdb', color:isSelected?'#3b5bdb':'#fff', fontSize:'11px', fontWeight:600, cursor:'pointer' }}>
                   <Send size={11}/> {isSelected?'Cancel':'Publish'}
@@ -1056,20 +1289,26 @@ function PublishPanel({ paper, onClose, onPublish }: { paper:Paper; onClose:()=>
 }
 
 function PublishView({ papers, onDelete, onPublish, onNewPaper }: { papers:Paper[]; onDelete:(id:string)=>void; onPublish:(id:string,cfg:PublishCfg)=>void; onNewPaper:()=>void }) {
-  const [filter,   setFilter]   = useState<'all'|PaperStatus>('all');
+  /** Publish 页仅管理 Draft / Published，不展示 Closed（Closed 仍可在 AI Grade 等流程使用） */
+  const publishPapers = papers.filter((p) => p.status === 'draft' || p.status === 'published');
+  const [filter,   setFilter]   = useState<'all' | 'draft' | 'published'>('all');
   const [selPaper, setSelPaper] = useState<Paper|null>(null);
 
-  const displayed = filter==='all' ? papers : papers.filter(p=>p.status===filter);
-  const cnt = { all:papers.length, draft:papers.filter(p=>p.status==='draft').length, published:papers.filter(p=>p.status==='published').length, closed:papers.filter(p=>p.status==='closed').length };
+  const displayed = filter === 'all' ? publishPapers : publishPapers.filter((p) => p.status === filter);
+  const cnt = {
+    all: publishPapers.length,
+    draft: publishPapers.filter((p) => p.status === 'draft').length,
+    published: publishPapers.filter((p) => p.status === 'published').length,
+  };
 
   return (
     <div style={{ display:'flex', height:'100%', overflow:'hidden' }}>
       <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
         <div style={{ padding:'12px 20px', borderBottom:'1px solid #e8eaed', display:'flex', alignItems:'center', gap:'10px', flexShrink:0, background:'#fafafa' }}>
           <div style={{ display:'flex', background:'#f3f4f6', borderRadius:'8px', padding:'2px' }}>
-            {([['all',`All (${cnt.all})`],['draft',`Drafts (${cnt.draft})`],['published',`Published (${cnt.published})`],['closed',`Closed (${cnt.closed})`]] as [string,string][]).map(([k,l])=>(
+            {([['all', `All (${cnt.all})`], ['draft', `Drafts (${cnt.draft})`], ['published', `Published (${cnt.published})`]] as [string, string][]).map(([k, l]) => (
               <React.Fragment key={k}>
-                <Pill label={l} active={filter===k} onClick={()=>setFilter(k as typeof filter)}/>
+                <Pill label={l} active={filter === k} onClick={() => setFilter(k as typeof filter)}/>
               </React.Fragment>
             ))}
           </div>
@@ -1355,8 +1594,29 @@ function GradeView({ papers, subs, onUpdateSub }: { papers:Paper[]; subs:Student
 ═══════════════════════════════════════════════════════════════════════════ */
 export default function AssessmentGrading() {
   const [tab,    setTab]    = useState<StudioTab>('assemble');
-  const [papers, setPapers] = useState<Paper[]>(INIT_PAPERS);
-  const [subs,   setSubs]   = useState<StudentSub[]>(INIT_SUBS);
+  const [papers, setPapers] = useState<Paper[]>([]);
+  const [subs,   setSubs]   = useState<StudentSub[]>([]);
+  /** loading: before fetch · api: loaded server rows · api_empty: 200 but 0 items · error: network/HTTP */
+  const [papersListSource, setPapersListSource] = useState<'loading' | 'api' | 'api_empty' | 'error'>('loading');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetchPaperListApi({ page: 1, page_size: 100 });
+        if (cancelled) return;
+        const mapped = res.items.map(mapApiItemToGradingPaper);
+        setPapers(mapped);
+        setPapersListSource(mapped.length > 0 ? 'api' : 'api_empty');
+      } catch {
+        if (!cancelled) {
+          setPapers([]);
+          setPapersListSource('error');
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const draftCount   = papers.filter(p=>p.status==='draft').length;
   const pendingCount = subs.filter(s=>s.status==='pending_sa').length;
@@ -1372,7 +1632,18 @@ export default function AssessmentGrading() {
         <div style={{ padding:'14px 24px 0', display:'flex', alignItems:'flex-end', gap:'20px' }}>
           <div style={{ paddingBottom:'12px' }}>
             <div style={{ fontSize:'16px', fontWeight:700, color:'#0f0f23', marginBottom:'2px' }}>Grading Studio</div>
-            <div style={{ fontSize:'11px', color:'#9ca3af' }}>Assemble papers · Publish to students · AI-assisted grading</div>
+            <div style={{ fontSize:'11px', color:'#9ca3af' }}>
+              Assemble papers · Publish to students · AI-assisted grading
+              {papersListSource === 'loading' && (
+                <span style={{ marginLeft: '8px', color: '#6b7280' }}>(Loading papers…)</span>
+              )}
+              {papersListSource === 'error' && (
+                <span style={{ marginLeft: '8px', color: '#b91c1c' }}>(Failed to load papers)</span>
+              )}
+              {papersListSource === 'api' && (
+                <span style={{ marginLeft: '8px', color: '#15803d' }}>(Loaded from server)</span>
+              )}
+            </div>
           </div>
           <StudioTabBar tab={tab} setTab={setTab} draftCount={draftCount} pendingCount={pendingCount}/>
         </div>

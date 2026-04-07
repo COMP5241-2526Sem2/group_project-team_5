@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Filter, Search, ChevronDown, Check, Plus, Eye, X, FileText } from 'lucide-react';
+import { listQuestionBankSetsApi, type QuestionBankSetDto } from '../../../utils/questionBankApi';
+import { prefetchQuestionBankSets, readCachedQuestionBankSets } from '../../../utils/assessmentDataCache';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Difficulty = 'easy' | 'medium' | 'hard';
@@ -52,98 +54,33 @@ const SUBJECT_CONFIG: Record<string, { color: string }> = {
   History:   { color: '#475569' },
 };
 
-// ── Mock Data ─────────────────────────────────────────────────────────────────
-const QUESTION_SETS: QuestionSet[] = [
-  {
-    id: 'qs1', type: 'MCQ', subject: 'Biology', grade: 'Grade 10', semester: 'Vol.1',
-    difficulty: 'medium', chapter: 'Ch.3 Photosynthesis', source: 'Ch.3 Photosynthesis.pdf', aiGenerated: true,
-    questions: [
-      { id: 'q1', type: 'MCQ', difficulty: 'medium', prompt: 'Which organelle is primarily responsible for ATP synthesis via oxidative phosphorylation?', options: ['A. Nucleus', 'B. Mitochondria', 'C. Ribosome', 'D. Golgi apparatus'], answer: 'B' },
-      { id: 'q2', type: 'MCQ', difficulty: 'easy',   prompt: 'What is the primary pigment responsible for capturing light energy in photosynthesis?', options: ['A. Carotenoid', 'B. Xanthophyll', 'C. Chlorophyll a', 'D. Chlorophyll b'], answer: 'C' },
-      { id: 'q3', type: 'MCQ', difficulty: 'hard',   prompt: 'In the Z-scheme of photosynthesis, the final electron acceptor is:', options: ['A. Ferredoxin', 'B. NADP⁺', 'C. Plastocyanin', 'D. Oxygen'], answer: 'B' },
-    ],
-  },
-  {
-    id: 'qs2', type: 'True/False', subject: 'Biology', grade: 'Grade 10', semester: 'Vol.1',
-    difficulty: 'easy', chapter: 'Ch.3 Photosynthesis', source: 'Ch.3 Photosynthesis.pdf', aiGenerated: true,
-    questions: [
-      { id: 'q4', type: 'True/False', difficulty: 'easy', prompt: 'The Calvin cycle reactions are also known as the "light-independent" reactions.', answer: 'True' },
-      { id: 'q5', type: 'True/False', difficulty: 'easy', prompt: 'Oxygen is produced during the light-dependent reactions of photosynthesis.', answer: 'True' },
-      { id: 'q6', type: 'True/False', difficulty: 'medium', prompt: 'The Calvin cycle takes place in the thylakoid membrane.', answer: 'False' },
-    ],
-  },
-  {
-    id: 'qs3', type: 'Fill-blank', subject: 'Biology', grade: 'Grade 10', semester: 'Vol.1',
-    difficulty: 'hard', chapter: 'Ch.3 Photosynthesis', source: 'Ch.3 Photosynthesis.pdf', aiGenerated: true,
-    questions: [
-      { id: 'q7', type: 'Fill-blank', difficulty: 'hard', prompt: 'The molecule _______ acts as the primary electron acceptor immediately after Photosystem I.', answer: 'Ferredoxin' },
-      { id: 'q8', type: 'Fill-blank', difficulty: 'medium', prompt: 'The splitting of water during photosynthesis is called _______, releasing oxygen as a byproduct.', answer: 'Photolysis' },
-    ],
-  },
-  {
-    id: 'qs4', type: 'Short Answer', subject: 'Biology', grade: 'Grade 10', semester: 'Vol.1',
-    difficulty: 'medium', chapter: 'Ch.3 Photosynthesis', source: 'Ch.3 Photosynthesis.pdf', aiGenerated: true,
-    questions: [
-      { id: 'q9',  type: 'Short Answer', difficulty: 'medium', prompt: 'Explain why a leaf appears green, and describe what happens to the wavelengths of light that are not reflected.' },
-      { id: 'q10', type: 'Short Answer', difficulty: 'hard',   prompt: 'Compare the roles of Photosystem I and Photosystem II in the light-dependent reactions.' },
-    ],
-  },
-  {
-    id: 'qs5', type: 'MCQ', subject: 'Physics', grade: 'Grade 11', semester: 'Vol.1',
-    difficulty: 'medium', chapter: "Newton's Laws of Motion", source: "Newton's Laws.docx", aiGenerated: true,
-    questions: [
-      { id: 'q11', type: 'MCQ', difficulty: 'medium', prompt: "According to Newton's second law, if the net force on an object doubles while its mass stays the same, the acceleration:", options: ['A. Halves', 'B. Stays the same', 'C. Doubles', 'D. Quadruples'], answer: 'C' },
-      { id: 'q12', type: 'MCQ', difficulty: 'hard',   prompt: 'A 5 kg block on a frictionless surface is acted on by forces of 20 N east and 15 N north. What is the magnitude of the resulting acceleration?', options: ['A. 5.0 m/s²', 'B. 7.0 m/s²', 'C. 4.0 m/s²', 'D. 6.0 m/s²'], answer: 'A' },
-      { id: 'q13', type: 'MCQ', difficulty: 'easy',   prompt: "Newton's third law states that for every action there is an equal and _______ reaction.", options: ['A. Larger', 'B. Smaller', 'C. Opposite', 'D. Parallel'], answer: 'C' },
-    ],
-  },
-  {
-    id: 'qs6', type: 'MCQ', subject: 'Math', grade: 'Grade 9', semester: 'Vol.2',
-    difficulty: 'medium', chapter: 'Quadratic Functions', source: 'Quadratic Functions.pdf', aiGenerated: true,
-    questions: [
-      { id: 'q14', type: 'MCQ', difficulty: 'medium', prompt: 'Which of the following is the vertex form of f(x) = x² − 6x + 5?', options: ['A. (x − 3)² − 4', 'B. (x + 3)² − 4', 'C. (x − 3)² + 4', 'D. (x − 6)² + 5'], answer: 'A' },
-      { id: 'q15', type: 'MCQ', difficulty: 'easy',   prompt: 'The axis of symmetry for f(x) = 2x² − 8x + 3 is x =', options: ['A. x = 2', 'B. x = −2', 'C. x = 4', 'D. x = −4'], answer: 'A' },
-    ],
-  },
-  {
-    id: 'qs7', type: 'Short Answer', subject: 'Math', grade: 'Grade 9', semester: 'Vol.2',
-    difficulty: 'medium', chapter: 'Quadratic Functions', source: 'Quadratic Functions.pdf', aiGenerated: true,
-    questions: [
-      { id: 'q16', type: 'Short Answer', difficulty: 'medium', prompt: 'Solve 2x² + 5x − 3 = 0 using the quadratic formula and show all working.' },
-      { id: 'q17', type: 'Short Answer', difficulty: 'hard',   prompt: 'A ball is thrown upward with height h(t) = −5t² + 20t + 2. Find the maximum height and the time at which it occurs.' },
-    ],
-  },
-  {
-    id: 'qs8', type: 'MCQ', subject: 'Chemistry', grade: 'Grade 11', semester: 'Vol.2',
-    difficulty: 'medium', chapter: 'Electrochemistry', source: 'Manual entry', aiGenerated: false,
-    questions: [
-      { id: 'q18', type: 'MCQ', difficulty: 'medium', prompt: 'In a galvanic cell, oxidation occurs at the:', options: ['A. Anode', 'B. Cathode', 'C. Salt bridge', 'D. External circuit'], answer: 'A' },
-      { id: 'q19', type: 'MCQ', difficulty: 'hard',   prompt: 'For the reaction Zn + Cu²⁺ → Zn²⁺ + Cu, the standard cell potential (E°cell) is:', options: ['A. 0.34 V', 'B. 1.10 V', 'C. 0.76 V', 'D. −1.10 V'], answer: 'B' },
-    ],
-  },
-  {
-    id: 'qs9', type: 'Essay', subject: 'Chemistry', grade: 'Grade 11', semester: 'Vol.2',
-    difficulty: 'hard', chapter: 'Organic Reactions', source: 'Manual entry', aiGenerated: false,
-    questions: [
-      { id: 'q20', type: 'Essay', difficulty: 'hard', prompt: 'Compare and contrast the mechanisms of SN1 and SN2 reactions, including the role of substrate structure and solvent polarity.' },
-    ],
-  },
-  {
-    id: 'qs10', type: 'Fill-blank', subject: 'English', grade: 'Grade 8', semester: 'Vol.1',
-    difficulty: 'easy', chapter: 'Literary Devices', source: 'Manual entry', aiGenerated: false,
-    questions: [
-      { id: 'q21', type: 'Fill-blank', difficulty: 'easy',   prompt: 'The author uses _______ to convey the sense of isolation felt by the protagonist in Chapter 3.', answer: 'imagery' },
-      { id: 'q22', type: 'Fill-blank', difficulty: 'medium', prompt: 'A comparison using "like" or "as" is called a _______.', answer: 'simile' },
-      { id: 'q23', type: 'Fill-blank', difficulty: 'easy',   prompt: 'When an author gives human characteristics to non-human things, it is called _______.', answer: 'personification' },
-    ],
-  },
-];
-
 const SUBJECT_OPTIONS  = ['All Subjects',    'Biology', 'Physics', 'Math', 'Chemistry', 'English', 'History'];
 const GRADE_OPTIONS    = ['All Grades',      'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'];
 const SEMESTER_OPTIONS = ['All Semesters',   'Vol.1', 'Vol.2'];
 const DIFF_OPTIONS     = ['All Difficulties','Easy', 'Medium', 'Hard'];
 const TYPE_OPTIONS     = ['All Types',       'MCQ', 'True/False', 'Fill-blank', 'Short Answer', 'Essay'];
+
+function mapQuestionBankDtoToSet(d: QuestionBankSetDto): QuestionSet {
+  return {
+    id: d.id,
+    type: d.type as QType,
+    subject: d.subject,
+    grade: d.grade,
+    semester: d.semester,
+    difficulty: d.difficulty as Difficulty,
+    chapter: d.chapter,
+    source: d.source,
+    aiGenerated: d.ai_generated,
+    questions: d.questions.map((q) => ({
+      id: q.id,
+      type: q.type as QType,
+      prompt: q.prompt,
+      options: q.options && q.options.length > 0 ? q.options : undefined,
+      answer: q.answer ?? undefined,
+      difficulty: q.difficulty as Difficulty,
+    })),
+  };
+}
 
 const isDefault = (val: string) =>
   ['All Subjects','All Grades','All Semesters','All Difficulties','All Types'].includes(val);
@@ -157,8 +94,47 @@ export default function AssessmentLibrary() {
   const [filterDiff,    setFilterDiff]    = useState('All Difficulties');
   const [filterType,    setFilterType]    = useState('All Types');
   const [activeSet,     setActiveSet]     = useState<QuestionSet | null>(null);
+  const [sets,          setSets]          = useState<QuestionSet[]>([]);
+  const [loading,       setLoading]       = useState(true);
+  const [loadError,     setLoadError]     = useState<string | null>(null);
 
-  const filtered = QUESTION_SETS.filter(s => {
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const params = {
+        subject: isDefault(filterSubject) ? undefined : filterSubject,
+        grade: isDefault(filterGrade) ? undefined : filterGrade,
+        semester: isDefault(filterSem) ? undefined : filterSem,
+        difficulty: isDefault(filterDiff) ? undefined : filterDiff,
+        question_type: isDefault(filterType) ? undefined : filterType,
+      };
+
+      // If we already prefetched (e.g. hover/click), render immediately.
+      const cached = readCachedQuestionBankSets(params);
+      if (cached && !cancelled) {
+        setSets(cached.sets.map(mapQuestionBankDtoToSet));
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
+      setLoadError(null);
+      try {
+        // Always refresh in background to ensure "DB 最新"。
+        const res = await prefetchQuestionBankSets(params, { force: true });
+        if (!cancelled) setSets(res.sets.map(mapQuestionBankDtoToSet));
+      } catch (e) {
+        if (!cancelled) {
+          setSets([]);
+          setLoadError(e instanceof Error ? e.message : 'Failed to load question bank');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [filterSubject, filterGrade, filterSem, filterDiff, filterType]);
+
+  const filtered = sets.filter(s => {
     const q = search.toLowerCase();
     return (
       (!q || s.type.toLowerCase().includes(q) || s.subject.toLowerCase().includes(q) || s.chapter.toLowerCase().includes(q)) &&
@@ -241,12 +217,25 @@ export default function AssessmentLibrary() {
           </button>
         </div>
 
+        {loadError && (
+          <div style={{
+            margin: '0 14px 10px', padding: '10px 12px', borderRadius: '8px',
+            background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: '12px', flexShrink: 0,
+          }}>
+            {loadError}
+          </div>
+        )}
+
         {/* Grid */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '14px' }}>
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '64px 16px', color: '#9ca3af' }}>
+              <div style={{ fontSize: '13px' }}>Loading question bank…</div>
+            </div>
+          ) : filtered.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '64px 16px', color: '#9ca3af' }}>
               <Search size={28} style={{ opacity: 0.35, display: 'block', margin: '0 auto 10px' }} />
-              <div style={{ fontSize: '13px' }}>No matches</div>
+              <div style={{ fontSize: '13px' }}>{loadError ? 'Could not load data' : 'No matches'}</div>
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>

@@ -1,6 +1,7 @@
 import React, { type ElementType, type ReactNode, useCallback, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { useChat } from '../labs/ChatContext';
+import { prefetchPaperList, prefetchQuestionBankSets } from '../../utils/assessmentDataCache';
 
 /** 跨 Labs 页面实例保留：用于检测 Lab Catalog ↔ Drafts 切换（TeacherLayout 会随路由重挂载） */
 let prevTeacherLabsSection: 'catalog' | 'drafts' | null = null;
@@ -102,6 +103,18 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
     }
     navigate(path);
   }, [isGenerating, location.pathname, navigate]);
+
+  const prefetchAssessmentSub = useCallback((subId: string) => {
+    // Fire-and-forget prefetch to make first navigation instant.
+    if (subId === 'library') {
+      void prefetchQuestionBankSets({});
+      return;
+    }
+    if (subId === 'papers') {
+      void prefetchPaperList({ page: 1, page_size: 100 });
+      return;
+    }
+  }, []);
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#ffffff', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
@@ -267,6 +280,7 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
                                       <button
                                         key={sub.id}
                                         onClick={() => { setActiveSub(sub.id); guardedNavigate(sub.path); }}
+                                        onFocus={() => prefetchAssessmentSub(sub.id)}
                                         style={{
                                           width: '100%', display: 'flex', alignItems: 'center',
                                           padding: '6px 10px', borderRadius: '7px', border: 'none', cursor: 'pointer',
@@ -276,7 +290,13 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
                                           color: isSubActive ? '#3b5bdb' : '#6b7280',
                                           transition: 'background 0.12s, color 0.12s', textAlign: 'left',
                                         }}
-                                        onMouseEnter={e => { if (!isSubActive) { (e.currentTarget as HTMLElement).style.background = '#f9fafb'; (e.currentTarget as HTMLElement).style.color = '#374151'; } }}
+                                        onMouseEnter={e => {
+                                          prefetchAssessmentSub(sub.id);
+                                          if (!isSubActive) {
+                                            (e.currentTarget as HTMLElement).style.background = '#f9fafb';
+                                            (e.currentTarget as HTMLElement).style.color = '#374151';
+                                          }
+                                        }}
                                         onMouseLeave={e => { if (!isSubActive) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#6b7280'; } }}
                                       >
                                         {sub.label}

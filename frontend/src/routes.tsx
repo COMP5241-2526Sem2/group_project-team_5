@@ -40,6 +40,7 @@ export const router = createBrowserRouter([
   { path: "/teacher/assessment/generate",          element: <TeacherAssessment /> },
   { path: "/teacher/assessment/ai-paper",          element: <TeacherAssessment /> },
   { path: "/teacher/assessment/library",           element: <TeacherAssessment /> },
+  { path: "/teacher/assessment/papers/:paperId/edit", element: <TeacherAssessment /> },
   { path: "/teacher/assessment/papers",            element: <TeacherAssessment /> },
   { path: "/teacher/assessment/grading",           element: <TeacherAssessment /> },
   { path: "/teacher/assessment/:id",               element: <AssessmentDetailPage /> },

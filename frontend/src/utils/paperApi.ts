@@ -1,4 +1,4 @@
-import { apiRequest } from "./apiClient";
+import { apiRequest, apiRequestBlobWithProgress, type BlobProgress } from "./apiClient";
 
 export interface PaperListItemDto {
   paper_id: number;
@@ -15,6 +15,7 @@ export interface PaperListItemDto {
   question_count: number;
   quality_score: number | null;
   created_at: string;
+  has_source_pdf?: boolean;
 }
 
 export interface PaperListResponseDto {
@@ -27,6 +28,7 @@ export interface PaperListResponseDto {
 export interface PaperDetailOptionDto {
   key: string;
   text: string;
+  is_correct?: boolean | null;
 }
 
 export interface PaperDetailQuestionDto {
@@ -36,6 +38,8 @@ export interface PaperDetailQuestionDto {
   prompt: string;
   difficulty: string | null;
   score: number;
+  answer?: string | null;
+  explanation?: string | null;
   options: PaperDetailOptionDto[];
 }
 
@@ -65,6 +69,7 @@ export interface PaperDetailDto {
   question_count: number;
   quality_score: number | null;
   created_at: string;
+  has_source_pdf?: boolean;
   sections: PaperDetailSectionDto[];
 }
 
@@ -133,4 +138,149 @@ export async function createPaperApi(payload: PaperCreateRequestDto): Promise<Pa
     method: "POST",
     body: JSON.stringify(payload),
   }, "teacher");
+}
+
+export async function updatePaperApi(
+  paperId: number,
+  payload: PaperCreateRequestDto,
+): Promise<PaperCreateResponseDto> {
+  return apiRequest<PaperCreateResponseDto>(`/papers/${paperId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  }, "teacher");
+}
+
+export type PaperExportFormat = "html" | "pdf" | "txt";
+
+export type { BlobProgress };
+
+function triggerBrowserDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function replaceExt(name: string, ext: string): string {
+  const trimmed = (name || "").trim();
+  if (!trimmed) return `paper${ext}`;
+  const idx = trimmed.lastIndexOf(".");
+  if (idx <= 0) return `${trimmed}${ext}`;
+  return `${trimmed.slice(0, idx)}${ext}`;
+}
+
+async function htmlToPdfBlob(htmlText: string): Promise<Blob> {
+  const [{ jsPDF }, { default: html2canvas }] = await Promise.all([
+    import("jspdf"),
+    import("html2canvas"),
+  ]);
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(htmlText, "text/html");
+  const body = doc.body;
+
+  const container = document.createElement("div");
+  container.style.position = "fixed";
+  container.style.left = "-10000px";
+  container.style.top = "0";
+  container.style.width = "800px";
+  container.style.background = "#fff";
+  container.style.color = "#111";
+  container.style.padding = "0";
+  container.style.margin = "0";
+
+  // Preserve styles from exported HTML
+  const styleEls = Array.from(doc.querySelectorAll("style"));
+  styleEls.forEach((s) => container.appendChild(s.cloneNode(true)));
+
+  const bodyWrapper = document.createElement("div");
+  bodyWrapper.style.padding = "24px";
+  bodyWrapper.style.boxSizing = "border-box";
+  bodyWrapper.appendChild(body.cloneNode(true));
+  container.appendChild(bodyWrapper);
+
+  document.body.appendChild(container);
+  try {
+    const canvas = await html2canvas(container, {
+      backgroundColor: "#ffffff",
+      scale: 2,
+      useCORS: true,
+    });
+
+    const pdf = new jsPDF({ orientation: "p", unit: "pt", format: "a4" });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+
+    const imgData = canvas.toDataURL("image/jpeg", 0.92);
+    const imgWidth = pageWidth;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+    let y = 0;
+    pdf.addImage(imgData, "JPEG", 0, y, imgWidth, imgHeight);
+    let remaining = imgHeight - pageHeight;
+    while (remaining > 1) {
+      pdf.addPage();
+      y -= pageHeight;
+      pdf.addImage(imgData, "JPEG", 0, y, imgWidth, imgHeight);
+      remaining -= pageHeight;
+    }
+
+    const out = pdf.output("arraybuffer");
+    return new Blob([out], { type: "application/pdf" });
+  } finally {
+    container.remove();
+  }
+}
+
+/** Triggers browser download with optional per-chunk progress (streams response body). */
+export async function downloadPaperExportApi(
+  paperId: number,
+  format: PaperExportFormat,
+  onProgress?: (p: BlobProgress) => void,
+): Promise<void> {
+  // If user selects PDF but paper has no stored source PDF, backend will 400.
+  // We fall back to downloading HTML and rendering it to a PDF client-side.
+  if (format === "pdf") {
+    try {
+      const { blob, filename } = await apiRequestBlobWithProgress(
+        `/papers/${paperId}/export?format=pdf`,
+        "teacher",
+        onProgress,
+      );
+      triggerBrowserDownload(blob, filename ?? `paper-${paperId}.pdf`);
+      return;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      if (!msg.toLowerCase().includes("pdf")) {
+        throw e;
+      }
+      // fallback continues below
+    }
+
+    const { blob: htmlBlob, filename: htmlName } = await apiRequestBlobWithProgress(
+      `/papers/${paperId}/export?format=html`,
+      "teacher",
+      onProgress,
+    );
+    const htmlText = await htmlBlob.text();
+    const pdfBlob = await htmlToPdfBlob(htmlText);
+    const baseName = htmlName ?? `paper-${paperId}.html`;
+    triggerBrowserDownload(pdfBlob, replaceExt(baseName, ".pdf"));
+    return;
+  }
+
+  const suffix = `?format=${encodeURIComponent(format)}`;
+  const { blob, filename } = await apiRequestBlobWithProgress(
+    `/papers/${paperId}/export${suffix}`,
+    "teacher",
+    onProgress,
+  );
+  let fallback = `paper-${paperId}.html`;
+  if (blob.type.includes("text/plain")) fallback = `paper-${paperId}.txt`;
+  triggerBrowserDownload(blob, filename ?? fallback);
 }

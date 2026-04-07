@@ -25,6 +25,7 @@ class PaperListItem(BaseModel):
     quality_score: int | None = None
     published_at: datetime | None = None
     created_at: datetime
+    has_source_pdf: bool = False
 
 
 class PaperListResponse(BaseModel):
@@ -37,6 +38,7 @@ class PaperListResponse(BaseModel):
 class PaperQuestionOptionView(BaseModel):
     key: str
     text: str
+    is_correct: bool | None = None
 
 
 class PaperQuestionView(BaseModel):
@@ -46,6 +48,8 @@ class PaperQuestionView(BaseModel):
     prompt: str
     difficulty: str | None = None
     score: float
+    answer: str | None = None
+    explanation: str | None = None
     options: list[PaperQuestionOptionView] = []
 
 
@@ -76,6 +80,7 @@ class PaperDetailResponse(BaseModel):
     quality_score: int | None = None
     published_at: datetime | None = None
     created_at: datetime
+    has_source_pdf: bool = False
     sections: list[PaperSectionView]
 
 
@@ -119,3 +124,8 @@ class PaperCreateResponse(BaseModel):
     status: PaperStatusView
     question_count: int
     created_at: datetime
+
+
+# Draft update uses the same body shape as create (replace all questions).
+PaperUpdateRequest = PaperCreateRequest
+PaperUpdateResponse = PaperCreateResponse

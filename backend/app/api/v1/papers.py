@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from typing import Literal
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -26,7 +28,7 @@ from app.schemas.paper_ai_scoring import (
     PaperAISuggestionsResponse,
 )
 from app.schemas.paper import PaperDetailResponse, PaperListResponse, PaperStatusMutationResponse
-from app.schemas.paper import PaperCreateRequest, PaperCreateResponse
+from app.schemas.paper import PaperCreateRequest, PaperCreateResponse, PaperUpdateRequest, PaperUpdateResponse
 from app.services.paper_ai_scoring_service import PaperAIScoringService
 from app.services.paper_attempt_service import PaperAttemptService
 from app.services.paper_service import PaperService
@@ -86,6 +88,41 @@ async def get_paper_detail(
 ) -> PaperDetailResponse:
     actor_id = _require_user_id(x_user_id)
     return await PaperService.get_paper_detail(db=db, actor_id=actor_id, paper_id=paper_id)
+
+
+@router.put("/papers/{paper_id}", response_model=PaperUpdateResponse)
+async def update_draft_paper(
+    paper_id: int,
+    payload: PaperUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    x_user_id: int | None = Header(default=None, alias="X-User-Id"),
+) -> PaperUpdateResponse:
+    actor_id = _require_user_id(x_user_id)
+    return await PaperService.update_draft_paper(db=db, actor_id=actor_id, paper_id=paper_id, payload=payload)
+
+
+@router.get("/papers/{paper_id}/export")
+async def export_paper(
+    paper_id: int,
+    export_format: Literal["html", "pdf", "txt"] | None = Query(default=None, alias="format"),
+    db: AsyncSession = Depends(get_db),
+    x_user_id: int | None = Header(default=None, alias="X-User-Id"),
+) -> Response:
+    """File download. Omit `format` for legacy behavior (PDF if stored, else HTML)."""
+    actor_id = _require_user_id(x_user_id)
+    body, media_type, filename = await PaperService.export_paper_file(
+        db, actor_id, paper_id, export_format=export_format
+    )
+    if "pdf" in media_type:
+        ext = ".pdf"
+    elif "text/plain" in media_type:
+        ext = ".txt"
+    else:
+        ext = ".html"
+    ascii_fallback = f"paper_{paper_id}{ext}"
+    encoded = quote(filename, safe="")
+    disposition = f'attachment; filename="{ascii_fallback}"; filename*=UTF-8\'\'{encoded}'
+    return Response(content=body, media_type=media_type, headers={"Content-Disposition": disposition})
 
 
 @router.post("/papers/{paper_id}/publish", response_model=PaperStatusMutationResponse)

@@ -81,93 +81,7 @@ const DEFAULT_SECTIONS: SectionCfg[] = [
   { key: 'essay',  label: 'Section V  — Essay',            type: 'Essay',        count: 1,  scoreEach: 15 },
 ];
 
-// ── Mock paper ────────────────────────────────────────────────────────────────
-const MOCK_PAPER: GeneratedSection[] = [
-  {
-    title: 'Section I — Multiple Choice',
-    description: '15 questions, 3 points each, 45 points total. Choose the single best answer.',
-    questions: [
-      { id: 'p1', score: 3, difficulty: 'easy',   prompt: 'Which organelle is the site of photosynthesis in plant cells?',                              options: [{ key: 'A', text: 'Mitochondria', correct: false }, { key: 'B', text: 'Chloroplast', correct: true }, { key: 'C', text: 'Ribosome', correct: false }, { key: 'D', text: 'Vacuole', correct: false }] },
-      { id: 'p2', score: 3, difficulty: 'medium', prompt: 'In the Calvin cycle, which molecule acts as the first acceptor of CO₂?',                    options: [{ key: 'A', text: 'RuBP', correct: true }, { key: 'B', text: 'G3P', correct: false }, { key: 'C', text: 'ATP', correct: false }, { key: 'D', text: 'NADPH', correct: false }] },
-      { id: 'p3', score: 3, difficulty: 'medium', prompt: 'Which of the following is NOT a product of the light-dependent reactions?',                  options: [{ key: 'A', text: 'ATP', correct: false }, { key: 'B', text: 'NADPH', correct: false }, { key: 'C', text: 'O₂', correct: false }, { key: 'D', text: 'Glucose', correct: true }] },
-      { id: 'p4', score: 3, difficulty: 'hard',   prompt: 'In the Z-scheme of electron flow, electrons ultimately reduce NADP⁺ to NADPH after passing through:', options: [{ key: 'A', text: 'Cytochrome b6f', correct: false }, { key: 'B', text: 'Plastocyanin', correct: false }, { key: 'C', text: 'Ferredoxin', correct: true }, { key: 'D', text: 'Plastoquinone', correct: false }] },
-    ],
-  },
-  {
-    title: 'Section II — True / False',
-    description: '5 questions, 2 points each, 10 points total. Write T (True) or F (False).',
-    questions: [
-      { id: 'p5', score: 2, difficulty: 'easy',   prompt: 'The Calvin cycle is also called the "dark reactions" because it cannot occur in light.',   answer: 'F' },
-      { id: 'p6', score: 2, difficulty: 'easy',   prompt: 'Oxygen is released as a by-product of the light-dependent reactions via photolysis.',      answer: 'T' },
-      { id: 'p7', score: 2, difficulty: 'medium', prompt: 'Chlorophyll a absorbs light most strongly in the green region of the visible spectrum.',    answer: 'F' },
-    ],
-  },
-  {
-    title: 'Section III — Fill in the Blank',
-    description: '5 questions, 3 points each, 15 points total.',
-    questions: [
-      { id: 'p8',  score: 3, difficulty: 'medium', prompt: 'The splitting of water molecules during the light reactions is called _______.', answer: 'Photolysis' },
-      { id: 'p9',  score: 3, difficulty: 'hard',   prompt: 'In Photosystem I, the primary electron acceptor that passes electrons to NADP⁺ is _______.', answer: 'Ferredoxin' },
-    ],
-  },
-  {
-    title: 'Section IV — Short Answer',
-    description: '3 questions, 6 points each, 18 points total.',
-    questions: [
-      { id: 'p10', score: 6, difficulty: 'medium', prompt: 'Explain why leaves appear green. What happens to the wavelengths of light that are absorbed rather than reflected?' },
-      { id: 'p11', score: 6, difficulty: 'hard',   prompt: 'Compare the roles of Photosystem I and Photosystem II in the light-dependent reactions of photosynthesis.' },
-    ],
-  },
-  {
-    title: 'Section V — Essay',
-    description: '1 question, 15 points.',
-    questions: [
-      { id: 'p12', score: 15, difficulty: 'hard', prompt: 'Describe the complete process of photosynthesis, covering both the light-dependent and light-independent reactions. Include the key molecules produced and consumed at each stage, and explain how the two stages are interconnected.' },
-    ],
-  },
-];
-
-// ── Pre-populated mock drafts ─────────────────────────────────────────────────
-const INITIAL_DRAFTS: DraftPaper[] = [
-  {
-    id: 'd1',
-    title: 'Grade 10 Physics Midterm — Spring 2026',
-    grade: 'Grade 10',
-    subject: 'Physics',
-    examType: 'midterm',
-    totalScore: 120,
-    duration: 90,
-    questionCount: 29,
-    savedAt: '2026-03-28T14:22:00Z',
-    sections: [],
-    note: 'Need to review Section III difficulty balance before publishing.',
-  },
-  {
-    id: 'd2',
-    title: 'Grade 9 Chemistry Unit Test — Ch.3 Acids & Bases',
-    grade: 'Grade 9',
-    subject: 'Chemistry',
-    examType: 'unit',
-    totalScore: 80,
-    duration: 60,
-    questionCount: 22,
-    savedAt: '2026-03-31T09:05:00Z',
-    sections: [],
-    note: '',
-  },
-  {
-    id: 'd3',
-    title: 'Grade 11 Math Review — Sequences & Derivatives',
-    grade: 'Grade 11',
-    subject: 'Mathematics',
-    examType: 'review',
-    totalScore: 150,
-    duration: 120,
-    questionCount: 35,
-    savedAt: '2026-04-01T17:40:00Z',
-    sections: [],
-  },
-];
+// 当前页面只展示真实数据/真实生成结果；不再内置 mock 试卷与 mock 草稿，避免无效加载与包体膨胀。
 
 const DIFF_CFG = {
   easy:   { bg: '#dcfce7', color: '#15803d' },
@@ -438,7 +352,7 @@ function DraftsView({
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function AssessmentAIPaper() {
   const [pageView, setPageView] = useState<PageView>('wizard');
-  const [drafts, setDrafts] = useState<DraftPaper[]>(INITIAL_DRAFTS);
+  const [drafts, setDrafts] = useState<DraftPaper[]>([]);
   const [publishedIds, setPublishedIds] = useState<string[]>([]);
 
   const [step, setStep] = useState(1);
@@ -466,6 +380,7 @@ export default function AssessmentAIPaper() {
   const [genDone,    setGenDone]      = useState(false);
   const [paper,      setPaper]        = useState<GeneratedSection[]>([]);
   const [draftSaved, setDraftSaved]   = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const chapters = CHAPTERS_BY_SUBJECT[subject] || CHAPTERS_BY_SUBJECT['default'];
 
@@ -486,6 +401,7 @@ export default function AssessmentAIPaper() {
   }
 
   async function handleGenerate() {
+    setErrorMsg(null);
     setGenerating(true); setGenProgress(0); setGenDone(false); setPaper([]); setDraftSaved(false);
     const steps = [8, 20, 35, 52, 68, 82, 93, 100];
     for (const p of steps) {
@@ -493,8 +409,11 @@ export default function AssessmentAIPaper() {
       setGenProgress(p);
     }
     await new Promise(r => setTimeout(r, 300));
-    setPaper(MOCK_PAPER);
-    setGenerating(false); setGenDone(true);
+    // 后端生成尚未接入时，保持为空并提示
+    setPaper([]);
+    setGenerating(false);
+    setGenDone(true);
+    setErrorMsg('暂未接入试卷生成接口，请使用“Generate”页生成并保存为试卷。');
   }
 
   function handleSaveDraft() {
@@ -977,6 +896,27 @@ export default function AssessmentAIPaper() {
                 {/* Done — paper preview */}
                 {genDone && (
                   <div>
+                    {errorMsg && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '10px',
+                          padding: '12px 14px',
+                          borderRadius: '10px',
+                          background: '#fffbeb',
+                          border: '1px solid #fde68a',
+                          color: '#92400e',
+                          fontSize: '12px',
+                          marginBottom: '14px',
+                        }}
+                      >
+                        <AlertCircle size={14} style={{ flexShrink: 0, marginTop: '1px' }} />
+                        <div style={{ lineHeight: 1.6 }}>
+                          {errorMsg}
+                        </div>
+                      </div>
+                    )}
                     {/* Toolbar */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
                       <div>

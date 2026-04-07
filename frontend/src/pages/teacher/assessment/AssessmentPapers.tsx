@@ -1,15 +1,19 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Filter, Search, Eye, Download, FileText, Clock,
   Star, Calendar, BookOpen, ChevronDown, X, Target, BarChart2,
 } from 'lucide-react';
 import { CustomSelect } from '../../../components/teacher/CustomSelect';
 import {
+  downloadPaperExportApi,
   fetchPaperDetailApi,
   fetchPaperListApi,
+  type BlobProgress,
   type PaperDetailDto,
+  type PaperExportFormat,
   type PaperListItemDto,
 } from '../../../utils/paperApi';
+import { prefetchPaperList, readCachedPaperList } from '../../../utils/assessmentDataCache';
 
 /* ─── Types ────────────────────────────────────────────────────── */
 interface Paper {
@@ -27,6 +31,8 @@ interface Paper {
   status: 'published' | 'draft' | 'closed';
   createdAt: string;
   textbook: string;
+  /** True when DB stores an imported source PDF (optional download format). */
+  hasSourcePdf: boolean;
   sections: Section[];
 }
 
@@ -35,10 +41,10 @@ interface Section {
   type: string;
   count: number;
   scoreEach: number;
-  questions: MockQuestion[];
+  questions: Question[];
 }
 
-interface MockQuestion {
+interface Question {
   n: number;
   text: string;
   options?: string[];
@@ -67,6 +73,7 @@ function mapListItemToPaper(item: PaperListItemDto): Paper {
     status: item.status,
     createdAt: formatDate(item.created_at),
     textbook: '-',
+    hasSourcePdf: item.has_source_pdf ?? false,
     sections: [],
   };
 }
@@ -87,6 +94,7 @@ function mapDetailToPaper(detail: PaperDetailDto): Paper {
     status: detail.status,
     createdAt: formatDate(detail.created_at),
     textbook: '-',
+    hasSourcePdf: detail.has_source_pdf ?? false,
     sections: detail.sections.map((sec) => ({
       title: sec.title,
       type: sec.question_type,
@@ -100,195 +108,6 @@ function mapDetailToPaper(detail: PaperDetailDto): Paper {
     })),
   };
 }
-
-/* ─── Mock Data ─────────────────────────────────────────────────── */
-const MCQ_SECTION = (offset = 0): Section => ({
-  title: 'Multiple Choice', type: 'mcq', count: 5, scoreEach: 5,
-  questions: [
-    { n: offset + 1, text: 'Which of the following correctly identifies all parts of speech in the sentence?', options: ['A. Noun, Verb, Adjective', 'B. Pronoun, Adverb, Conjunction', 'C. Noun, Adjective, Verb', 'D. Verb, Preposition, Noun'], answer: 'C' },
-    { n: offset + 2, text: 'Choose the word that best completes the sentence: The scientist conducted a __ experiment.', options: ['A. careful', 'B. carefully', 'C. care', 'D. careless'], answer: 'A' },
-    { n: offset + 3, text: 'Identify the correct punctuation for the following sentence.', options: ['A. Its a beautiful day.', "B. It's a beautiful day.", 'C. Its a beautiful day!', "D. It's, a beautiful day."], answer: 'B' },
-    { n: offset + 4, text: 'Which literary device is used in "The wind whispered secrets to the trees"?', options: ['A. Simile', 'B. Metaphor', 'C. Personification', 'D. Alliteration'], answer: 'C' },
-    { n: offset + 5, text: 'What is the main idea of a paragraph that discusses climate change effects?', options: ['A. Weather is unpredictable', 'B. Rising temperatures affect ecosystems', 'C. Humans cause all natural disasters', 'D. Plants grow faster in heat'], answer: 'B' },
-  ],
-});
-
-const TF_SECTION = (offset = 0): Section => ({
-  title: 'True / False', type: 'tf', count: 5, scoreEach: 2,
-  questions: [
-    { n: offset + 1, text: 'The mitochondria is known as the powerhouse of the cell.', answer: 'True' },
-    { n: offset + 2, text: 'Photosynthesis only occurs at night.', answer: 'False' },
-    { n: offset + 3, text: 'DNA stands for Deoxyribonucleic Acid.', answer: 'True' },
-    { n: offset + 4, text: 'All mammals are warm-blooded.', answer: 'True' },
-    { n: offset + 5, text: 'Viruses are classified as living organisms.', answer: 'False' },
-  ],
-});
-
-const FILL_SECTION = (offset = 0): Section => ({
-  title: 'Fill in the Blank', type: 'fill', count: 5, scoreEach: 4,
-  questions: [
-    { n: offset + 1, text: 'The process by which plants make food using sunlight is called _______.', answer: 'photosynthesis' },
-    { n: offset + 2, text: 'The speed of light in a vacuum is approximately _______ m/s.', answer: '3 × 10⁸' },
-    { n: offset + 3, text: 'The chemical symbol for gold is _______.', answer: 'Au' },
-    { n: offset + 4, text: "Newton's _______ law states that for every action there is an equal and opposite reaction.", answer: 'third' },
-    { n: offset + 5, text: 'The powerhouse of the cell is the _______.', answer: 'mitochondria' },
-  ],
-});
-
-const SA_SECTION = (offset = 0): Section => ({
-  title: 'Short Answer', type: 'sa', count: 5, scoreEach: 6,
-  questions: [
-    { n: offset + 1, text: 'Explain the role of chlorophyll in photosynthesis.' },
-    { n: offset + 2, text: "Describe Newton's second law of motion and give an example." },
-    { n: offset + 3, text: 'What is the difference between a physical change and a chemical change?' },
-    { n: offset + 4, text: 'How does the water cycle work? Name at least three stages.' },
-    { n: offset + 5, text: 'Why is biodiversity important for ecosystem stability?' },
-  ],
-});
-
-const MOCK_PAPERS: Paper[] = [
-  {
-    id: '1',
-    title: 'Grade 3 Chinese Vol.2 — Unified Curriculum Test',
-    publisher: 'Unified Curriculum Press',
-    grade: 'Grade 3',
-    subject: 'Chinese',
-    semester: 'Vol.2',
-    type: 'Practice',
-    totalScore: 50,
-    durationMin: 30,
-    questionCount: 30,
-    quality: 88,
-    status: 'published',
-    createdAt: '2026/3/31',
-    textbook: 'Unified Curriculum Chinese',
-    sections: [MCQ_SECTION(0), TF_SECTION(5), FILL_SECTION(10)],
-  },
-  {
-    id: '2',
-    title: 'Grade 3 Math Vol.2 — PEP Edition Test',
-    publisher: 'PEP Mathematics',
-    grade: 'Grade 3',
-    subject: 'Math',
-    semester: 'Vol.2',
-    type: 'Unit Test',
-    totalScore: 100,
-    durationMin: 45,
-    questionCount: 40,
-    quality: 88,
-    status: 'published',
-    createdAt: '2026/3/31',
-    textbook: 'PEP Mathematics',
-    sections: [MCQ_SECTION(0), FILL_SECTION(5), SA_SECTION(10)],
-  },
-  {
-    id: '3',
-    title: 'Grade 3 Math Vol.1 — PEP Edition Test',
-    publisher: 'PEP Mathematics',
-    grade: 'Grade 3',
-    subject: 'Math',
-    semester: 'Vol.1',
-    type: 'Midterm',
-    totalScore: 100,
-    durationMin: 60,
-    questionCount: 25,
-    quality: 84,
-    status: 'published',
-    createdAt: '2026/3/22',
-    textbook: 'PEP Mathematics',
-    sections: [MCQ_SECTION(0), TF_SECTION(5), SA_SECTION(10)],
-  },
-  {
-    id: '4',
-    title: 'Grade 3 Chinese Vol.1 — Unified Curriculum Test',
-    publisher: 'Unified Curriculum Press',
-    grade: 'Grade 3',
-    subject: 'Chinese',
-    semester: 'Vol.1',
-    type: 'Midterm',
-    totalScore: 100,
-    durationMin: 60,
-    questionCount: 15,
-    quality: 88,
-    status: 'published',
-    createdAt: '2026/3/21',
-    textbook: 'Unified Curriculum Chinese',
-    sections: [MCQ_SECTION(0), FILL_SECTION(5)],
-  },
-  {
-    id: '5',
-    title: 'Grade 4 Science Vol.1 — Final Exam',
-    publisher: 'Science Education Press',
-    grade: 'Grade 4',
-    subject: 'Science',
-    semester: 'Vol.1',
-    type: 'Final Exam',
-    totalScore: 100,
-    durationMin: 90,
-    questionCount: 35,
-    quality: 91,
-    status: 'published',
-    createdAt: '2026/3/15',
-    textbook: 'Science Education Press',
-    sections: [MCQ_SECTION(0), TF_SECTION(5), FILL_SECTION(10), SA_SECTION(15)],
-  },
-  {
-    id: '6',
-    title: 'Grade 5 English Vol.2 — Unit Assessment',
-    publisher: 'Oxford English',
-    grade: 'Grade 5',
-    subject: 'English',
-    semester: 'Vol.2',
-    type: 'Unit Test',
-    totalScore: 80,
-    durationMin: 50,
-    questionCount: 28,
-    quality: 85,
-    status: 'draft',
-    createdAt: '2026/3/10',
-    textbook: 'Oxford Primary English',
-    sections: [MCQ_SECTION(0), FILL_SECTION(5), SA_SECTION(10)],
-  },
-  {
-    id: '7',
-    title: 'Grade 6 Math Vol.1 — Semester Quiz',
-    publisher: 'PEP Mathematics',
-    grade: 'Grade 6',
-    subject: 'Math',
-    semester: 'Vol.1',
-    type: 'Quiz',
-    totalScore: 60,
-    durationMin: 40,
-    questionCount: 20,
-    quality: 79,
-    status: 'draft',
-    createdAt: '2026/3/5',
-    textbook: 'PEP Mathematics',
-    sections: [MCQ_SECTION(0), TF_SECTION(5)],
-  },
-  {
-    id: '8',
-    title: 'Grade 4 Chinese Vol.2 — Comprehensive Test',
-    publisher: 'Unified Curriculum Press',
-    grade: 'Grade 4',
-    subject: 'Chinese',
-    semester: 'Vol.2',
-    type: 'Comprehensive',
-    totalScore: 120,
-    durationMin: 75,
-    questionCount: 42,
-    quality: 93,
-    status: 'published',
-    createdAt: '2026/2/28',
-    textbook: 'Unified Curriculum Chinese',
-    sections: [MCQ_SECTION(0), TF_SECTION(5), FILL_SECTION(10), SA_SECTION(15)],
-  },
-];
-
-const ALL_SUBJECTS  = ['All Subjects',  ...Array.from(new Set(MOCK_PAPERS.map(p => p.subject)))];
-const ALL_GRADES    = ['All Grades',    ...Array.from(new Set(MOCK_PAPERS.map(p => p.grade)))];
-const ALL_SEMESTERS = ['All Semesters', 'Vol.1', 'Vol.2'];
-const ALL_TYPES     = ['All Types',     ...Array.from(new Set(MOCK_PAPERS.map(p => p.type)))];
 
 /* ─── Sub-components ─────────────────────────────────────────────── */
 function FilterSelect({
@@ -314,8 +133,196 @@ function QualityBar({ score }: { score: number }) {
   );
 }
 
+const EXPORT_OPTIONS: { id: PaperExportFormat; title: string; desc: string }[] = [
+  { id: 'html', title: 'HTML 试卷', desc: '可在浏览器中打开、打印（版式与页面一致）' },
+  { id: 'pdf', title: 'PDF', desc: '无原始PDF时将按HTML样式渲染生成（可能为图片型PDF）' },
+  { id: 'txt', title: '纯文本 (.txt)', desc: '便于复制或二次编辑' },
+];
+
+function DownloadFormatModal({
+  paper,
+  onClose,
+}: {
+  paper: Paper;
+  onClose: () => void;
+}) {
+  const [format, setFormat] = useState<PaperExportFormat>('html');
+  const [progress, setProgress] = useState<BlobProgress | null>(null);
+  const [busy, setBusy] = useState(false);
+  const startAtRef = useRef<number>(0);
+  const rafRef = useRef<number | null>(null);
+  const lastPercentRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    setFormat('html');
+    setProgress(null);
+    setBusy(false);
+    startAtRef.current = 0;
+    lastPercentRef.current = null;
+    if (rafRef.current != null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+  }, [paper.id]);
+
+  async function handleConfirm() {
+    setBusy(true);
+    setProgress({ loaded: 0, total: null, percent: 0 });
+    try {
+      startAtRef.current = performance.now();
+      await downloadPaperExportApi(Number(paper.id), format, (p) => {
+        // Throttle to animation frames, and only update when percent changes,
+        // to keep the width transition visually smooth.
+        const nextPercent = p.percent ?? null;
+        if (nextPercent === lastPercentRef.current) return;
+        lastPercentRef.current = nextPercent;
+        if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+        rafRef.current = requestAnimationFrame(() => setProgress(p));
+      });
+
+      const elapsed = performance.now() - startAtRef.current;
+      const minVisibleMs = 650; // ensures user can see the bar moving
+      if (elapsed < minVisibleMs) {
+        await new Promise((r) => setTimeout(r, minVisibleMs - elapsed));
+      }
+      onClose();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '下载失败');
+    } finally {
+      setBusy(false);
+      setProgress(null);
+    }
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 200,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(15, 15, 35, 0.45)', backdropFilter: 'blur(3px)',
+      }}
+      onClick={busy ? undefined : onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="export-dialog-title"
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: 'min(400px, calc(100vw - 32px))',
+          background: '#fff',
+          borderRadius: '12px',
+          boxShadow: '0 20px 50px rgba(0,0,0,0.18)',
+          padding: '22px 22px 18px',
+          border: '1px solid #e8eaed',
+        }}
+      >
+        <h3 id="export-dialog-title" style={{ margin: '0 0 6px', fontSize: '17px', fontWeight: 700, color: '#0f0f23' }}>
+          选择下载格式
+        </h3>
+        <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#6b7280', lineHeight: 1.5 }}>
+          {paper.title}
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {EXPORT_OPTIONS.map(opt => {
+            const selected = format === opt.id;
+            return (
+              <label
+                key={opt.id}
+                style={{
+                  display: 'flex', alignItems: 'flex-start', gap: '10px',
+                  padding: '12px 12px',
+                  borderRadius: '8px',
+                  border: `1px solid ${selected ? '#3b5bdb' : '#e5e7eb'}`,
+                  background: selected ? '#f5f7ff' : '#fafafa',
+                  cursor: busy ? 'not-allowed' : 'pointer',
+                  opacity: busy ? 0.85 : 1,
+                }}
+              >
+                <input
+                  type="radio"
+                  name="export-format"
+                  checked={selected}
+                  disabled={busy}
+                  onChange={() => { setFormat(opt.id); }}
+                  style={{ marginTop: '3px' }}
+                />
+                <span>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>{opt.title}</span>
+                  <span style={{ display: 'block', fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{opt.desc}</span>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+
+        {busy && progress && (
+          <div style={{ marginTop: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                {progress.percent != null
+                  ? (format === 'pdf' && !paper.hasSourcePdf && progress.percent >= 100 ? '生成 PDF…' : `下载中 ${progress.percent}%`)
+                  : '下载中…'}
+              </span>
+              <span style={{ fontSize: '12px', color: '#9ca3af' }}>
+                {(progress.loaded / 1024).toFixed(1)} KB
+              </span>
+            </div>
+            <div style={{ height: '8px', background: '#e5e7eb', borderRadius: '99px', overflow: 'hidden' }}>
+              <div
+                style={{
+                  height: '100%',
+                  width: progress.percent != null ? `${progress.percent}%` : '36%',
+                  background: 'linear-gradient(90deg, #3b5bdb, #5b7cfa)',
+                  borderRadius: '99px',
+                  transition: 'width 0.35s ease-out',
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onClose}
+            style={{
+              padding: '8px 16px', borderRadius: '8px', border: '1px solid #e5e7eb',
+              background: '#fff', fontSize: '13px', color: '#374151', cursor: busy ? 'not-allowed' : 'pointer',
+            }}
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={handleConfirm}
+            style={{
+              padding: '8px 18px', borderRadius: '8px', border: 'none',
+              background: busy ? '#93a6e8' : '#3b5bdb', fontSize: '13px', fontWeight: 600,
+              color: '#fff', cursor: busy ? 'wait' : 'pointer',
+            }}
+          >
+            {busy ? '下载中…' : '下载'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Detail Panel ───────────────────────────────────────────────── */
-function PaperDetailPanel({ paper, onClose }: { paper: Paper; onClose: () => void }) {
+function PaperDetailPanel({
+  paper,
+  onClose,
+  onDownload,
+}: {
+  paper: Paper;
+  onClose: () => void;
+  onDownload: () => void;
+}) {
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 100,
@@ -335,18 +342,24 @@ function PaperDetailPanel({ paper, onClose }: { paper: Paper; onClose: () => voi
 
         {/* Floating action buttons */}
         <div style={{ position: 'absolute', right: '16px', top: '140px', display: 'flex', flexDirection: 'column', gap: '8px', zIndex: 10 }}>
-          {[
-            { icon: <Eye size={16} />, title: 'Preview' },
-            { icon: <Download size={16} />, title: 'Download' },
-          ].map(btn => (
-            <button key={btn.title} title={btn.title}
-              style={{ width: '42px', height: '42px', borderRadius: '50%', border: '1px solid #e8eaed', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#374151', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f3f4f6'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff'; }}
-            >
-              {btn.icon}
-            </button>
-          ))}
+          <button type="button" title="Preview"
+            style={{ width: '42px', height: '42px', borderRadius: '50%', border: '1px solid #e8eaed', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#374151', cursor: 'default', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
+          >
+            <Eye size={16} />
+          </button>
+          <button type="button" title="Download"
+            onClick={onDownload}
+            style={{
+              width: '42px', height: '42px', borderRadius: '50%', border: '1px solid #e8eaed', background: '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#374151',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f3f4f6'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff'; }}
+          >
+            <Download size={16} />
+          </button>
         </div>
 
         {/* Header */}
@@ -478,15 +491,23 @@ export default function AssessmentPapers() {
   const [loading, setLoading]     = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [previewPaper, setPreviewPaper] = useState<Paper | null>(null);
+  const [exportModalPaper, setExportModalPaper] = useState<Paper | null>(null);
 
   useEffect(() => {
     let active = true;
 
     (async () => {
-      setLoading(true);
+      const cached = readCachedPaperList({ page: 1, page_size: 100 });
+      if (cached && active) {
+        setPapers(cached.items.map(mapListItemToPaper));
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
       setLoadError(null);
       try {
-        const result = await fetchPaperListApi({ page: 1, page_size: 100 });
+        // Always refresh to reflect latest DB state.
+        const result = await prefetchPaperList({ page: 1, page_size: 100 }, { force: true });
         if (!active) return;
         setPapers(result.items.map(mapListItemToPaper));
       } catch (err) {
@@ -619,7 +640,12 @@ export default function AssessmentPapers() {
             gap: '12px',
           }}>
             {filtered.map(paper => (
-              <PaperCard key={paper.id} paper={paper} onView={() => handleView(paper)} />
+              <PaperCard
+                key={paper.id}
+                paper={paper}
+                onView={() => handleView(paper)}
+                onDownload={() => setExportModalPaper(paper)}
+              />
             ))}
           </div>
         )}
@@ -627,14 +653,33 @@ export default function AssessmentPapers() {
 
       {/* ── Detail Panel ─────────────────────────────────────────── */}
       {previewPaper && (
-        <PaperDetailPanel paper={previewPaper} onClose={() => setPreviewPaper(null)} />
+        <PaperDetailPanel
+          paper={previewPaper}
+          onClose={() => setPreviewPaper(null)}
+          onDownload={() => setExportModalPaper(previewPaper)}
+        />
+      )}
+
+      {exportModalPaper && (
+        <DownloadFormatModal
+          paper={exportModalPaper}
+          onClose={() => setExportModalPaper(null)}
+        />
       )}
     </div>
   );
 }
 
 /* ─── Paper Card ─────────────────────────────────────────────────── */
-function PaperCard({ paper, onView }: { paper: Paper; onView: () => void }) {
+function PaperCard({
+  paper,
+  onView,
+  onDownload,
+}: {
+  paper: Paper;
+  onView: () => void;
+  onDownload: () => void;
+}) {
   const rows: { label: string; value: string | number }[] = [
     { label: 'Total Score',  value: `${paper.totalScore} pts` },
     { label: 'Duration',     value: `${paper.durationMin} min` },
@@ -702,6 +747,7 @@ function PaperCard({ paper, onView }: { paper: Paper; onView: () => void }) {
       {/* Action buttons */}
       <div style={{ display: 'flex', borderTop: '1px solid #f3f4f6' }}>
         <button
+          type="button"
           onClick={onView}
           style={{
             flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
@@ -715,7 +761,8 @@ function PaperCard({ paper, onView }: { paper: Paper; onView: () => void }) {
           <Eye size={14} style={{ color: '#6b7280' }} /> View
         </button>
         <button
-          onClick={() => {}}
+          type="button"
+          onClick={onDownload}
           style={{
             flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
             padding: '12px', border: 'none',
