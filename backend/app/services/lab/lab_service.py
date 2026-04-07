@@ -42,8 +42,8 @@ from app.schemas.lab import (
     SubjectLab,
 )
 from app.config import settings
-from app.services.lab_prompts import RenderCodeAgent, ReflectionReport
-from app.services.lab_prompts.render_code_agent import LayoutPlan
+from app.services.lab.lab_prompts import RenderCodeAgent, ReflectionReport
+from app.services.lab.lab_prompts.render_code_agent import LayoutPlan
 
 logger = logging.getLogger(__name__)
 
@@ -660,7 +660,7 @@ async def validate_render_code_with_agent(
         - ReflectionReport: 反省报告
         - LayoutPlan: 布局方案（可能为 None）
     """
-    from app.services.lab_prompts.render_code_agent import LayoutPlan
+    from app.services.lab.lab_prompts.render_code_agent import LayoutPlan
 
     agent = RenderCodeAgent()
     return await agent.validate_and_enhance(
@@ -757,6 +757,9 @@ __all__ = [
     "signature_from_orm_lab",
     "augment_generate_assistant_content_for_llm",
     "enforce_generate_base_definition",
+    # 自 lab_prompts 引入，供 API 层显式导入
+    "ReflectionReport",
+    "LayoutPlan",
 ]
 
 

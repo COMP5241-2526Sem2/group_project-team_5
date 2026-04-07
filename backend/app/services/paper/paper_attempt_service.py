@@ -18,7 +18,7 @@ from app.models.assessment import (
     PaperStatus,
 )
 from app.models.user import AccountType
-from app.schemas.paper_attempts import (
+from app.schemas.paper.paper_attempts import (
     PaperAnswerWriteItem,
     PaperAttemptCreateResponse,
     PaperAttemptListItem,

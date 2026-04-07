@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass
 
 from app.schemas.paper import PaperCreateQuestion, PaperCreateQuestionOption, PaperCreateRequest
-from app.services.source_text_extraction_service import SourceTextExtractionService
+from app.services.paper.common.source_text_extraction_service import SourceTextExtractionService
 
 
 @dataclass(slots=True)

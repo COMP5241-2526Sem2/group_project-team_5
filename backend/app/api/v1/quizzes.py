@@ -7,7 +7,7 @@ from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.schemas.quiz_runtime import (
+from app.schemas.quiz.quiz_runtime import (
     AudioAuditRequest,
     AudioAuditResponse,
     AudioUploadResponse,
@@ -24,7 +24,7 @@ from app.schemas.quiz_runtime import (
     SaveAnswersRequest,
     SaveAnswersResponse,
 )
-from app.services.quiz_runtime_service import QuizRuntimeService
+from app.services.quiz.quiz_runtime_service import QuizRuntimeService
 
 router = APIRouter(tags=["quizzes"])
 

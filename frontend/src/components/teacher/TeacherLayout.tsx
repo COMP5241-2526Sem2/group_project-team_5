@@ -31,7 +31,7 @@ const ASSESSMENT_SUB_ITEMS: SubNavItem[] = [
   { id: 'ai-paper',  label: 'AI Paper',         path: '/teacher/assessment/ai-paper'  },
   { id: 'library',   label: 'Question Bank',    path: '/teacher/assessment/library'   },
   { id: 'papers',    label: 'Exam Papers',      path: '/teacher/assessment/papers'    },
-  { id: 'grading',   label: 'Grading',          path: '/teacher/assessment/grading'   },
+  { id: 'grading',   label: 'Task Publishing', path: '/teacher/assessment/grading'   },
 ];
 
 const LABS_SUB_ITEMS: SubNavItem[] = [

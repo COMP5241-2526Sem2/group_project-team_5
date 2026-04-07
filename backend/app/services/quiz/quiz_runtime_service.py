@@ -22,7 +22,7 @@ from app.models.assessment import (
 )
 from app.models.user import AccountType
 from app.config import settings
-from app.schemas.quiz_runtime import (
+from app.schemas.quiz.quiz_runtime import (
     AudioRecordSummary,
     AudioAuditRequest,
     AudioAuditResponse,

@@ -16,7 +16,9 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -444,3 +446,85 @@ class QuizAudioPlaybackAudit(Base):
     ip: Mapped[str | None] = mapped_column(Text, nullable=True)
     device_info: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class TeacherTaskStatus(str, enum.Enum):
+    """Teacher-assembled assignments (任务发布); isolated from papers / question bank writes."""
+
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    ARCHIVED = "archived"
+
+
+class TeacherTask(Base):
+    """Task draft/publish container. Does not create Paper or QuestionBankItem rows."""
+
+    __tablename__ = "teacher_tasks"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    course_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("courses.id", ondelete="RESTRICT"), nullable=False, index=True)
+    grade: Mapped[str] = mapped_column(Text, nullable=False)
+    subject: Mapped[str] = mapped_column(Text, nullable=False)
+    semester: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    task_kind: Mapped[str] = mapped_column(Text, nullable=False)
+    total_score: Mapped[int] = mapped_column(Integer, nullable=False)
+    duration_min: Mapped[int] = mapped_column(Integer, nullable=False)
+    question_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Same pattern as task_kind / source_kind: plain text + CHECK (no PostgreSQL ENUM).
+    status: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        default=TeacherTaskStatus.DRAFT.value,
+        server_default=text("'draft'"),
+    )
+    created_by: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    items: Mapped[list["TeacherTaskItem"]] = relationship(back_populates="task", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        CheckConstraint("total_score >= 0", name="ck_teacher_tasks_total_score_non_negative"),
+        CheckConstraint("duration_min >= 0", name="ck_teacher_tasks_duration_non_negative"),
+        CheckConstraint("question_count >= 0", name="ck_teacher_tasks_question_count_non_negative"),
+        CheckConstraint(
+            "status IN ('draft', 'published', 'archived')",
+            name="ck_teacher_tasks_status",
+        ),
+    )
+
+
+class TeacherTaskItem(Base):
+    """Snapshot + optional FK to bank question; no writes to question_bank_items or papers."""
+
+    __tablename__ = "teacher_task_items"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    task_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("teacher_tasks.id", ondelete="CASCADE"), nullable=False, index=True)
+    order_num: Mapped[int] = mapped_column(Integer, nullable=False)
+    section_label: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    question_type: Mapped[str] = mapped_column(Text, nullable=False)
+    score: Mapped[float] = mapped_column(Numeric(8, 2), nullable=False)
+    source_kind: Mapped[str] = mapped_column(Text, nullable=False)
+    bank_question_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("question_bank_items.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    ref_paper_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True, index=True)
+    ref_paper_question_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    snapshot_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+
+    task: Mapped["TeacherTask"] = relationship(back_populates="items")
+
+    __table_args__ = (
+        UniqueConstraint("task_id", "order_num", name="uq_teacher_task_items_task_order"),
+        CheckConstraint("order_num >= 1", name="ck_teacher_task_items_order_positive"),
+        CheckConstraint("score >= 0", name="ck_teacher_task_items_score_non_negative"),
+        CheckConstraint(
+            "source_kind IN ('bank', 'paper_snapshot')",
+            name="ck_teacher_task_items_source_kind",
+        ),
+    )

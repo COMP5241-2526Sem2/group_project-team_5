@@ -2,16 +2,16 @@ from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.schemas.quiz_generation import (
+from app.schemas.quiz.quiz_generation import (
+    AIQuestionGenExtractTextResponse,
     AIQuestionGenPreviewRequest,
     AIQuestionGenPreviewResponse,
-    AIQuestionGenExtractTextResponse,
     QuizGenerateRequest,
     QuizGenerateResponse,
 )
-from app.services.ai_question_gen_service import AIQuestionGenService
-from app.services.quiz_generation_service import QuizGenerationService
-from app.services.source_text_extraction_service import SourceTextExtractionService
+from app.services.paper.common.source_text_extraction_service import SourceTextExtractionService
+from app.services.quiz.ai_question_gen_service import AIQuestionGenService
+from app.services.quiz.quiz_generation_service import QuizGenerationService
 
 router = APIRouter(prefix="/quiz-generation", tags=["quiz-generation"])
 

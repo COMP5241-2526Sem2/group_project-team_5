@@ -1,11 +1,22 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router';
 import {
   fetchPaperListApi,
   fetchPaperDetailApi,
-  type PaperListItemDto,
   type PaperDetailDto,
 } from '../../../utils/paperApi';
+import {
+  fetchTaskListApi,
+  fetchTaskDetailApi,
+  createTaskApi,
+  updateTaskApi,
+  deleteTaskApi,
+  publishTaskApi,
+  type TaskListItemDto,
+  type TaskDetailDto,
+  type TaskCreateRequestDto,
+  type TaskItemPayloadDto,
+  type TaskSourceKind,
+} from '../../../utils/taskApi';
 import { listQuestionBankSetsApi, type QuestionBankSetDto } from '../../../utils/questionBankApi';
 import {
   Search, Plus, X, Check, ChevronDown, ChevronLeft, ChevronRight,
@@ -18,7 +29,7 @@ import {
 /* ═══════════════════════════════════════════════════════════════════════════
    TYPES
 ═══════════════════════════════════════════════════════════════════════════ */
-type StudioTab   = 'assemble' | 'publish' | 'grade';
+type StudioTab   = 'assemble' | 'publish';
 type AssembleMode = 'bank' | 'papers';
 type QType       = 'MCQ' | 'True/False' | 'Fill-blank' | 'Short Answer' | 'Essay';
 type Diff        = 'easy' | 'medium' | 'hard';
@@ -168,14 +179,24 @@ const SUBJECTS = ['Biology','Physics','Chemistry','Math','English','History'];
 const Q_TYPES: QType[] = ['MCQ','True/False','Fill-blank','Short Answer','Essay'];
 const ROMAN = ['I','II','III','IV','V','VI','VII','VIII'];
 
-function mapApiItemToGradingPaper(item: PaperListItemDto): Paper {
-  const et = (item.exam_type || '').toLowerCase();
-  const kind: PaperKind =
-    et.includes('homework') ? 'homework' : et.includes('quiz') ? 'quiz' : 'exam';
+function snapshotToQType(snap: Record<string, unknown>): QType | null {
+  const u = snap.uiType;
+  if (typeof u === 'string' && (Q_TYPES as readonly string[]).includes(u)) return u as QType;
+  return null;
+}
+
+function taskKindStringToPaperKind(k: string): PaperKind {
+  const x = (k || 'exam').toLowerCase();
+  if (x.includes('homework')) return 'homework';
+  if (x.includes('quiz')) return 'quiz';
+  return 'exam';
+}
+
+function mapTaskListItemToPaper(item: TaskListItemDto): Paper {
   return {
-    id: String(item.paper_id),
+    id: String(item.task_id),
     title: item.title,
-    kind,
+    kind: taskKindStringToPaperKind(item.task_kind),
     grade: item.grade,
     subject: item.subject,
     status: item.status,
@@ -184,6 +205,129 @@ function mapApiItemToGradingPaper(item: PaperListItemDto): Paper {
     qCount: item.question_count,
     sections: [],
     createdAt: item.created_at,
+  };
+}
+
+function taskDetailToCanvas(detail: TaskDetailDto): {
+  sections: Section[];
+  grade: string;
+  subject: string;
+  title: string;
+  kind: PaperKind;
+  dur: number;
+  taskId: number;
+} {
+  const sorted = [...detail.items].sort((a, b) => a.order - b.order);
+  const sectionOrder: string[] = [];
+  const sectionByLabel = new Map<string, Section>();
+
+  for (const it of sorted) {
+    const label = (it.section_label || 'Section').trim() || 'Section';
+    if (!sectionByLabel.has(label)) {
+      const snap0 = it.snapshot || {};
+      const qType = snapshotToQType(snap0) ?? detailTypeToQType(it.question_type);
+      sectionByLabel.set(label, {
+        id: nid(),
+        label,
+        type: qType,
+        ptsEach: Math.max(1, Math.round(it.score)),
+        qs: [],
+      });
+      sectionOrder.push(label);
+    }
+    const sec = sectionByLabel.get(label)!;
+    const snap = it.snapshot || {};
+    const qType = snapshotToQType(snap) ?? detailTypeToQType(it.question_type);
+    let libId: string;
+    if (it.source_kind === 'paper_snapshot' && it.ref_paper_id != null && it.ref_paper_question_id != null) {
+      libId = `pq_${it.ref_paper_id}_${it.ref_paper_question_id}`;
+    } else if (it.bank_question_id != null) {
+      libId = String(it.bank_question_id);
+    } else {
+      libId = nid();
+    }
+    sec.qs.push({
+      uid: nid(),
+      libId,
+      type: qType,
+      diff: normDiffFromApi(typeof snap.difficulty === 'string' ? snap.difficulty : null),
+      pts: Math.max(1, Math.round(it.score)),
+      prompt: typeof snap.prompt === 'string' ? snap.prompt : '',
+      options: Array.isArray(snap.options) ? (snap.options as string[]) : undefined,
+      answer: typeof snap.answer === 'string' ? snap.answer : undefined,
+    });
+  }
+
+  return {
+    sections: sectionOrder.map((l) => sectionByLabel.get(l)!),
+    grade: detail.grade,
+    subject: detail.subject,
+    title: detail.title,
+    kind: taskKindStringToPaperKind(detail.task_kind),
+    dur: detail.duration_min,
+    taskId: detail.task_id,
+  };
+}
+
+function buildTaskPayload(
+  sections: Section[],
+  opts: { title: string; grade: string; subject: string; kind: PaperKind; dur: number },
+): TaskCreateRequestDto {
+  const items: TaskItemPayloadDto[] = [];
+  let order = 0;
+  for (const sec of sections) {
+    for (const q of sec.qs) {
+      order += 1;
+      const snap: Record<string, unknown> = {
+        prompt: q.prompt,
+        difficulty: q.diff,
+        uiType: q.type,
+      };
+      if (q.options && q.options.length > 0) snap.options = q.options;
+      if (q.answer) snap.answer = q.answer;
+
+      let source_kind: TaskSourceKind = 'bank';
+      let bank_question_id: number | null = null;
+      let ref_paper_id: number | null = null;
+      let ref_paper_question_id: number | null = null;
+      if (q.libId.startsWith('pq_')) {
+        source_kind = 'paper_snapshot';
+        const m = q.libId.match(/^pq_(\d+)_(\d+)$/);
+        if (m) {
+          ref_paper_id = Number(m[1]);
+          ref_paper_question_id = Number(m[2]);
+        }
+      } else if (/^\d+$/.test(q.libId)) {
+        bank_question_id = Number(q.libId);
+      }
+
+      items.push({
+        order,
+        section_label: sec.label,
+        question_type: q.type,
+        score: q.pts,
+        source_kind,
+        bank_question_id,
+        ref_paper_id,
+        ref_paper_question_id,
+        snapshot: snap,
+      });
+    }
+  }
+  const totalPts = sections.reduce((n, s) => n + s.qs.length * s.ptsEach, 0);
+  const title =
+    opts.title.trim() ||
+    `${opts.grade} ${opts.subject} ${opts.kind === 'exam' ? 'Exam' : opts.kind === 'quiz' ? 'Quiz' : 'Homework'}`;
+  return {
+    title,
+    grade: opts.grade,
+    subject: opts.subject,
+    semester: null,
+    task_kind: opts.kind,
+    duration_min: opts.dur,
+    total_score: totalPts,
+    course_id: null,
+    items,
   };
 }
 
@@ -247,13 +391,12 @@ function MiniSelect({ label, value, onChange, options }: { label:string; value:s
 /* ═══════════════════════════════════════════════════════════════════════════
    TAB BAR
 ═══════════════════════════════════════════════════════════════════════════ */
-function StudioTabBar({ tab, setTab, draftCount, pendingCount }: {
-  tab:StudioTab; setTab:(t:StudioTab)=>void; draftCount:number; pendingCount:number;
+function StudioTabBar({ tab, setTab, draftCount }: {
+  tab:StudioTab; setTab:(t:StudioTab)=>void; draftCount:number;
 }) {
   const tabs: { id:StudioTab; label:string; emoji:string; badge?:number }[] = [
     { id:'assemble', label:'Assemble', emoji:'🔨' },
     { id:'publish',  label:'Publish',  emoji:'📤', badge:draftCount  },
-    { id:'grade',    label:'AI Grade', emoji:'⚡', badge:pendingCount },
   ];
   return (
     <div style={{ display:'flex', alignItems:'stretch', borderBottom:'1px solid #e8eaed', background:'#fff', padding:'0 24px', flexShrink:0 }}>
@@ -439,7 +582,7 @@ function QuestionBankBrowser({
           loadError ? null : (
             <div style={{ textAlign:'center', padding:'36px 12px', color:'#9ca3af' }}>
               <BookOpen size={26} style={{ opacity:0.18, display:'block', margin:'0 auto 8px' }}/>
-              <div style={{ fontSize:'12px' }}>当前年级学科下暂无题目</div>
+              <div style={{ fontSize:'12px' }}>No questions for this grade and subject</div>
             </div>
           )
         ) : Q_TYPES.map(t=>{
@@ -597,7 +740,7 @@ function ExamPaperPicker({ grade, subject, onLoad, canvasHasContent, loadedPaper
           </div>
         ) : papers.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '28px 12px', color: '#9ca3af', fontSize: '12px' }}>
-            {listError ? '' : '当前年级学科下暂无试卷'}
+            {listError ? '' : 'No exam papers for this grade and subject'}
           </div>
         ) : (
           papers.map((meta) => {
@@ -848,7 +991,15 @@ function CanvasQCard({ q, globalIdx, isEditing, isReplaceTarget, onEdit, onCance
 /* ═══════════════════════════════════════════════════════════════════════════
    ASSEMBLE VIEW
 ═══════════════════════════════════════════════════════════════════════════ */
-function AssembleView({ onSave }: { onSave:(p:Paper)=>void }) {
+function AssembleView({
+  editingTaskId,
+  onSaved,
+  onTaskCreated,
+}: {
+  editingTaskId: number | null;
+  onSaved: () => void;
+  onTaskCreated: (taskId: number) => void;
+}) {
   const [mode,    setMode]    = useState<AssembleMode>('bank');
   const [grade,   setGrade]   = useState('Grade 10');
   const [subject, setSubject] = useState('Biology');
@@ -864,8 +1015,44 @@ function AssembleView({ onSave }: { onSave:(p:Paper)=>void }) {
   const [addSecOpen,    setAddSecOpen]    = useState(false);
   const [newSecType,    setNewSecType]    = useState<QType>('MCQ');
   const [saved,         setSaved]         = useState(false);
+  const [saving,        setSaving]        = useState(false);
   const [editingId,     setEditingId]     = useState<string|null>(null);
   const [replaceTarget, setReplaceTarget] = useState<{ secId:string; uid:string; type:QType }|null>(null);
+
+  useEffect(() => {
+    if (editingTaskId == null) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const d = await fetchTaskDetailApi(editingTaskId);
+        if (cancelled) return;
+        const c = taskDetailToCanvas(d);
+        setSections(c.sections);
+        setGrade(c.grade);
+        setSubject(c.subject);
+        setTitle(c.title);
+        setKind(c.kind);
+        setDur(c.dur);
+        setLoadedPaperId(null);
+        setLoadedPaperTitle(null);
+        setEditingId(null);
+        setReplaceTarget(null);
+      } catch (e) {
+        if (!cancelled) window.alert(e instanceof Error ? e.message : 'Failed to load task');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [editingTaskId]);
+
+  useEffect(() => {
+    if (editingTaskId !== null) return;
+    setSections([]);
+    setTitle('');
+    setLoadedPaperId(null);
+    setLoadedPaperTitle(null);
+    setEditingId(null);
+    setReplaceTarget(null);
+  }, [editingTaskId]);
 
   const addedIds = new Set<string>(sections.flatMap(s => s.qs.map(q => q.libId)));
   const canvasHasContent = sections.some(s=>s.qs.length>0);
@@ -929,12 +1116,32 @@ function AssembleView({ onSave }: { onSave:(p:Paper)=>void }) {
   const totalQ   = sections.reduce((n,s)=>n+s.qs.length, 0);
   const totalPts = sections.reduce((n,s)=>n+s.qs.length*s.ptsEach, 0);
 
-  function handleSave() {
-    const paper: Paper = {
-      id:`p${Date.now()}`, title:title||`${grade} ${subject} ${kind==='exam'?'Exam':kind==='quiz'?'Quiz':'Homework'}`,
-      kind, grade, subject, status:'draft', duration:dur, totalPts, qCount:totalQ, sections, createdAt:new Date().toISOString(),
-    };
-    onSave(paper); setSaved(true); setTimeout(()=>setSaved(false), 2500);
+  async function handleSave() {
+    if (totalQ === 0 || saving) return;
+    setSaving(true);
+    try {
+      const payload: TaskCreateRequestDto = buildTaskPayload(sections, {
+        title,
+        grade,
+        subject,
+        kind,
+        dur,
+      });
+      if (editingTaskId != null) {
+        await updateTaskApi(editingTaskId, payload);
+        onSaved();
+      } else {
+        const res = await createTaskApi(payload);
+        onTaskCreated(res.task_id);
+        onSaved();
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'Failed to save task');
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -1005,7 +1212,7 @@ function AssembleView({ onSave }: { onSave:(p:Paper)=>void }) {
         {/* RIGHT — Canvas */}
         <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', background:'#f7f8fb' }}>
           <div style={{ padding:'8px 18px', borderBottom:'1px solid #e8eaed', background:'#fff', display:'flex', alignItems:'center', gap:'10px', flexShrink:0 }}>
-            <span style={{ fontSize:'12px', fontWeight:700, color:'#0f0f23' }}>Paper Canvas</span>
+            <span style={{ fontSize:'12px', fontWeight:700, color:'#0f0f23' }}>Task Canvas</span>
             <span style={{ fontSize:'11px', color:'#9ca3af' }}>{totalQ}q · {totalPts}pts · {dur}min</span>
             {loadedPaperId && loadedPaperTitle && (
               <span style={{ fontSize:'10px', padding:'2px 8px', borderRadius:'20px', background:'#f0f4ff', color:'#3b5bdb', fontWeight:600 }}>
@@ -1024,7 +1231,7 @@ function AssembleView({ onSave }: { onSave:(p:Paper)=>void }) {
             {sections.length===0 ? (
               <div style={{ textAlign:'center', padding:'60px 20px', border:'2px dashed #e8eaed', borderRadius:'16px', color:'#9ca3af', background:'#fff' }}>
                 <Layers size={30} style={{ opacity:0.18, display:'block', margin:'0 auto 10px' }}/>
-                <div style={{ fontSize:'13px', fontWeight:600, color:'#374151', marginBottom:'4px' }}>Paper canvas is empty</div>
+                <div style={{ fontSize:'13px', fontWeight:600, color:'#374151', marginBottom:'4px' }}>Task canvas is empty</div>
                 <div style={{ fontSize:'12px' }}>Browse the Question Bank to add questions, or load an Exam Paper as a starting point.</div>
               </div>
             ) : sections.map((sec,si)=>{
@@ -1103,9 +1310,9 @@ function AssembleView({ onSave }: { onSave:(p:Paper)=>void }) {
             </div>
             <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
               {saved && <span style={{ fontSize:'11px', color:'#15803d', display:'flex', alignItems:'center', gap:'4px' }}><CheckCircle2 size={12}/> Saved</span>}
-              <button onClick={handleSave} disabled={totalQ===0}
-                style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 18px', borderRadius:'9px', border:'none', cursor:totalQ>0?'pointer':'not-allowed', background:totalQ>0?'#3b5bdb':'#e8eaed', color:totalQ>0?'#fff':'#9ca3af', fontSize:'13px', fontWeight:600 }}>
-                <Save size={12}/> Save Draft
+              <button onClick={() => void handleSave()} disabled={totalQ===0||saving}
+                style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 18px', borderRadius:'9px', border:'none', cursor:totalQ>0&&!saving?'pointer':'not-allowed', background:totalQ>0&&!saving?'#3b5bdb':'#e8eaed', color:totalQ>0&&!saving?'#fff':'#9ca3af', fontSize:'13px', fontWeight:600 }}>
+                {saving ? <Loader2 size={12} style={{ animation:'spin 0.7s linear infinite' }}/> : <Save size={12}/>} Save Draft
               </button>
             </div>
           </div>
@@ -1118,19 +1325,18 @@ function AssembleView({ onSave }: { onSave:(p:Paper)=>void }) {
 /* ═══════════════════════════════════════════════════════════════════════════
    PUBLISH VIEW
 ═══════════════════════════════════════════════════════════════════════════ */
-function PublishCard({ paper, onDelete, onSelectPublish, isSelected }: {
-  paper:Paper; onDelete:(id:string)=>void; onSelectPublish:()=>void; isSelected:boolean;
+function PublishCard({ paper, onDelete, onSelectPublish, onEditTask, isSelected }: {
+  paper:Paper; onDelete:(id:string)=>void; onSelectPublish:()=>void; onEditTask?:(taskId:number)=>void; isSelected:boolean;
 }) {
-  const navigate = useNavigate();
   const [confirmDel, setConfirmDel] = useState(false);
   const sc=STATUS_C[paper.status]; const se=SUBJ_EMOJI[paper.subject]??'📄';
 
   function handleEdit() {
     if (!/^\d+$/.test(paper.id)) {
-      window.alert('This draft is local-only and not synced to the server yet, so it cannot be edited via API. Please save/sync it to the server first.');
+      window.alert('Invalid task id.');
       return;
     }
-    navigate(`/teacher/assessment/papers/${paper.id}/edit`);
+    onEditTask?.(Number(paper.id));
   }
   return (
     <div style={{ background:'#fff', border:`1.5px solid ${isSelected?'#93c5fd':'#e8eaed'}`, borderRadius:'12px', overflow:'hidden', boxShadow:isSelected?'0 0 0 3px rgba(59,91,219,0.10)':'none', transition:'all 0.15s' }}>
@@ -1177,7 +1383,7 @@ function PublishCard({ paper, onDelete, onSelectPublish, isSelected }: {
   );
 }
 
-function PublishPanel({ paper, onClose, onPublish }: { paper:Paper; onClose:()=>void; onPublish:(cfg:PublishCfg)=>void }) {
+function PublishPanel({ paper, onClose, onPublish }: { paper:Paper; onClose:()=>void; onPublish:(cfg:PublishCfg)=>Promise<void> | void }) {
   const [assignKind,  setAssignKind]  = useState<AssignKind>('exam');
   const [classes,     setClasses]     = useState<string[]>([]);
   const [startDate,   setStartDate]   = useState('2026-04-10');
@@ -1194,10 +1400,19 @@ function PublishPanel({ paper, onClose, onPublish }: { paper:Paper; onClose:()=>
     homework: { label:'Homework', emoji:'📚', desc:'Untimed, flexible submission window' },
   };
   function toggleClass(c: string) { setClasses(prev=>prev.includes(c)?prev.filter(x=>x!==c):[...prev,c]); }
-  function doPublish() {
+  async function doPublish() {
     if (!classes.length) return;
     setPublishing(true);
-    setTimeout(()=>{ setPublishing(false); setDone(true); onPublish({ assignKind, classes, startDate, endDate, timeLimit, showResults, allowLate }); setTimeout(onClose,1100); },1400);
+    setDone(false);
+    try {
+      await onPublish({ assignKind, classes, startDate, endDate, timeLimit, showResults, allowLate });
+      setDone(true);
+      setTimeout(onClose, 900);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'Publish failed');
+    } finally {
+      setPublishing(false);
+    }
   }
 
   return (
@@ -1207,7 +1422,7 @@ function PublishPanel({ paper, onClose, onPublish }: { paper:Paper; onClose:()=>
           <Send size={15} style={{ color:'#3b5bdb' }}/>
         </div>
         <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:'13px', fontWeight:700, color:'#0f0f23' }}>Publish Paper</div>
+          <div style={{ fontSize:'13px', fontWeight:700, color:'#0f0f23' }}>Publish Task</div>
           <div style={{ fontSize:'10px', color:'#6b7280', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{paper.title}</div>
         </div>
         <button onClick={onClose} style={{ width:'24px', height:'24px', borderRadius:'6px', border:'none', cursor:'pointer', background:'transparent', color:'#9ca3af', display:'flex', alignItems:'center', justifyContent:'center' }}
@@ -1288,8 +1503,8 @@ function PublishPanel({ paper, onClose, onPublish }: { paper:Paper; onClose:()=>
   );
 }
 
-function PublishView({ papers, onDelete, onPublish, onNewPaper }: { papers:Paper[]; onDelete:(id:string)=>void; onPublish:(id:string,cfg:PublishCfg)=>void; onNewPaper:()=>void }) {
-  /** Publish 页仅管理 Draft / Published，不展示 Closed（Closed 仍可在 AI Grade 等流程使用） */
+function PublishView({ papers, onDelete, onPublish, onNewPaper, onEditTask }: { papers:Paper[]; onDelete:(id:string)=>void; onPublish:(id:string,cfg:PublishCfg)=>void; onNewPaper:()=>void; onEditTask:(taskId:number)=>void }) {
+  /** Publish tab lists Draft / Published only; Closed is omitted */
   const publishPapers = papers.filter((p) => p.status === 'draft' || p.status === 'published');
   const [filter,   setFilter]   = useState<'all' | 'draft' | 'published'>('all');
   const [selPaper, setSelPaper] = useState<Paper|null>(null);
@@ -1313,7 +1528,7 @@ function PublishView({ papers, onDelete, onPublish, onNewPaper }: { papers:Paper
             ))}
           </div>
           <button onClick={onNewPaper} style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:'5px', padding:'7px 15px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#3b5bdb', color:'#fff', fontSize:'12px', fontWeight:600 }}>
-            <ChevronLeft size={12}/> 返回assemble
+            <ChevronLeft size={12}/> Back to Assemble
           </button>
         </div>
         <div style={{ flex:1, overflowY:'auto', padding:'14px 20px', display:'flex', flexDirection:'column', gap:'8px' }}>
@@ -1324,12 +1539,12 @@ function PublishView({ papers, onDelete, onPublish, onNewPaper }: { papers:Paper
             </div>
           ) : displayed.map(paper=>(
             <React.Fragment key={paper.id}>
-              <PublishCard paper={paper} isSelected={selPaper?.id===paper.id} onDelete={onDelete} onSelectPublish={()=>setSelPaper(p=>p?.id===paper.id?null:paper)}/>
+              <PublishCard paper={paper} isSelected={selPaper?.id===paper.id} onDelete={onDelete} onEditTask={onEditTask} onSelectPublish={()=>setSelPaper(p=>p?.id===paper.id?null:paper)}/>
             </React.Fragment>
           ))}
         </div>
       </div>
-      {selPaper && <PublishPanel paper={selPaper} onClose={()=>setSelPaper(null)} onPublish={cfg=>{ onPublish(selPaper.id,cfg); setSelPaper(null); }}/>}
+      {selPaper && <PublishPanel paper={selPaper} onClose={()=>setSelPaper(null)} onPublish={async (cfg)=>{ await onPublish(selPaper.id,cfg); setSelPaper(null); }}/>}
     </div>
   );
 }
@@ -1595,63 +1810,93 @@ function GradeView({ papers, subs, onUpdateSub }: { papers:Paper[]; subs:Student
 export default function AssessmentGrading() {
   const [tab,    setTab]    = useState<StudioTab>('assemble');
   const [papers, setPapers] = useState<Paper[]>([]);
-  const [subs,   setSubs]   = useState<StudentSub[]>([]);
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   /** loading: before fetch · api: loaded server rows · api_empty: 200 but 0 items · error: network/HTTP */
   const [papersListSource, setPapersListSource] = useState<'loading' | 'api' | 'api_empty' | 'error'>('loading');
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetchPaperListApi({ page: 1, page_size: 100 });
-        if (cancelled) return;
-        const mapped = res.items.map(mapApiItemToGradingPaper);
-        setPapers(mapped);
-        setPapersListSource(mapped.length > 0 ? 'api' : 'api_empty');
-      } catch {
-        if (!cancelled) {
-          setPapers([]);
-          setPapersListSource('error');
-        }
-      }
-    })();
-    return () => { cancelled = true; };
+  const reloadTasks = React.useCallback(async () => {
+    try {
+      const res = await fetchTaskListApi({ page: 1, page_size: 100 });
+      const mapped = res.items.map(mapTaskListItemToPaper);
+      setPapers(mapped);
+      setPapersListSource(mapped.length > 0 ? 'api' : 'api_empty');
+    } catch {
+      setPapers([]);
+      setPapersListSource('error');
+    }
   }, []);
 
-  const draftCount   = papers.filter(p=>p.status==='draft').length;
-  const pendingCount = subs.filter(s=>s.status==='pending_sa').length;
+  useEffect(() => {
+    void reloadTasks();
+  }, [reloadTasks]);
 
-  function addPaper(p: Paper)                        { setPapers(prev=>[p,...prev]); }
-  function deletePaper(id: string)                   { setPapers(prev=>prev.filter(p=>p.id!==id)); }
-  function publishPaper(id: string, cfg: PublishCfg) { setPapers(prev=>prev.map(p=>p.id===id?{...p,status:'published',publishCfg:cfg}:p)); }
-  function updateSub(sub: StudentSub)                { setSubs(prev=>prev.map(s=>s.id===sub.id?sub:s)); }
+  const draftCount   = papers.filter(p=>p.status==='draft').length;
+
+  async function deletePaper(id: string) {
+    const n = Number(id);
+    if (!Number.isFinite(n)) return;
+    try {
+      await deleteTaskApi(n);
+      await reloadTasks();
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'Delete failed');
+    }
+  }
+
+  async function publishPaper(id: string, cfg: PublishCfg) {
+    const n = Number(id);
+    if (!Number.isFinite(n)) return;
+    try {
+      await publishTaskApi(n);
+      await reloadTasks();
+      setPapers((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, status: 'published' as const, publishCfg: cfg } : p)),
+      );
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'Publish failed');
+      throw e;
+    }
+  }
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'calc(100vh - 48px)', overflow:'hidden', fontFamily:'-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background:'#fff' }}>
       <div style={{ background:'#fff', borderBottom:'1px solid #e8eaed', flexShrink:0 }}>
         <div style={{ padding:'14px 24px 0', display:'flex', alignItems:'flex-end', gap:'20px' }}>
           <div style={{ paddingBottom:'12px' }}>
-            <div style={{ fontSize:'16px', fontWeight:700, color:'#0f0f23', marginBottom:'2px' }}>Grading Studio</div>
+            <div style={{ fontSize:'16px', fontWeight:700, color:'#0f0f23', marginBottom:'2px' }}>Task Publishing</div>
             <div style={{ fontSize:'11px', color:'#9ca3af' }}>
-              Assemble papers · Publish to students · AI-assisted grading
+              Assemble tasks · Publish to students · Separate from the exam paper library
               {papersListSource === 'loading' && (
-                <span style={{ marginLeft: '8px', color: '#6b7280' }}>(Loading papers…)</span>
+                <span style={{ marginLeft: '8px', color: '#6b7280' }}>Loading…</span>
               )}
               {papersListSource === 'error' && (
-                <span style={{ marginLeft: '8px', color: '#b91c1c' }}>(Failed to load papers)</span>
+                <span style={{ marginLeft: '8px', color: '#b91c1c' }}>Failed to load</span>
               )}
               {papersListSource === 'api' && (
-                <span style={{ marginLeft: '8px', color: '#15803d' }}>(Loaded from server)</span>
+                <span style={{ marginLeft: '8px', color: '#15803d' }}>Loaded</span>
               )}
             </div>
           </div>
-          <StudioTabBar tab={tab} setTab={setTab} draftCount={draftCount} pendingCount={pendingCount}/>
+          <StudioTabBar tab={tab} setTab={setTab} draftCount={draftCount}/>
         </div>
       </div>
       <div style={{ flex:1, overflow:'hidden' }}>
-        {tab==='assemble' && <AssembleView onSave={addPaper}/>}
-        {tab==='publish'  && <PublishView  papers={papers} onDelete={deletePaper} onPublish={publishPaper} onNewPaper={()=>setTab('assemble')}/>}
-        {tab==='grade'    && <GradeView    papers={papers} subs={subs} onUpdateSub={updateSub}/>}
+        {tab==='assemble' && (
+          <AssembleView
+            editingTaskId={editingTaskId}
+            onSaved={() => { void reloadTasks(); }}
+            onTaskCreated={(taskId) => { setEditingTaskId(taskId); }}
+          />
+        )}
+        {tab==='publish'  && (
+          <PublishView
+            papers={papers}
+            onDelete={deletePaper}
+            onPublish={publishPaper}
+            onNewPaper={() => { setEditingTaskId(null); setTab('assemble'); }}
+            onEditTask={(taskId) => { setEditingTaskId(taskId); setTab('assemble'); }}
+          />
+        )}
       </div>
       <style>{`@keyframes spin { to { transform:rotate(360deg); } }`}</style>
     </div>

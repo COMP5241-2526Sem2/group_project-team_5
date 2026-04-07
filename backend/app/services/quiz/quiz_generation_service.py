@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.models import Question, QuestionBankItem, QuestionBankOption, QuestionItem, QuestionStatus
-from app.schemas.quiz_generation import GeneratedQuizItem, QuizGenerateRequest, QuizGenerateResponse
+from app.schemas.quiz.quiz_generation import GeneratedQuizItem, QuizGenerateRequest, QuizGenerateResponse
 
 
 @dataclass(slots=True)

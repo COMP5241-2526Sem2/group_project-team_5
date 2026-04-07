@@ -20,15 +20,15 @@ from app.models.assessment import (
     PaperQuestion,
 )
 from app.models.user import AccountType
-from app.schemas.paper_ai_scoring import (
+from app.schemas.paper.paper_ai_scoring import (
     PaperAIAdoptBatchItem,
     PaperAIAdoptBatchResponse,
     PaperAIAdoptResponse,
     PaperAISuggestionItem,
     PaperAISuggestionsResponse,
 )
-from app.schemas.paper_attempts import PaperGradeBatchItem
-from app.services.paper_attempt_service import OBJECTIVE_TYPES, PaperAttemptService
+from app.schemas.paper.paper_attempts import PaperGradeBatchItem
+from app.services.paper.paper_attempt_service import OBJECTIVE_TYPES, PaperAttemptService
 
 
 @dataclass(slots=True)

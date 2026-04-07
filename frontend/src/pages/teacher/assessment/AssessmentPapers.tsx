@@ -1075,6 +1075,9 @@ function ManagePaperModal({
             <>
               <Btn icon={<Pencil size={16} />} label="Edit draft" onClick={onEdit} disabled={busy} />
               <Btn icon={<Send size={16} />} label={busy ? 'Publishing…' : 'Publish'} primary onClick={onPublish} disabled={busy} />
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Btn icon={<Trash2 size={16} />} label="Delete paper" danger onClick={onDelete} disabled={busy} />
+              </div>
             </>
           )}
 

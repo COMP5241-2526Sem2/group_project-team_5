@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from openai import AsyncOpenAI
 
 from app.config import settings
-from app.schemas.quiz_generation import (
+from app.schemas.quiz.quiz_generation import (
     AIQuestionGenOption,
     AIQuestionGenPreviewRequest,
     AIQuestionGenPreviewResponse,

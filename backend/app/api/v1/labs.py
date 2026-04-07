@@ -33,7 +33,7 @@ from app.schemas.lab import (
     normalize_lab_definition_dict,
 )
 from app.services import lab_service
-from app.services.lab_service import (
+from app.services.lab.lab_service import (
     apply_reflection_report_to_definition,
     apply_save_payload_to_lab,
     build_session_messages,

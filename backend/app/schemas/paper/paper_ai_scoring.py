@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from app.schemas.paper_attempts import PaperAttemptStatus
+from .paper_attempts import PaperAttemptStatus
 
 
 class PaperAISuggestionItem(BaseModel):

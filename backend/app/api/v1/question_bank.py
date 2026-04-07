@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.schemas.question_bank import QuestionBankSetsResponse
-from app.services.question_bank_service import QuestionBankService
+from app.schemas.quiz.question_bank import QuestionBankSetsResponse
+from app.services.paper.question_bank.question_bank_service import QuestionBankService
 
 router = APIRouter(prefix="/question-bank", tags=["question-bank"])
 

@@ -14,6 +14,9 @@ def _compile_bigint_for_sqlite(_type, _compiler, **_kw) -> str:
 
 
 from app.models.assessment import (  # noqa: E402
+    TeacherTask,
+    TeacherTaskItem,
+    TeacherTaskStatus,
     Paper,
     PaperAIAdoptionAudit,
     PaperAttempt,
@@ -52,6 +55,9 @@ from app.models.user import StudentProfile, TeacherProfile, User  # noqa: E402
 __all__ = [
     "Base",
     # assessment
+    "TeacherTask",
+    "TeacherTaskItem",
+    "TeacherTaskStatus",
     "Paper",
     "PaperSection",
     "PaperQuestion",

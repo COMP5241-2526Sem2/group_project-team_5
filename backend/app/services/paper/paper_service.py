@@ -31,7 +31,7 @@ from app.schemas.paper import (
     PaperSectionView,
     PaperStatusMutationResponse,
 )
-from app.services.paper_export import render_paper_html, render_paper_txt, sanitize_download_filename
+from app.services.paper.paper_export import render_paper_html, render_paper_txt, sanitize_download_filename
 
 
 @dataclass(slots=True)

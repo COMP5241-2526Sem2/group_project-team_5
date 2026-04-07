@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.assessment import QuestionBankItem, QuestionBankOption
-from app.schemas.question_bank import (
+from app.schemas.quiz.question_bank import (
     QuestionBankSetOut,
     QuestionBankSetQuestionOut,
     QuestionBankSetsResponse,
