@@ -85,7 +85,7 @@ async def parse_paper_pdf(
 ) -> PaperPdfParseResponse:
     _require_user_id(x_user_id)
     data = await file.read()
-    result = PaperPdfImportService.parse_pdf_to_paper_draft(
+    result = await PaperPdfImportService.parse_pdf_to_paper_draft(
         file_name=file.filename or "paper.pdf",
         content_type=file.content_type,
         data=data,

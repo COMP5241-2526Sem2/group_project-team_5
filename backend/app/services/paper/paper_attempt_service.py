@@ -7,6 +7,7 @@ from decimal import Decimal
 from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 from app.models import Course, User
 from app.models.assessment import (
@@ -193,6 +194,7 @@ class PaperAttemptService:
             .join(User, User.id == PaperAttempt.student_id)
             .join(Paper, Paper.id == PaperAttempt.paper_id)
             .where(PaperAttempt.paper_id == paper.id)
+            .options(defer(Paper.source_pdf), defer(Paper.source_file_name))
         )
         count_stmt = select(func.count()).select_from(PaperAttempt).where(PaperAttempt.paper_id == paper.id)
 

@@ -101,6 +101,8 @@ export interface PaperCreateRequestDto {
   total_score?: number;
   course_id?: number;
   questions: PaperCreateQuestionDto[];
+  /** If true, server publishes in the same transaction as create (one round-trip). */
+  publish_after?: boolean;
 }
 
 export interface PaperCreateResponseDto {

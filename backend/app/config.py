@@ -47,6 +47,23 @@ class Settings(BaseSettings):
     quiz_generation_llm_max_retries: int = 2
     quiz_audio_max_bytes: int = 8 * 1024 * 1024
 
+    # PDF import: optional LLM structured parse when heuristics return no questions
+    paper_pdf_import_llm_enabled: bool = True
+    paper_pdf_import_model: str = ""
+    paper_pdf_import_temperature: float = 0.2
+    paper_pdf_import_timeout_sec: float = 0.0
+    paper_pdf_import_max_tokens: int = 0
+    paper_pdf_import_max_source_chars: int = 24000
+    paper_pdf_import_llm_max_retries: int = 2
+
+    # PDF import: multimodal (render pages to images) when PDF has no text layer
+    paper_pdf_import_vision_enabled: bool = True
+    paper_pdf_import_vision_model: str = ""
+    paper_pdf_import_vision_max_pages: int = 8
+    paper_pdf_import_vision_zoom: float = 1.5
+    paper_pdf_import_vision_max_tokens: int = 0
+    paper_pdf_import_vision_timeout_sec: float = 0.0
+
     # Diagnostics
     # 默认不落盘保存 LLM 原始会话（避免在 api/v1 下生成 llm_raw_session_*.txt）
     dump_llm_raw_sessions: bool = False

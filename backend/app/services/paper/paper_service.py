@@ -6,10 +6,12 @@ from datetime import datetime, timezone
 from fastapi import HTTPException
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 from app.models import Course, User
 from app.models.assessment import (
     Paper,
+    PaperAttempt,
     PaperQuestion,
     PaperQuestionOption,
     PaperSection,
@@ -77,10 +79,9 @@ class PaperService:
             db.add(section)
             await db.flush()
 
+            banks: list[QuestionBankItem] = []
             for item in items:
-                score = round(item.score if item.score is not None else default_score_each, 2)
                 answer_text = PaperService._resolve_answer_text(item)
-
                 bank = QuestionBankItem(
                     publisher="generated",
                     grade=payload.grade,
@@ -97,8 +98,10 @@ class PaperService:
                     created_by=actor_id,
                 )
                 db.add(bank)
-                await db.flush()
+                banks.append(bank)
+            await db.flush()
 
+            for bank, item in zip(banks, items, strict=True):
                 for opt in item.options:
                     db.add(
                         QuestionBankOption(
@@ -109,6 +112,10 @@ class PaperService:
                         )
                     )
 
+            pqs: list[PaperQuestion] = []
+            for item, bank in zip(items, banks, strict=True):
+                score = round(item.score if item.score is not None else default_score_each, 2)
+                answer_text = PaperService._resolve_answer_text(item)
                 paper_question = PaperQuestion(
                     paper_id=paper.id,
                     section_id=section.id,
@@ -123,19 +130,21 @@ class PaperService:
                     chapter=None,
                 )
                 db.add(paper_question)
-                await db.flush()
+                pqs.append(paper_question)
+                question_order += 1
+            await db.flush()
 
+            for pq, item in zip(pqs, items, strict=True):
                 for opt in item.options:
                     db.add(
                         PaperQuestionOption(
-                            question_id=paper_question.id,
+                            question_id=pq.id,
                             option_key=opt.key,
                             option_text=opt.text,
                             is_correct=opt.is_correct,
                         )
                     )
-
-                question_order += 1
+            await db.flush()
 
             section_order += 1
 
@@ -181,6 +190,7 @@ class PaperService:
         if question_count <= 0:
             raise HTTPException(status_code=400, detail="questions must not be empty")
 
+        now = datetime.now(timezone.utc)
         paper = Paper(
             title=payload.title,
             course_id=course.id,
@@ -194,14 +204,20 @@ class PaperService:
             quality_score=None,
             status=PaperStatus.DRAFT,
             created_by=actor_id,
+            created_at=now,
+            updated_at=now,
         )
         db.add(paper)
         await db.flush()
 
         await PaperService._populate_paper_questions(db, paper, payload, actor_id)
 
+        if payload.publish_after:
+            paper.status = PaperStatus.PUBLISHED
+            paper.published_at = datetime.now(timezone.utc)
+            paper.updated_at = datetime.now(timezone.utc)
+
         await db.commit()
-        await db.refresh(paper)
 
         return PaperCreateResponse(
             paper_id=paper.id,
@@ -251,8 +267,8 @@ class PaperService:
         await db.flush()
         await PaperService._populate_paper_questions(db, paper, payload, actor_id)
 
+        paper.updated_at = datetime.now(timezone.utc)
         await db.commit()
-        await db.refresh(paper)
 
         return PaperCreateResponse(
             paper_id=paper.id,
@@ -302,7 +318,9 @@ class PaperService:
     @staticmethod
     async def unpublish_paper(db: AsyncSession, actor_id: int, paper_id: int) -> PaperStatusMutationResponse:
         """Rollback a published paper back to draft (owner/admin only)."""
-        paper = await PaperService._get_paper_for_write(db, actor_id, paper_id)
+        paper = await PaperService._get_paper_for_write(
+            db, actor_id, paper_id, omit_large_attachment_columns=True
+        )
         if paper.status != PaperStatus.PUBLISHED:
             raise HTTPException(status_code=400, detail="only published papers can be rolled back to draft")
 
@@ -324,7 +342,9 @@ class PaperService:
         - If the paper has attempts, do not delete.
         - If any question-bank rows are linked to course quizzes, do not delete.
         """
-        paper = await PaperService._get_paper_for_write(db, actor_id, paper_id)
+        paper = await PaperService._get_paper_for_write(
+            db, actor_id, paper_id, omit_large_attachment_columns=True
+        )
 
         attempt_count = await db.scalar(
             select(func.count()).select_from(PaperAttempt).where(PaperAttempt.paper_id == paper.id)
@@ -379,7 +399,13 @@ class PaperService:
             q=q,
         )
 
-        base_stmt = select(Paper, Course).join(Course, Course.id == Paper.course_id)
+        # Read path for UI: do not load binary original or filename — has_source_pdf from SQL only.
+        has_source_pdf_col = Paper.source_pdf.isnot(None).label("has_source_pdf")
+        base_stmt = (
+            select(Paper, Course, has_source_pdf_col)
+            .join(Course, Course.id == Paper.course_id)
+            .options(defer(Paper.source_pdf), defer(Paper.source_file_name))
+        )
         base_stmt = PaperService._apply_visibility_scope(base_stmt, actor)
         base_stmt = PaperService._apply_filters(base_stmt, filters)
 
@@ -396,23 +422,28 @@ class PaperService:
             .limit(page_size)
         )
 
-        items = [PaperService._to_list_item(paper, course, actor) for paper, course in rows.all()]
+        items = [
+            PaperService._to_list_item(paper, course, actor, has_source_pdf=bool(h))
+            for paper, course, h in rows.all()
+        ]
         return PaperListResponse(items=items, page=page, page_size=page_size, total=total)
 
     @staticmethod
     async def get_paper_detail(db: AsyncSession, actor_id: int, paper_id: int) -> PaperDetailResponse:
         actor = await PaperService._require_teacher_or_admin(db, actor_id)
 
+        has_source_pdf_col = Paper.source_pdf.isnot(None).label("has_source_pdf")
         row = await db.execute(
-            select(Paper, Course)
+            select(Paper, Course, has_source_pdf_col)
             .join(Course, Course.id == Paper.course_id)
             .where(Paper.id == paper_id)
+            .options(defer(Paper.source_pdf), defer(Paper.source_file_name))
         )
         resolved = row.first()
         if resolved is None:
             raise HTTPException(status_code=404, detail="paper not found")
 
-        paper, course = resolved
+        paper, course, has_source_pdf_flag = resolved
         PaperService._assert_visibility(actor, paper, course)
 
         section_rows = await db.execute(
@@ -493,7 +524,7 @@ class PaperService:
             quality_score=paper.quality_score,
             published_at=paper.published_at,
             created_at=paper.created_at,
-            has_source_pdf=bool(paper.source_pdf and len(paper.source_pdf) > 0),
+            has_source_pdf=bool(has_source_pdf_flag),
             sections=section_views,
         )
 
@@ -575,13 +606,27 @@ class PaperService:
         return paper
 
     @staticmethod
-    async def _get_paper_for_write(db: AsyncSession, actor_id: int, paper_id: int) -> Paper:
+    async def _get_paper_for_write(
+        db: AsyncSession,
+        actor_id: int,
+        paper_id: int,
+        *,
+        omit_large_attachment_columns: bool = False,
+    ) -> Paper:
+        """Load paper + course for owner-scoped mutations.
+
+        When ``omit_large_attachment_columns`` is True, ``source_pdf`` / ``source_file_name`` are not
+        loaded (avoids reading multi‑MB BYTEA on delete / unpublish paths).
+        """
         actor = await PaperService._require_teacher_or_admin(db, actor_id)
-        row = await db.execute(
+        stmt = (
             select(Paper, Course)
             .join(Course, Course.id == Paper.course_id)
             .where(Paper.id == paper_id)
         )
+        if omit_large_attachment_columns:
+            stmt = stmt.options(defer(Paper.source_pdf), defer(Paper.source_file_name))
+        row = await db.execute(stmt)
         resolved = row.first()
         if resolved is None:
             raise HTTPException(status_code=404, detail="paper not found")
@@ -644,7 +689,17 @@ class PaperService:
         return status.value
 
     @staticmethod
-    def _to_list_item(paper: Paper, course: Course, actor: User) -> PaperListItem:
+    def _to_list_item(
+        paper: Paper,
+        course: Course,
+        actor: User,
+        *,
+        has_source_pdf: bool | None = None,
+    ) -> PaperListItem:
+        if has_source_pdf is None:
+            has_pdf = bool(paper.source_pdf and len(paper.source_pdf) > 0)
+        else:
+            has_pdf = has_source_pdf
         return PaperListItem(
             paper_id=paper.id,
             title=paper.title,
@@ -662,7 +717,7 @@ class PaperService:
             quality_score=paper.quality_score,
             published_at=paper.published_at,
             created_at=paper.created_at,
-            has_source_pdf=bool(paper.source_pdf and len(paper.source_pdf) > 0),
+            has_source_pdf=has_pdf,
         )
 
     @staticmethod

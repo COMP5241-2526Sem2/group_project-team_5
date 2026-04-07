@@ -1,11 +1,10 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type CSSProperties, type DragEvent } from "react";
 import { useNavigate } from "react-router";
 import { FileText, Loader2, Upload, Save, Send, AlertTriangle } from "lucide-react";
+import ImportedPaperPreview from "./ImportedPaperPreview";
 import {
   createPaperApi,
   parsePaperPdfApi,
-  publishPaperApi,
-  uploadPaperSourcePdfApi,
   type PaperCreateQuestionDto,
   type PaperCreateRequestDto,
 } from "../../../utils/paperApi";
@@ -13,7 +12,7 @@ import {
 type ParseState =
   | { status: "idle" }
   | { status: "parsing" }
-  | { status: "parsed"; draft: PaperCreateRequestDto; warnings: string[]; preview: string }
+  | { status: "parsed"; draft: PaperCreateRequestDto; warnings: string[] }
   | { status: "error"; message: string };
 
 export default function AssessmentPaperImport() {
@@ -23,7 +22,7 @@ export default function AssessmentPaperImport() {
   const [file, setFile] = useState<File | null>(null);
   const [parseState, setParseState] = useState<ParseState>({ status: "idle" });
   const [saving, setSaving] = useState<"none" | "draft" | "published">("none");
-
+  const [dropHover, setDropHover] = useState(false);
   const draft: PaperCreateRequestDto | null = useMemo(() => {
     if (parseState.status !== "parsed") return null;
     return parseState.draft;
@@ -44,24 +43,25 @@ export default function AssessmentPaperImport() {
     });
   }
 
+  function isPdfFile(f: File): boolean {
+    return f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
+  }
+
   async function handleParse(selected: File) {
     setFile(selected);
     setParseState({ status: "parsing" });
     try {
       const res = await parsePaperPdfApi(selected);
       const d = res.paper_draft;
-      // Defensive: backend guarantees >=1, but keep UI stable.
-      const safeQuestions = (d.questions || []).length
-        ? d.questions
-        : [{ type: "Short Answer", prompt: "[Placeholder] Please edit the question content.", options: [] } as PaperCreateQuestionDto];
       setParseState({
         status: "parsed",
-        draft: { ...d, questions: safeQuestions },
+        draft: d,
         warnings: res.warnings || [],
-        preview: res.extracted_text_preview || "",
       });
     } catch (e) {
-      setParseState({ status: "error", message: e instanceof Error ? e.message : "Failed to parse" });
+      const msg = e instanceof Error ? e.message : "Failed to parse";
+      setParseState({ status: "error", message: msg });
+      window.alert(msg);
     }
   }
 
@@ -82,25 +82,13 @@ export default function AssessmentPaperImport() {
 
     setSaving(target);
     try {
-      // 1) create as draft (backend always creates draft)
-      const created = await createPaperApi({
+      await createPaperApi({
         ...draft,
         title: draft.title.trim(),
         grade: draft.grade.trim(),
         subject: draft.subject.trim(),
+        publish_after: target === "published",
       });
-
-      // 2) upload original PDF (best-effort)
-      try {
-        await uploadPaperSourcePdfApi(created.paper_id, file);
-      } catch {
-        // non-blocking
-      }
-
-      // 3) optional publish
-      if (target === "published") {
-        await publishPaperApi(created.paper_id);
-      }
 
       navigate("/teacher/assessment/papers");
     } catch (e) {
@@ -109,6 +97,56 @@ export default function AssessmentPaperImport() {
       setSaving("none");
     }
   }
+
+  const parsing = parseState.status === "parsing";
+
+  function handlePdfDropZoneDragOver(e: DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (parsing) return;
+    e.dataTransfer.dropEffect = "copy";
+  }
+
+  function handlePdfDropZoneDragEnter(e: DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (parsing) return;
+    setDropHover(true);
+  }
+
+  function handlePdfDropZoneDragLeave(e: DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const next = e.relatedTarget as Node | null;
+    if (next && e.currentTarget.contains(next)) return;
+    setDropHover(false);
+  }
+
+  function handlePdfDropZoneDrop(e: DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDropHover(false);
+    if (parsing) return;
+    const dropped = Array.from(e.dataTransfer.files).find(isPdfFile);
+    if (dropped) {
+      void handleParse(dropped);
+      return;
+    }
+    if (e.dataTransfer.files.length > 0) {
+      window.alert("Please drop a PDF file.");
+    }
+  }
+
+  const pdfDropZoneStyle = (base: CSSProperties): CSSProperties => ({
+    ...base,
+    ...(dropHover && !parsing
+      ? {
+          borderColor: "#3b5bdb",
+          background: "#f0f4ff",
+          boxShadow: "inset 0 0 0 1px rgba(59, 91, 219, 0.25)",
+        }
+      : {}),
+  });
 
   return (
     <div style={{ height: "calc(100vh - 48px)", background: "#fafafa", overflow: "hidden", display: "flex", flexDirection: "column" }}>
@@ -148,9 +186,20 @@ export default function AssessmentPaperImport() {
         </div>
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: "18px 22px" }}>
-        <div style={{ maxWidth: 980, margin: "0 auto" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: 12, alignItems: "start" }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: "18px 22px", display: "flex", flexDirection: "column" }}>
+        <div
+          style={{
+            maxWidth: 1320,
+            margin: "0 auto",
+            width: "100%",
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "flex-start",
+            gap: 18,
+          }}
+        >
+          {/* Left: grows with content; outer middle column scrolls (overflow:auto) */}
+          <div style={{ flex: 1, minWidth: 0, paddingRight: 2 }}>
             <div style={{ background: "#fff", border: "1px solid #e8eaed", borderRadius: 12, padding: 16 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 12 }}>
                 <div style={{ fontSize: 13, fontWeight: 800, color: "#0f0f23" }}>1) Upload PDF</div>
@@ -176,13 +225,50 @@ export default function AssessmentPaperImport() {
               </div>
 
               {!file && parseState.status === "idle" && (
-                <div style={{ padding: "18px 12px", borderRadius: 10, border: "1px dashed #d1d5db", background: "#fafafa", color: "#6b7280", fontSize: 13, lineHeight: 1.6 }}>
+                <div
+                  onDragEnter={handlePdfDropZoneDragEnter}
+                  onDragLeave={handlePdfDropZoneDragLeave}
+                  onDragOver={handlePdfDropZoneDragOver}
+                  onDrop={handlePdfDropZoneDrop}
+                  style={pdfDropZoneStyle({
+                    padding: "18px 12px",
+                    borderRadius: 10,
+                    border: "1px dashed #d1d5db",
+                    background: "#fafafa",
+                    color: "#6b7280",
+                    fontSize: 13,
+                    lineHeight: 1.6,
+                    transition: "border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease",
+                    cursor: parsing ? "default" : dropHover ? "copy" : "default",
+                  })}
+                >
                   Supports PDF (digital PDFs work best). After uploading, we will try to parse questions. You can preview and edit the result on the right.
+                  <div style={{ marginTop: 8, fontSize: 12, color: "#9ca3af" }}>
+                    Saving stores only the structured paper (title, questions, etc.); the PDF file is not kept in the database.
+                  </div>
+                  <div style={{ marginTop: 4, fontSize: 12, color: "#9ca3af" }}>Or drag and drop a PDF here.</div>
                 </div>
               )}
 
               {file && (
-                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, border: "1px solid #f0f2f5", background: "#fafafa" }}>
+                <div
+                  onDragEnter={handlePdfDropZoneDragEnter}
+                  onDragLeave={handlePdfDropZoneDragLeave}
+                  onDragOver={handlePdfDropZoneDragOver}
+                  onDrop={handlePdfDropZoneDrop}
+                  style={pdfDropZoneStyle({
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    border: "1px solid #f0f2f5",
+                    background: "#fafafa",
+                    transition: "border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease",
+                    cursor: parsing ? "default" : dropHover ? "copy" : "default",
+                  })}
+                  title={parsing ? undefined : "Drop another PDF to replace"}
+                >
                   <FileText size={16} style={{ color: "#6b7280" }} />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name}</div>
@@ -247,84 +333,120 @@ export default function AssessmentPaperImport() {
                       </label>
                     </div>
                   </div>
-                </>
-              )}
-            </div>
 
-            <div style={{ background: "#fff", border: "1px solid #e8eaed", borderRadius: 12, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: "#0f0f23", marginBottom: 10 }}>Extracted text preview (for debugging)</div>
-              {parseState.status === "parsed" ? (
-                <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word", fontSize: 12, color: "#374151", lineHeight: 1.6, maxHeight: 220, overflow: "auto", background: "#fafafa", border: "1px solid #f0f2f5", borderRadius: 10, padding: 10 }}>
-                  {parseState.preview || "[Empty] No extractable text (possibly a scanned PDF)."}
-                </pre>
-              ) : (
-                <div style={{ padding: "14px 12px", borderRadius: 10, border: "1px solid #f0f2f5", background: "#fafafa", color: "#9ca3af", fontSize: 12 }}>
-                  Shown after upload & parse
-                </div>
+                  <div style={{ marginTop: 20, paddingTop: 18, borderTop: "1px solid #f0f2f5" }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: "#0f0f23", marginBottom: 12 }}>
+                      3) Questions (preview &amp; edit) ({draft?.questions.length ?? 0})
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {draft!.questions.map((q, i) => (
+                        <div key={i} style={{ padding: 12, borderRadius: 12, border: "1px solid #f0f2f5", background: "#fafafa" }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
+                            <div style={{ fontSize: 11, fontWeight: 800, color: "#6b7280", textTransform: "uppercase" }}>
+                              #{i + 1} · {q.type}
+                            </div>
+                            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#374151" }}>
+                              Score
+                              <input
+                                type="number"
+                                min={0}
+                                step={0.5}
+                                value={q.score ?? ""}
+                                onChange={(e) => setQuestionPatch(i, { score: e.target.value === "" ? undefined : Number(e.target.value) })}
+                                style={{ width: 84, padding: "6px 8px", borderRadius: 8, border: "1px solid #e8eaed", fontSize: 12 }}
+                              />
+                            </label>
+                          </div>
+                          <textarea
+                            value={q.prompt}
+                            onChange={(e) => setQuestionPatch(i, { prompt: e.target.value })}
+                            rows={3}
+                            style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #e8eaed", fontSize: 13, resize: "vertical" }}
+                          />
+                          {(q.options || []).length > 0 && (
+                            <div style={{ marginTop: 10 }}>
+                              <div style={{ fontSize: 12, fontWeight: 800, color: "#374151", marginBottom: 6 }}>Options</div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                {(q.options || []).map((opt, j) => (
+                                  <div key={j} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                    <span style={{ width: 26, fontSize: 12, fontWeight: 800, color: "#6b7280" }}>{opt.key}</span>
+                                    <input
+                                      value={opt.text}
+                                      onChange={(e) => {
+                                        const text = e.target.value;
+                                        setQuestionPatch(i, {
+                                          options: (q.options || []).map((o, jj) => (jj === j ? { ...o, text } : o)),
+                                        });
+                                      }}
+                                      style={{ flex: 1, padding: "8px 10px", borderRadius: 10, border: "1px solid #e8eaed", fontSize: 13 }}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ marginTop: 10, fontSize: 12, color: "#9ca3af", lineHeight: 1.6 }}>
+                      Tip: Parsed structure is heuristic; edit as needed. The preview on the right updates live.
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </div>
 
-          {parseState.status === "parsed" && (
-            <div style={{ marginTop: 12, background: "#fff", border: "1px solid #e8eaed", borderRadius: 12, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: "#0f0f23", marginBottom: 12 }}>
-                3) Questions (preview & edit) ({draft?.questions.length ?? 0})
+          {/* Right: sticky + max height so preview stays visible while page scrolls */}
+          <div
+            style={{
+              flex: "0 0 42%",
+              maxWidth: 520,
+              minWidth: 280,
+              position: "sticky",
+              top: 0,
+              alignSelf: "flex-start",
+              maxHeight: "calc(100vh - 120px)",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <div
+              style={{
+                background: "#fff",
+                border: "1px solid #e8eaed",
+                borderRadius: 12,
+                padding: 16,
+                flex: 1,
+                minHeight: 0,
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+                maxHeight: "calc(100vh - 120px)",
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#0f0f23", marginBottom: 6, flexShrink: 0 }}>
+                Rendered paper preview
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {draft!.questions.map((q, i) => (
-                  <div key={i} style={{ padding: 12, borderRadius: 12, border: "1px solid #f0f2f5", background: "#fafafa" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: "#6b7280", textTransform: "uppercase" }}>
-                        #{i + 1} · {q.type}
-                      </div>
-                      <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#374151" }}>
-                        Score
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.5}
-                          value={q.score ?? ""}
-                          onChange={(e) => setQuestionPatch(i, { score: e.target.value === "" ? undefined : Number(e.target.value) })}
-                          style={{ width: 84, padding: "6px 8px", borderRadius: 8, border: "1px solid #e8eaed", fontSize: 12 }}
-                        />
-                      </label>
+              <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 12, lineHeight: 1.5, flexShrink: 0 }}>
+                Live layout from the draft on the left. Edits apply immediately.
+              </div>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden" }}>
+                {parseState.status === "parsed" && draft ? (
+                  <>
+                    <ImportedPaperPreview draft={draft} />
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 10, textAlign: "center", lineHeight: 1.5 }}>
+                      Export: browser menu → Print → Save as PDF (optional).
                     </div>
-                    <textarea
-                      value={q.prompt}
-                      onChange={(e) => setQuestionPatch(i, { prompt: e.target.value })}
-                      rows={3}
-                      style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #e8eaed", fontSize: 13, resize: "vertical" }}
-                    />
-                    {(q.options || []).length > 0 && (
-                      <div style={{ marginTop: 10 }}>
-                        <div style={{ fontSize: 12, fontWeight: 800, color: "#374151", marginBottom: 6 }}>Options</div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          {(q.options || []).map((opt, j) => (
-                            <div key={j} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                              <span style={{ width: 26, fontSize: 12, fontWeight: 800, color: "#6b7280" }}>{opt.key}</span>
-                              <input
-                                value={opt.text}
-                                onChange={(e) => {
-                                  const text = e.target.value;
-                                  setQuestionPatch(i, {
-                                    options: (q.options || []).map((o, jj) => (jj === j ? { ...o, text } : o)),
-                                  });
-                                }}
-                                style={{ flex: 1, padding: "8px 10px", borderRadius: 10, border: "1px solid #e8eaed", fontSize: 13 }}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                  </>
+                ) : (
+                  <div style={{ padding: "24px 12px", borderRadius: 10, border: "1px solid #f0f2f5", background: "#fafafa", color: "#9ca3af", fontSize: 12, textAlign: "center" }}>
+                    Shown after upload &amp; parse
                   </div>
-                ))}
-              </div>
-              <div style={{ marginTop: 10, fontSize: 12, color: "#9ca3af", lineHeight: 1.6 }}>
-                Tip: This is heuristic parsing. Scanned PDFs may contain no extractable text. You can still edit and save manually.
+                )}
               </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
 

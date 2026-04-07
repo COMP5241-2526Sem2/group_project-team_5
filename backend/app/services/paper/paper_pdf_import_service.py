@@ -4,8 +4,13 @@ import os
 import re
 from dataclasses import dataclass
 
+from fastapi import HTTPException
+
+from app.config import settings
 from app.schemas.paper import PaperCreateQuestion, PaperCreateQuestionOption, PaperCreateRequest
 from app.services.paper.common.source_text_extraction_service import SourceTextExtractionService
+from app.services.paper.paper_pdf_llm_parse_service import PaperPdfLlmParseService
+from app.services.paper.paper_pdf_vision_parse_service import PaperPdfVisionParseService
 
 
 @dataclass(slots=True)
@@ -18,15 +23,15 @@ class PaperPdfParseResult:
 class PaperPdfImportService:
     """Parse an uploaded PDF into PaperCreateRequest-compatible draft payload.
 
-    Notes:
-    - This is intentionally heuristic. It must never block saving: return a minimal placeholder on failure.
-    - OCR is out of scope; scanned PDFs typically produce little/no text with pypdf.
+    Heuristic parsing first; optional text LLM when no questions but text exists;
+    optional vision (page images) when PDF has no text layer.
+    On total failure, raises HTTPException (422) — no placeholder questions.
     """
 
     _preview_chars = 1200
 
     @staticmethod
-    def parse_pdf_to_paper_draft(
+    async def parse_pdf_to_paper_draft(
         *,
         file_name: str,
         content_type: str | None,
@@ -42,17 +47,39 @@ class PaperPdfImportService:
     ) -> PaperPdfParseResult:
         warnings: list[str] = []
 
-        extracted = ""
-        try:
-            extracted = SourceTextExtractionService.extract_text(
-                file_name=file_name or "paper.pdf",
-                content_type=content_type,
-                data=data,
+        if not data:
+            raise HTTPException(status_code=400, detail="uploaded file is empty")
+        if len(data) > SourceTextExtractionService.max_upload_bytes:
+            raise HTTPException(status_code=400, detail="file too large for extraction")
+
+        extracted = SourceTextExtractionService.extract_normalized_pdf_text(data)
+
+        if not extracted:
+            if settings.paper_pdf_import_vision_enabled and settings.ohmygpt_api_key.strip():
+                questions = await PaperPdfVisionParseService.parse_questions_from_pdf_bytes(data)
+                preview = (questions[0].prompt if questions else "")[: PaperPdfImportService._preview_chars]
+                return PaperPdfImportService._build_result(
+                    questions=questions,
+                    warnings=warnings,
+                    extracted_text_preview=preview or "[Vision import — no text preview]",
+                    file_name=file_name,
+                    title=title,
+                    grade=grade,
+                    subject=subject,
+                    semester=semester,
+                    exam_type=exam_type,
+                    duration_min=duration_min,
+                    total_score=total_score,
+                    course_id=course_id,
+                )
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "No extractable text from PDF (scanned/image-only). "
+                    "Enable vision import (PAPER_PDF_IMPORT_VISION_ENABLED) and set OHMYGPT_API_KEY, "
+                    "or use a PDF with embedded text."
+                ),
             )
-        except Exception as exc:
-            # Keep going with placeholder; API must be resilient.
-            warnings.append("PDF文本抽取失败，可能是扫描件或版式复杂；已生成占位题目供后续编辑。")
-            extracted = ""
 
         extracted_preview = (extracted or "")[: PaperPdfImportService._preview_chars]
 
@@ -68,21 +95,16 @@ class PaperPdfImportService:
         resolved_total = int(total_score) if total_score is not None else 100
 
         questions = PaperPdfImportService._parse_questions(extracted, warnings=warnings)
-        if not questions:
-            warnings.append("未能从PDF中解析出题目结构；已生成占位题目。")
-            questions = [
-                PaperCreateQuestion(
-                    type="Short Answer",
-                    prompt="[占位] 请在此编辑题目内容（PDF解析未识别出题目）。",
-                    difficulty=None,
-                    explanation=None,
-                    answer=None,
-                    options=[],
-                    score=None,
-                )
-            ]
 
-        # If total_score wasn't provided, derive a reasonable default from question count.
+        if not questions:
+            if settings.paper_pdf_import_llm_enabled:
+                questions = await PaperPdfLlmParseService.parse_questions_from_text(extracted)
+            else:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Could not parse questions from PDF; enable paper PDF LLM import or use numbered questions (1. 2.).",
+                )
+
         if total_score is None:
             resolved_total = max(1, len(questions))
 
@@ -105,9 +127,57 @@ class PaperPdfImportService:
         )
 
     @staticmethod
+    def _build_result(
+        *,
+        questions: list[PaperCreateQuestion],
+        warnings: list[str],
+        extracted_text_preview: str,
+        file_name: str | None,
+        title: str | None,
+        grade: str | None,
+        subject: str | None,
+        semester: str | None,
+        exam_type: str | None,
+        duration_min: int | None,
+        total_score: int | None,
+        course_id: int | None,
+    ) -> PaperPdfParseResult:
+        inferred_title = (title or "").strip()
+        if not inferred_title:
+            stem = os.path.splitext(os.path.basename(file_name or "paper"))[0].strip()
+            inferred_title = stem or "Imported Paper"
+
+        resolved_grade = (grade or "").strip() or "Grade 7"
+        resolved_subject = (subject or "").strip() or "Biology"
+        resolved_exam_type = (exam_type or "").strip() or "imported_pdf"
+        resolved_duration = int(duration_min) if duration_min is not None else 60
+        resolved_total = int(total_score) if total_score is not None else 100
+
+        if total_score is None:
+            resolved_total = max(1, len(questions))
+
+        paper_draft = PaperCreateRequest(
+            title=inferred_title,
+            grade=resolved_grade,
+            subject=resolved_subject,
+            semester=(semester or None),
+            exam_type=resolved_exam_type,
+            duration_min=max(1, resolved_duration),
+            total_score=max(1, resolved_total),
+            course_id=course_id,
+            questions=questions,
+        )
+
+        return PaperPdfParseResult(
+            paper_draft=paper_draft,
+            warnings=warnings,
+            extracted_text_preview=extracted_text_preview,
+        )
+
+    @staticmethod
     def _parse_questions(text: str, *, warnings: list[str]) -> list[PaperCreateQuestion]:
-        if not text or len(text.strip()) < 20:
-            warnings.append("PDF可抽取文本过少（疑似扫描件/OCR缺失）。")
+        stripped = (text or "").strip()
+        if not stripped:
             return []
 
         lines = [PaperPdfImportService._normalize_line(ln) for ln in text.splitlines()]
@@ -115,9 +185,10 @@ class PaperPdfImportService:
 
         blocks = PaperPdfImportService._split_question_blocks(lines)
         if not blocks:
-            # Fallback: attempt to create a few questions from sentences.
+            tlen = len(stripped)
+            min_frag = 5 if tlen < 200 else 12
             frags = re.split(r"[。！？!?]", text)
-            prompts = [f.strip() for f in frags if len(f.strip()) >= 12][:10]
+            prompts = [f.strip() for f in frags if len(f.strip()) >= min_frag][:10]
             return [
                 PaperCreateQuestion(
                     type="Short Answer",
@@ -166,7 +237,6 @@ class PaperPdfImportService:
         current_lines: list[str] = []
 
         for line in lines:
-            # Common patterns: "1.", "1)", "1）", "1、"
             m = re.match(r"^(\d{1,3})\s*[\.\)\]）、】【:：]\s*(.*)$", line)
             if m:
                 if current_num is not None and current_lines:
@@ -205,7 +275,6 @@ class PaperPdfImportService:
                 opts.append(PaperPdfImportService._Opt(key=m.group(1), text=m.group(2).strip()))
                 continue
 
-            # option continuation
             if opts:
                 last = opts[-1]
                 last.text = f"{last.text} {line}".strip()
@@ -218,11 +287,9 @@ class PaperPdfImportService:
 
     @staticmethod
     def _split_inline_options(line: str) -> list[tuple[str, str]]:
-        # Examples: "A. xxx B. yyy C. zzz D. ttt"
         if not line:
             return []
         parts = re.split(r"(?=(?:^|\s)([A-H])[\.\)）]\s*)", f" {line}".strip())
-        # re.split keeps groups; we want pairs (key, text)
         out: list[tuple[str, str]] = []
         key: str | None = None
         buf: list[str] = []
@@ -239,7 +306,6 @@ class PaperPdfImportService:
                 buf.append(tok)
         if key is not None and buf:
             out.append((key, " ".join(buf).strip()))
-        # Require at least 2 options to be considered an option line.
         return out if len(out) >= 2 else []
 
     @staticmethod
@@ -252,4 +318,3 @@ class PaperPdfImportService:
         if "____" in prompt or "填空" in prompt:
             return "Fill-blank"
         return "Short Answer"
-

@@ -118,6 +118,8 @@ class PaperCreateRequest(BaseModel):
     total_score: int = Field(default=100, ge=1)
     course_id: int | None = None
     questions: list[PaperCreateQuestion] = Field(min_length=1)
+    # Create-only: if true, mark published in the same transaction as insert (avoids a second HTTP round-trip).
+    publish_after: bool = False
 
 
 class PaperCreateResponse(BaseModel):
