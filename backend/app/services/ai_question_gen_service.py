@@ -115,13 +115,27 @@ class AIQuestionGenService:
         return AIQuestionGenService._client
 
     @staticmethod
+    def _token_limit_kwargs(*, model: str, max_tokens: int) -> dict[str, int]:
+        """
+        OpenAI-style APIs have started migrating some models to `max_completion_tokens`.
+        Keep backward compatibility by switching based on model name.
+        """
+        name = (model or "").strip().lower()
+        if name.startswith("gpt-5") or name.startswith("o"):
+            return {"max_completion_tokens": max_tokens}
+        return {"max_tokens": max_tokens}
+
+    @staticmethod
     async def _llm_generate(payload: AIQuestionGenPreviewRequest, type_targets: dict[str, int]) -> list[AIQuestionGenQuestion]:
         client = AIQuestionGenService._get_client()
         messages = AIQuestionGenService._build_messages(payload, type_targets)
         response = await client.chat.completions.create(
             model=settings.quiz_generation_model,
             temperature=settings.quiz_generation_temperature,
-            max_tokens=settings.quiz_generation_max_tokens,
+            **AIQuestionGenService._token_limit_kwargs(
+                model=settings.quiz_generation_model,
+                max_tokens=settings.quiz_generation_max_tokens,
+            ),
             response_format={"type": "json_object"},
             messages=messages,
         )
@@ -223,7 +237,10 @@ class AIQuestionGenService:
         response = await client.chat.completions.create(
             model=settings.quiz_generation_model,
             temperature=settings.quiz_generation_temperature,
-            max_tokens=settings.quiz_generation_max_tokens,
+            **AIQuestionGenService._token_limit_kwargs(
+                model=settings.quiz_generation_model,
+                max_tokens=settings.quiz_generation_max_tokens,
+            ),
             messages=AIQuestionGenService._build_messages(payload, type_targets),
         )
         raw = response.choices[0].message.content if response.choices else None

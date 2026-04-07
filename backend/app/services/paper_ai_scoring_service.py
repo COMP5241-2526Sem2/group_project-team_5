@@ -343,6 +343,13 @@ class PaperAIScoringService:
         return PaperAIScoringService._client
 
     @staticmethod
+    def _token_limit_kwargs(*, model: str, max_tokens: int) -> dict[str, int]:
+        name = (model or "").strip().lower()
+        if name.startswith("gpt-5") or name.startswith("o"):
+            return {"max_completion_tokens": max_tokens}
+        return {"max_tokens": max_tokens}
+
+    @staticmethod
     async def _llm_suggest(
         question: PaperQuestion,
         answer_text: str | None,
@@ -358,7 +365,10 @@ class PaperAIScoringService:
         resp = await client.chat.completions.create(
             model=settings.ai_scoring_model,
             temperature=settings.ai_scoring_temperature,
-            max_tokens=settings.ai_scoring_max_tokens,
+            **PaperAIScoringService._token_limit_kwargs(
+                model=settings.ai_scoring_model,
+                max_tokens=settings.ai_scoring_max_tokens,
+            ),
             response_format={"type": "json_object"},
             messages=[
                 {

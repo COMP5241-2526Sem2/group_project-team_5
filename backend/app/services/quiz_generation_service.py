@@ -343,6 +343,13 @@ class QuizGenerationService:
         return QuizGenerationService._client
 
     @staticmethod
+    def _token_limit_kwargs(*, model: str, max_tokens: int) -> dict[str, int]:
+        name = (model or "").strip().lower()
+        if name.startswith("gpt-5") or name.startswith("o"):
+            return {"max_completion_tokens": max_tokens}
+        return {"max_tokens": max_tokens}
+
+    @staticmethod
     async def _llm_generate_question_content(
         payload: QuizGenerateRequest,
         question_type: str,
@@ -352,7 +359,10 @@ class QuizGenerationService:
         response = await client.chat.completions.create(
             model=settings.quiz_generation_model,
             temperature=settings.quiz_generation_temperature,
-            max_tokens=settings.quiz_generation_max_tokens,
+            **QuizGenerationService._token_limit_kwargs(
+                model=settings.quiz_generation_model,
+                max_tokens=settings.quiz_generation_max_tokens,
+            ),
             response_format={"type": "json_object"},
             messages=[
                 {
