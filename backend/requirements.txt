@@ -1,15 +1,36 @@
+# Python 环境依赖（pip）。安装：pip install -r requirements.txt
+# 与 pyproject.toml 的 [project.dependencies] 保持一致，并含脚本常用包。
+
+# --- Web ---
 fastapi>=0.135.3
 uvicorn>=0.42.0
+python-multipart==0.0.9
+httpx>=0.28.1
+
+# --- DB / ORM ---
 sqlalchemy>=2.0.48
+greenlet>=3.2.4
+alembic>=1.18.4
 asyncpg>=0.31.0
 aiomysql>=0.3.2
 aiosqlite>=0.22.1
+
+# --- Config / validation ---
 pydantic>=2.12.5
 pydantic-settings>=2.13.1
+python-dotenv>=1.0.0
+
+# --- Auth ---
 python-jose[cryptography]>=3.5.0
 passlib[bcrypt]>=1.7.4
-python-multipart==0.0.9
+
+# --- OpenAI / LLM ---
 openai>=2.30.0
 jiter>=0.8.0
-httpx>=0.28.1
+
+# --- PDF（pypdf + PyMuPDF 提供 import fitz）---
 pypdf>=5.4.0
+pymupdf>=1.24.0
+
+# --- 脚本：HuggingFace datasets ---
+datasets>=3.0.0

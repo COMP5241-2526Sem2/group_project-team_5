@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import BigInteger, DateTime, Text, UniqueConstraint, func
 from sqlalchemy import Enum as SQLEnum
@@ -26,7 +27,7 @@ class Textbook(Base):
         SQLEnum(TextbookSemester, name="textbook_semester"), nullable=False
     )
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    created_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
+    created_by: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False

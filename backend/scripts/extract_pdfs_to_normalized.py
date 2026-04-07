@@ -153,6 +153,8 @@ def parse_questions(text: str, *, subject: str, grade: str) -> list[dict[str, An
 
     for idx, block in blocks[:80]:
         prompt, options = parse_question_block(block)
+        if is_instruction_boilerplate(prompt=prompt, options=options):
+            continue
         question_type = infer_question_type(prompt=prompt, options=options)
 
         questions.append(
@@ -258,6 +260,46 @@ def dedupe_options(options: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return unique
 
 
+def is_instruction_boilerplate(*, prompt: str, options: list[dict[str, Any]]) -> bool:
+    if options:
+        return False
+    t = (prompt or "").strip()
+    if len(t) < 25:
+        return False
+    low = t.lower()
+    if "?" in low:
+        return False
+    hints = (
+        "instructions",
+        "time allowed",
+        "total mark",
+        "candidate",
+        "answer sheet",
+        "write your answers",
+        "do not write",
+        "this paper consists",
+        "section a",
+        "section b",
+    )
+    return any(h in low[:200] for h in hints)
+
+
+def is_multi_select_prompt(low: str) -> bool:
+    return any(
+        phrase in low
+        for phrase in (
+            "select all",
+            "choose all",
+            "select two",
+            "choose two",
+            "all that apply",
+            "multiple answer",
+            "more than one",
+            "several correct",
+        )
+    )
+
+
 def infer_question_type(*, prompt: str, options: list[dict[str, Any]]) -> str:
     low = prompt.lower()
 
@@ -265,7 +307,7 @@ def infer_question_type(*, prompt: str, options: list[dict[str, Any]]) -> str:
         option_texts = " ".join(str(o.get("option_text", "")) for o in options).lower()
         if is_true_false_prompt(prompt=low, option_texts=option_texts):
             return "TRUE_FALSE"
-        if "select two" in low or "choose two" in low or "all that apply" in low:
+        if is_multi_select_prompt(low) or "select two" in low or "choose two" in low or "all that apply" in low:
             return "MCQ_MULTI"
         return "MCQ_SINGLE"
 

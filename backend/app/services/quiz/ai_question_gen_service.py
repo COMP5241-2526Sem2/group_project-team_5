@@ -6,6 +6,7 @@ import logging
 import re
 from dataclasses import dataclass
 
+from fastapi import HTTPException
 from openai import AsyncOpenAI
 
 from app.config import settings
@@ -45,6 +46,12 @@ class AIQuestionGenService:
         type_targets = payload.type_targets or AIQuestionGenService._default_type_targets(payload.question_count)
 
         provider = settings.quiz_generation_provider.strip().lower()
+        if payload.require_ai and not AIQuestionGenService._llm_enabled():
+            raise HTTPException(
+                status_code=503,
+                detail="AI question generation requires an enabled LLM provider and API key (require_ai=true).",
+            )
+
         if AIQuestionGenService._llm_enabled():
             max_attempts = max(1, settings.quiz_generation_llm_max_retries)
             last_error: Exception | None = None
@@ -74,6 +81,12 @@ class AIQuestionGenService:
                 if attempt < max_attempts:
                     await asyncio.sleep(min(0.5 * attempt, 1.5))
 
+            if payload.require_ai:
+                detail = "LLM returned no questions or failed after retries."
+                if last_error is not None:
+                    detail = f"AI generation failed ({type(last_error).__name__})."
+                raise HTTPException(status_code=502, detail=detail)
+
             fallback = AIQuestionGenService._heuristic_generate(payload, type_targets)
             warning = "LLM unavailable or returned empty output; heuristic fallback was used."
             if last_error is not None:
@@ -86,6 +99,18 @@ class AIQuestionGenService:
 
         key_missing = provider in {"openai", "ohmygpt"} and not settings.ohmygpt_api_key.strip()
         provider_mismatch = provider not in {"openai", "ohmygpt", "heuristic"}
+
+        if payload.require_ai:
+            if key_missing:
+                raise HTTPException(
+                    status_code=503,
+                    detail="LLM provider is selected but the API key is missing (require_ai=true).",
+                )
+            if provider_mismatch:
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Unknown quiz_generation_provider '{provider}' (require_ai=true).",
+                )
 
         fallback = AIQuestionGenService._heuristic_generate(payload, type_targets)
         warning: str | None = None

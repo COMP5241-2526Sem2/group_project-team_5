@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Integer, JSON, Text, UniqueConstraint, func
 from sqlalchemy import Enum as SQLEnum
@@ -35,14 +36,14 @@ class LessonDeck(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     title: Mapped[str] = mapped_column(Text, nullable=False)
     subject: Mapped[str] = mapped_column(Text, nullable=False)
-    grade: Mapped[str | None] = mapped_column(Text, nullable=True)
+    grade: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     deck_source: Mapped[DeckSource] = mapped_column(
         SQLEnum(DeckSource, name="deck_source"), nullable=False, default=DeckSource.MANUAL
     )
     status: Mapped[DeckStatus] = mapped_column(SQLEnum(DeckStatus, name="deck_status"), nullable=False, default=DeckStatus.DRAFT)
     teacher_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
-    thumbnail: Mapped[str | None] = mapped_column(Text, nullable=True)
-    metadata_json: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
+    thumbnail: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[Optional[dict]] = mapped_column("metadata", JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
@@ -54,7 +55,7 @@ class Slide(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     deck_id: Mapped[int] = mapped_column(ForeignKey("lesson_decks.id", ondelete="CASCADE"), nullable=False, index=True)
-    title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     order_num: Mapped[int] = mapped_column(Integer, nullable=False)
 
     __table_args__ = (
@@ -71,8 +72,8 @@ class SlideBlock(Base):
     block_type: Mapped[SlideBlockType] = mapped_column(
         SQLEnum(SlideBlockType, name="slide_block_type"), nullable=False
     )
-    content: Mapped[str | None] = mapped_column(Text, nullable=True)
-    extra_payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    extra_payload: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     order_num: Mapped[int] = mapped_column(Integer, nullable=False)
 
     __table_args__ = (

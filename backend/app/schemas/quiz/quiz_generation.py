@@ -95,6 +95,8 @@ class AIQuestionGenPreviewRequest(BaseModel):
     difficulty: Difficulty
     question_count: int = Field(ge=1)
     type_targets: dict[str, int] | None = None
+    # When true, do not fall back to heuristic questions if the LLM fails or is disabled.
+    require_ai: bool = False
 
 
 class AIQuestionGenPreviewResponse(BaseModel):
