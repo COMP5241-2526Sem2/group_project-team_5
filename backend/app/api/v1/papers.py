@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Literal
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,10 +27,11 @@ from app.schemas.paper_ai_scoring import (
     PaperAIAdoptResponse,
     PaperAISuggestionsResponse,
 )
-from app.schemas.paper import PaperDetailResponse, PaperListResponse, PaperStatusMutationResponse
+from app.schemas.paper import PaperDetailResponse, PaperListResponse, PaperPdfParseResponse, PaperStatusMutationResponse
 from app.schemas.paper import PaperCreateRequest, PaperCreateResponse, PaperUpdateRequest, PaperUpdateResponse
 from app.services.paper_ai_scoring_service import PaperAIScoringService
 from app.services.paper_attempt_service import PaperAttemptService
+from app.services.paper_pdf_import_service import PaperPdfImportService
 from app.services.paper_service import PaperService
 
 router = APIRouter(tags=["papers"])
@@ -80,6 +81,41 @@ async def create_paper(
     return await PaperService.create_paper(db=db, actor_id=actor_id, payload=payload)
 
 
+@router.post("/papers/parse-pdf", response_model=PaperPdfParseResponse)
+async def parse_paper_pdf(
+    file: UploadFile = File(...),
+    title: str | None = Form(default=None),
+    grade: str | None = Form(default=None),
+    subject: str | None = Form(default=None),
+    semester: str | None = Form(default=None),
+    exam_type: str | None = Form(default=None),
+    duration_min: int | None = Form(default=None),
+    total_score: int | None = Form(default=None),
+    course_id: int | None = Form(default=None),
+    x_user_id: int | None = Header(default=None, alias="X-User-Id"),
+) -> PaperPdfParseResponse:
+    _require_user_id(x_user_id)
+    data = await file.read()
+    result = PaperPdfImportService.parse_pdf_to_paper_draft(
+        file_name=file.filename or "paper.pdf",
+        content_type=file.content_type,
+        data=data,
+        title=title,
+        grade=grade,
+        subject=subject,
+        semester=semester,
+        exam_type=exam_type,
+        duration_min=duration_min,
+        total_score=total_score,
+        course_id=course_id,
+    )
+    return PaperPdfParseResponse(
+        paper_draft=result.paper_draft,
+        warnings=result.warnings,
+        extracted_text_preview=result.extracted_text_preview,
+    )
+
+
 @router.get("/papers/{paper_id}", response_model=PaperDetailResponse)
 async def get_paper_detail(
     paper_id: int,
@@ -99,6 +135,28 @@ async def update_draft_paper(
 ) -> PaperUpdateResponse:
     actor_id = _require_user_id(x_user_id)
     return await PaperService.update_draft_paper(db=db, actor_id=actor_id, paper_id=paper_id, payload=payload)
+
+
+@router.post("/papers/{paper_id}/source-pdf", status_code=204)
+async def upload_paper_source_pdf(
+    paper_id: int,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    x_user_id: int | None = Header(default=None, alias="X-User-Id"),
+) -> None:
+    actor_id = _require_user_id(x_user_id)
+    paper = await PaperService._get_paper_for_write(db, actor_id, paper_id)
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="uploaded file is empty")
+    if len(data) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="file too large")
+
+    paper.source_pdf = data
+    paper.source_file_name = (file.filename or "").strip() or None
+    await db.commit()
+    return None
 
 
 @router.get("/papers/{paper_id}/export")
@@ -153,6 +211,27 @@ async def reopen_paper(
 ) -> PaperStatusMutationResponse:
     actor_id = _require_user_id(x_user_id)
     return await PaperService.reopen_paper(db=db, actor_id=actor_id, paper_id=paper_id)
+
+
+@router.post("/papers/{paper_id}/unpublish", response_model=PaperStatusMutationResponse)
+async def unpublish_paper(
+    paper_id: int,
+    db: AsyncSession = Depends(get_db),
+    x_user_id: int | None = Header(default=None, alias="X-User-Id"),
+) -> PaperStatusMutationResponse:
+    actor_id = _require_user_id(x_user_id)
+    return await PaperService.unpublish_paper(db=db, actor_id=actor_id, paper_id=paper_id)
+
+
+@router.delete("/papers/{paper_id}", status_code=204)
+async def delete_paper(
+    paper_id: int,
+    db: AsyncSession = Depends(get_db),
+    x_user_id: int | None = Header(default=None, alias="X-User-Id"),
+) -> None:
+    actor_id = _require_user_id(x_user_id)
+    await PaperService.delete_paper(db=db, actor_id=actor_id, paper_id=paper_id)
+    return None
 
 
 @router.get("/papers/{paper_id}/attempts/me", response_model=PaperAttemptCreateResponse)

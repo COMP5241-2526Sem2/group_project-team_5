@@ -64,7 +64,7 @@ export default function AssessmentPaperEdit() {
   const [questions, setQuestions] = useState<PaperCreateQuestionDto[]>([]);
 
   const goBack = useCallback(() => {
-    navigate('/teacher/assessment/grading');
+    navigate('/teacher/assessment/papers');
   }, [navigate]);
 
   useEffect(() => {
@@ -127,7 +127,7 @@ export default function AssessmentPaperEdit() {
         questions,
       };
       await updatePaperApi(paperId, payload);
-      navigate('/teacher/assessment/grading');
+      navigate('/teacher/assessment/papers');
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to save';
       window.alert(msg);

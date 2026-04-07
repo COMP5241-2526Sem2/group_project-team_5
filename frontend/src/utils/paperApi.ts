@@ -10,6 +10,7 @@ export interface PaperListItemDto {
   semester: string | null;
   exam_type: string;
   status: "draft" | "published" | "closed";
+  is_owner?: boolean;
   total_score: number;
   duration_min: number;
   question_count: number;
@@ -64,6 +65,7 @@ export interface PaperDetailDto {
   semester: string | null;
   exam_type: string;
   status: "draft" | "published" | "closed";
+  is_owner?: boolean;
   total_score: number;
   duration_min: number;
   question_count: number;
@@ -148,6 +150,72 @@ export async function updatePaperApi(
     method: "PUT",
     body: JSON.stringify(payload),
   }, "teacher");
+}
+
+export interface PaperPdfParseResponseDto {
+  paper_draft: PaperCreateRequestDto;
+  warnings: string[];
+  extracted_text_preview: string;
+}
+
+export async function parsePaperPdfApi(
+  file: File,
+  meta: Partial<{
+    title: string;
+    grade: string;
+    subject: string;
+    semester: string | null;
+    exam_type: string;
+    duration_min: number;
+    total_score: number;
+    course_id: number;
+  }> = {},
+): Promise<PaperPdfParseResponseDto> {
+  const form = new FormData();
+  form.append("file", file);
+  Object.entries(meta).forEach(([k, v]) => {
+    if (v === undefined || v === null) return;
+    const s = String(v).trim();
+    if (!s) return;
+    form.append(k, s);
+  });
+  return apiRequest<PaperPdfParseResponseDto>(
+    "/papers/parse-pdf",
+    { method: "POST", body: form },
+    "teacher",
+  );
+}
+
+export async function uploadPaperSourcePdfApi(paperId: number, file: File): Promise<void> {
+  const form = new FormData();
+  form.append("file", file);
+  await apiRequest<void>(
+    `/papers/${paperId}/source-pdf`,
+    { method: "POST", body: form },
+    "teacher",
+  );
+}
+
+export interface PaperStatusMutationResponseDto {
+  paper_id: number;
+  status: "draft" | "published" | "closed";
+  changed_at: string;
+}
+
+export async function publishPaperApi(paperId: number): Promise<PaperStatusMutationResponseDto> {
+  return apiRequest<PaperStatusMutationResponseDto>(`/papers/${paperId}/publish`, {
+    method: "POST",
+  }, "teacher");
+}
+
+export async function unpublishPaperApi(paperId: number): Promise<PaperStatusMutationResponseDto> {
+  return apiRequest<PaperStatusMutationResponseDto>(`/papers/${paperId}/unpublish`, {
+    method: "POST",
+  }, "teacher");
+}
+
+export async function deletePaperApi(paperId: number): Promise<void> {
+  await apiRequest<void>(`/papers/${paperId}`, { method: "DELETE" }, "teacher");
 }
 
 export type PaperExportFormat = "html" | "pdf" | "txt";

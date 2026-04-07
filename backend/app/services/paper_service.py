@@ -300,6 +300,44 @@ class PaperService:
         )
 
     @staticmethod
+    async def unpublish_paper(db: AsyncSession, actor_id: int, paper_id: int) -> PaperStatusMutationResponse:
+        """Rollback a published paper back to draft (owner/admin only)."""
+        paper = await PaperService._get_paper_for_write(db, actor_id, paper_id)
+        if paper.status != PaperStatus.PUBLISHED:
+            raise HTTPException(status_code=400, detail="only published papers can be rolled back to draft")
+
+        paper.status = PaperStatus.DRAFT
+        paper.published_at = None
+        await db.commit()
+
+        return PaperStatusMutationResponse(
+            paper_id=paper.id,
+            status=PaperService._map_status(paper.status),
+            changed_at=datetime.now(timezone.utc),
+        )
+
+    @staticmethod
+    async def delete_paper(db: AsyncSession, actor_id: int, paper_id: int) -> None:
+        """Delete a paper (owner/admin only).
+
+        Safety rules:
+        - If the paper has attempts, do not delete.
+        - If any question-bank rows are linked to course quizzes, do not delete.
+        """
+        paper = await PaperService._get_paper_for_write(db, actor_id, paper_id)
+
+        attempt_count = await db.scalar(
+            select(func.count()).select_from(PaperAttempt).where(PaperAttempt.paper_id == paper.id)
+        )
+        if int(attempt_count or 0) > 0:
+            raise HTTPException(status_code=409, detail="paper has attempts; cannot delete")
+
+        # Reuse the same guard as draft update (prevents deleting bank items if they are linked to quizzes).
+        await PaperService._delete_paper_questions_and_bank(db, paper.id)
+        await db.execute(delete(Paper).where(Paper.id == paper.id))
+        await db.commit()
+
+    @staticmethod
     async def reopen_paper(db: AsyncSession, actor_id: int, paper_id: int) -> PaperStatusMutationResponse:
         paper = await PaperService._get_paper_for_teacher_or_admin(db, actor_id, paper_id)
         if paper.status == PaperStatus.DRAFT:
@@ -342,11 +380,11 @@ class PaperService:
         )
 
         base_stmt = select(Paper, Course).join(Course, Course.id == Paper.course_id)
-        base_stmt = PaperService._apply_scope(base_stmt, actor)
+        base_stmt = PaperService._apply_visibility_scope(base_stmt, actor)
         base_stmt = PaperService._apply_filters(base_stmt, filters)
 
         count_stmt = select(func.count()).select_from(Paper).join(Course, Course.id == Paper.course_id)
-        count_stmt = PaperService._apply_scope(count_stmt, actor)
+        count_stmt = PaperService._apply_visibility_scope(count_stmt, actor)
         count_stmt = PaperService._apply_filters(count_stmt, filters)
 
         total = int((await db.scalar(count_stmt)) or 0)
@@ -358,7 +396,7 @@ class PaperService:
             .limit(page_size)
         )
 
-        items = [PaperService._to_list_item(paper, course) for paper, course in rows.all()]
+        items = [PaperService._to_list_item(paper, course, actor) for paper, course in rows.all()]
         return PaperListResponse(items=items, page=page, page_size=page_size, total=total)
 
     @staticmethod
@@ -375,7 +413,7 @@ class PaperService:
             raise HTTPException(status_code=404, detail="paper not found")
 
         paper, course = resolved
-        PaperService._assert_scope(actor, course)
+        PaperService._assert_visibility(actor, paper, course)
 
         section_rows = await db.execute(
             select(PaperSection)
@@ -448,6 +486,7 @@ class PaperService:
             semester=paper.semester,
             exam_type=paper.exam_type,
             status=PaperService._map_status(paper.status),
+            is_owner=PaperService._is_owner(actor, course),
             total_score=paper.total_score,
             duration_min=paper.duration_min,
             question_count=paper.question_count,
@@ -469,7 +508,7 @@ class PaperService:
 
         export_format: None = legacy (PDF if stored, else HTML); html | pdf | txt = explicit format.
         """
-        paper = await PaperService._get_paper_for_teacher_or_admin(db, actor_id, paper_id)
+        paper = await PaperService._get_paper_for_read(db, actor_id, paper_id)
         has_pdf = bool(paper.source_pdf and len(paper.source_pdf) > 0)
 
         if export_format is None:
@@ -517,6 +556,11 @@ class PaperService:
 
     @staticmethod
     async def _get_paper_for_teacher_or_admin(db: AsyncSession, actor_id: int, paper_id: int) -> Paper:
+        # Backward-compat helper: mutations still require ownership scope.
+        return await PaperService._get_paper_for_write(db, actor_id, paper_id)
+
+    @staticmethod
+    async def _get_paper_for_read(db: AsyncSession, actor_id: int, paper_id: int) -> Paper:
         actor = await PaperService._require_teacher_or_admin(db, actor_id)
         row = await db.execute(
             select(Paper, Course)
@@ -526,7 +570,21 @@ class PaperService:
         resolved = row.first()
         if resolved is None:
             raise HTTPException(status_code=404, detail="paper not found")
+        paper, course = resolved
+        PaperService._assert_visibility(actor, paper, course)
+        return paper
 
+    @staticmethod
+    async def _get_paper_for_write(db: AsyncSession, actor_id: int, paper_id: int) -> Paper:
+        actor = await PaperService._require_teacher_or_admin(db, actor_id)
+        row = await db.execute(
+            select(Paper, Course)
+            .join(Course, Course.id == Paper.course_id)
+            .where(Paper.id == paper_id)
+        )
+        resolved = row.first()
+        if resolved is None:
+            raise HTTPException(status_code=404, detail="paper not found")
         paper, course = resolved
         PaperService._assert_scope(actor, course)
         return paper
@@ -537,9 +595,24 @@ class PaperService:
             raise HTTPException(status_code=403, detail="forbidden for this course")
 
     @staticmethod
-    def _apply_scope(stmt, actor: User):
+    def _assert_visibility(actor: User, paper: Paper, course: Course) -> None:
+        """Visibility rules:
+        - draft/archived: only owning teacher (or admin) can access
+        - published: any teacher/admin can access
+        """
+        if actor.account_type == AccountType.ADMIN:
+            return
+        if actor.account_type == AccountType.TEACHER and paper.status == PaperStatus.PUBLISHED:
+            return
+        PaperService._assert_scope(actor, course)
+
+    @staticmethod
+    def _apply_visibility_scope(stmt, actor: User):
         if actor.account_type == AccountType.TEACHER:
-            return stmt.where(Course.teacher_id == actor.id)
+            # Teachers can see:
+            # - any published paper (shared across teachers)
+            # - any paper within their own course scope (draft/archived/published)
+            return stmt.where((Course.teacher_id == actor.id) | (Paper.status == PaperStatus.PUBLISHED))
         return stmt
 
     @staticmethod
@@ -571,7 +644,7 @@ class PaperService:
         return status.value
 
     @staticmethod
-    def _to_list_item(paper: Paper, course: Course) -> PaperListItem:
+    def _to_list_item(paper: Paper, course: Course, actor: User) -> PaperListItem:
         return PaperListItem(
             paper_id=paper.id,
             title=paper.title,
@@ -582,6 +655,7 @@ class PaperService:
             semester=paper.semester,
             exam_type=paper.exam_type,
             status=PaperService._map_status(paper.status),
+            is_owner=PaperService._is_owner(actor, course),
             total_score=paper.total_score,
             duration_min=paper.duration_min,
             question_count=paper.question_count,
@@ -589,6 +663,12 @@ class PaperService:
             published_at=paper.published_at,
             created_at=paper.created_at,
             has_source_pdf=bool(paper.source_pdf and len(paper.source_pdf) > 0),
+        )
+
+    @staticmethod
+    def _is_owner(actor: User, course: Course) -> bool:
+        return actor.account_type == AccountType.ADMIN or (
+            actor.account_type == AccountType.TEACHER and course.teacher_id == actor.id
         )
 
     @staticmethod

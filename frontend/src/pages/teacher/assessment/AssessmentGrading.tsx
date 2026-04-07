@@ -1313,7 +1313,7 @@ function PublishView({ papers, onDelete, onPublish, onNewPaper }: { papers:Paper
             ))}
           </div>
           <button onClick={onNewPaper} style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:'5px', padding:'7px 15px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#3b5bdb', color:'#fff', fontSize:'12px', fontWeight:600 }}>
-            <Plus size={12}/> New Paper
+            <ChevronLeft size={12}/> 返回assemble
           </button>
         </div>
         <div style={{ flex:1, overflowY:'auto', padding:'14px 20px', display:'flex', flexDirection:'column', gap:'8px' }}>

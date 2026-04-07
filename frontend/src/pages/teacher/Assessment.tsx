@@ -7,6 +7,7 @@ import AssessmentLibrary  from './assessment/AssessmentLibrary';
 import AssessmentPapers   from './assessment/AssessmentPapers';
 import AssessmentGrading  from './assessment/AssessmentGrading';
 import AssessmentPaperEdit from './assessment/AssessmentPaperEdit';
+import AssessmentPaperImport from './assessment/AssessmentPaperImport';
 
 /** 试卷编辑页路径，需与列表页 /papers 区分 */
 const isPaperEditPath = (p: string) =>
@@ -16,8 +17,9 @@ export default function Assessment() {
   const { pathname } = useLocation();
 
   const isPaperEdit = isPaperEditPath(pathname);
+  const isPaperImport = pathname.startsWith('/teacher/assessment/papers/import');
   const isLibrary = pathname.startsWith('/teacher/assessment/library');
-  const isPapersList = pathname.startsWith('/teacher/assessment/papers') && !isPaperEdit;
+  const isPapersList = pathname.startsWith('/teacher/assessment/papers') && !isPaperEdit && !isPaperImport;
 
   /** 曾在当前会话中打开过题库 / 试卷列表则保持挂载，切换侧栏时不必重新请求、可立即展示缓存 UI */
   const [libraryKept, setLibraryKept] = useState(false);
@@ -35,6 +37,9 @@ export default function Assessment() {
   function renderContent() {
     if (isPaperEdit) {
       return <AssessmentPaperEdit />;
+    }
+    if (isPaperImport) {
+      return <AssessmentPaperImport />;
     }
     if (pathname.startsWith('/teacher/assessment/ai-paper'))  return <AssessmentAIPaper />;
     if (isLibrary || isPapersList) {

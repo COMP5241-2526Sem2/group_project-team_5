@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
 import {
   Filter, Search, Eye, Download, FileText, Clock,
   Star, Calendar, BookOpen, ChevronDown, X, Target, BarChart2,
+  Upload, Send, Pencil, MoreHorizontal, Trash2, RotateCcw,
 } from 'lucide-react';
 import { CustomSelect } from '../../../components/teacher/CustomSelect';
 import {
   downloadPaperExportApi,
   fetchPaperDetailApi,
-  fetchPaperListApi,
+  publishPaperApi,
+  unpublishPaperApi,
+  deletePaperApi,
   type BlobProgress,
   type PaperDetailDto,
   type PaperExportFormat,
@@ -29,6 +33,8 @@ interface Paper {
   questionCount: number;
   quality: number;   // 0-100
   status: 'published' | 'draft' | 'closed';
+  isOwner: boolean;
+  ownerKnown: boolean;
   createdAt: string;
   textbook: string;
   /** True when DB stores an imported source PDF (optional download format). */
@@ -71,6 +77,8 @@ function mapListItemToPaper(item: PaperListItemDto): Paper {
     questionCount: item.question_count,
     quality: item.quality_score ?? 0,
     status: item.status,
+    isOwner: item.is_owner === true,
+    ownerKnown: item.is_owner !== undefined,
     createdAt: formatDate(item.created_at),
     textbook: '-',
     hasSourcePdf: item.has_source_pdf ?? false,
@@ -92,6 +100,8 @@ function mapDetailToPaper(detail: PaperDetailDto): Paper {
     questionCount: detail.question_count,
     quality: detail.quality_score ?? 0,
     status: detail.status,
+    isOwner: detail.is_owner === true,
+    ownerKnown: true,
     createdAt: formatDate(detail.created_at),
     textbook: '-',
     hasSourcePdf: detail.has_source_pdf ?? false,
@@ -482,6 +492,7 @@ function toRoman(n: number) {
 
 /* ─── Main Component ─────────────────────────────────────────────── */
 export default function AssessmentPapers() {
+  const navigate = useNavigate();
   const [search, setSearch]       = useState('');
   const [subject, setSubject]     = useState('All Subjects');
   const [grade, setGrade]         = useState('All Grades');
@@ -492,6 +503,15 @@ export default function AssessmentPapers() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [previewPaper, setPreviewPaper] = useState<Paper | null>(null);
   const [exportModalPaper, setExportModalPaper] = useState<Paper | null>(null);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [managePaper, setManagePaper] = useState<Paper | null>(null);
+  const [confirmDeletePaper, setConfirmDeletePaper] = useState<Paper | null>(null);
+  const [busyManage, setBusyManage] = useState(false);
+
+  async function refreshList() {
+    const result = await prefetchPaperList({ page: 1, page_size: 100 }, { force: true });
+    setPapers(result.items.map(mapListItemToPaper));
+  }
 
   useEffect(() => {
     let active = true;
@@ -561,6 +581,79 @@ export default function AssessmentPapers() {
     }
   }
 
+  async function handlePublish(paper: Paper) {
+    if (paper.status !== 'draft') return;
+    setPublishingId(paper.id);
+    try {
+      await publishPaperApi(Number(paper.id));
+      await refreshList();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '发布失败');
+    } finally {
+      setPublishingId(null);
+    }
+  }
+
+  async function handlePublishFromModal(paper: Paper) {
+    if (paper.status !== 'draft') return;
+    setBusyManage(true);
+    try {
+      await publishPaperApi(Number(paper.id));
+      await refreshList();
+      setManagePaper(null);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Publish failed');
+    } finally {
+      setBusyManage(false);
+    }
+  }
+
+  async function handleUnpublish(paper: Paper) {
+    if (paper.status !== 'published' || !paper.isOwner) return;
+    setBusyManage(true);
+    try {
+      await unpublishPaperApi(Number(paper.id));
+      await refreshList();
+      setManagePaper(null);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '回滚失败');
+    } finally {
+      setBusyManage(false);
+    }
+  }
+
+  async function handleDelete(paper: Paper) {
+    if (!paper.isOwner) return;
+    setBusyManage(true);
+    try {
+      await deletePaperApi(Number(paper.id));
+      await refreshList();
+      setConfirmDeletePaper(null);
+      setManagePaper(null);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '删除失败');
+    } finally {
+      setBusyManage(false);
+    }
+  }
+
+  function openManage(paper: Paper) {
+    setManagePaper(paper);
+    // If list payload came from an older cache without is_owner,
+    // refresh ownership by fetching detail on open.
+    if (!paper.ownerKnown) {
+      (async () => {
+        try {
+          const detail = await fetchPaperDetailApi(Number(paper.id));
+          const resolved = mapDetailToPaper(detail);
+          setManagePaper((prev) => (prev && prev.id === paper.id ? { ...prev, isOwner: resolved.isOwner, ownerKnown: true } : prev));
+        } catch {
+          setManagePaper((prev) => (prev && prev.id === paper.id ? { ...prev, ownerKnown: true } : prev));
+        }
+      })();
+    }
+  }
+
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 48px)', overflow: 'hidden', background: '#fafafa' }}>
 
@@ -622,6 +715,36 @@ export default function AssessmentPapers() {
 
       {/* ── Right Content ────────────────────────────────────────── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '22px 24px' }}>
+        {/* Top bar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f0f23' }}>Exam Papers</div>
+            <div style={{ fontSize: '12px', color: '#9ca3af' }}>Upload a paper file and parse it into an editable draft.</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/teacher/assessment/papers/import')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '10px 14px',
+              borderRadius: 10,
+              border: '1px solid #e8eaed',
+              background: '#fff',
+              color: '#374151',
+              fontSize: 13,
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f9fafb'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff'; }}
+          >
+            <Upload size={14} style={{ color: '#6b7280' }} />
+            Upload & parse
+          </button>
+        </div>
+
         {loading ? (
           <div style={{ textAlign: 'center', padding: '80px 0', color: '#9ca3af' }}>Loading papers...</div>
         ) : loadError ? (
@@ -645,6 +768,10 @@ export default function AssessmentPapers() {
                 paper={paper}
                 onView={() => handleView(paper)}
                 onDownload={() => setExportModalPaper(paper)}
+                onEdit={() => navigate(`/teacher/assessment/papers/${paper.id}/edit`)}
+                onPublish={() => handlePublish(paper)}
+                publishing={publishingId === paper.id}
+                onManage={() => openManage(paper)}
               />
             ))}
           </div>
@@ -666,6 +793,27 @@ export default function AssessmentPapers() {
           onClose={() => setExportModalPaper(null)}
         />
       )}
+
+      {managePaper && (
+        <ManagePaperModal
+          paper={managePaper}
+          busy={busyManage}
+          onClose={() => setManagePaper(null)}
+          onEdit={() => { setManagePaper(null); navigate(`/teacher/assessment/papers/${managePaper.id}/edit`); }}
+          onPublish={() => void handlePublishFromModal(managePaper)}
+          onUnpublish={() => void handleUnpublish(managePaper)}
+          onDelete={() => setConfirmDeletePaper(managePaper)}
+        />
+      )}
+
+      {confirmDeletePaper && (
+        <ConfirmDeleteModal
+          paper={confirmDeletePaper}
+          busy={busyManage}
+          onCancel={() => setConfirmDeletePaper(null)}
+          onConfirm={() => void handleDelete(confirmDeletePaper)}
+        />
+      )}
     </div>
   );
 }
@@ -675,10 +823,18 @@ function PaperCard({
   paper,
   onView,
   onDownload,
+  onEdit,
+  onPublish,
+  publishing,
+  onManage,
 }: {
   paper: Paper;
   onView: () => void;
   onDownload: () => void;
+  onEdit: () => void;
+  onPublish: () => void;
+  publishing: boolean;
+  onManage: () => void;
 }) {
   const rows: { label: string; value: string | number }[] = [
     { label: 'Total Score',  value: `${paper.totalScore} pts` },
@@ -703,18 +859,41 @@ function PaperCard({
         {/* Title + status badge */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', marginBottom: '6px' }}>
           <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#0f0f23', margin: 0, lineHeight: 1.4 }}>{paper.title}</h3>
-          <span style={{
-            fontSize: '10px',
-            fontWeight: 600,
-            padding: '2px 8px',
-            borderRadius: '20px',
-            background: paper.status === 'published' ? '#eff6ff' : paper.status === 'closed' ? '#fef2f2' : '#f3f4f6',
-            color: paper.status === 'published' ? '#1d4ed8' : paper.status === 'closed' ? '#dc2626' : '#6b7280',
-            flexShrink: 0,
-            marginTop: '2px',
-          }}>
-            {paper.status === 'published' ? 'Published' : paper.status === 'closed' ? 'Closed' : 'Draft'}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, marginTop: 2 }}>
+            <span style={{
+              fontSize: '10px',
+              fontWeight: 600,
+              padding: '2px 8px',
+              borderRadius: '20px',
+              background: paper.status === 'published' ? '#eff6ff' : paper.status === 'closed' ? '#fef2f2' : '#f3f4f6',
+              color: paper.status === 'published' ? '#1d4ed8' : paper.status === 'closed' ? '#dc2626' : '#6b7280',
+              flexShrink: 0,
+            }}>
+              {paper.status === 'published' ? 'Published' : paper.status === 'closed' ? 'Closed' : 'Draft'}
+            </span>
+
+            <button
+              type="button"
+              onClick={onManage}
+              title="Manage"
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 8,
+                border: '1px solid #e8eaed',
+                background: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#6b7280',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f9fafb'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff'; }}
+            >
+              <MoreHorizontal size={14} />
+            </button>
+          </div>
         </div>
 
         {/* Subtitle breadcrumb */}
@@ -750,8 +929,14 @@ function PaperCard({
           type="button"
           onClick={onView}
           style={{
-            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
-            padding: '12px', border: 'none', borderRight: '1px solid #f0f2f5',
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '7px',
+            padding: '12px',
+            border: 'none',
+            borderRight: '1px solid #f0f2f5',
             background: '#fff', color: '#374151', fontSize: '13px', cursor: 'pointer',
             transition: 'background 0.12s',
           }}
@@ -760,12 +945,19 @@ function PaperCard({
         >
           <Eye size={14} style={{ color: '#6b7280' }} /> View
         </button>
+
         <button
           type="button"
           onClick={onDownload}
           style={{
-            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
-            padding: '12px', border: 'none',
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '7px',
+            padding: '12px',
+            border: 'none',
+            borderRight: 'none',
             background: '#fff', color: '#374151', fontSize: '13px', cursor: 'pointer',
             transition: 'background 0.12s',
           }}
@@ -774,6 +966,235 @@ function PaperCard({
         >
           <Download size={14} style={{ color: '#6b7280' }} /> Download
         </button>
+      </div>
+    </div>
+  );
+}
+
+function ManagePaperModal({
+  paper,
+  busy,
+  onClose,
+  onEdit,
+  onPublish,
+  onUnpublish,
+  onDelete,
+}: {
+  paper: Paper;
+  busy: boolean;
+  onClose: () => void;
+  onEdit: () => void;
+  onPublish: () => void;
+  onUnpublish: () => void;
+  onDelete: () => void;
+}) {
+  const canManage = paper.isOwner;
+  const isDraft = paper.status === 'draft';
+  const isPublished = paper.status === 'published';
+
+  const Btn = ({
+    icon,
+    label,
+    danger,
+    primary,
+    onClick,
+    disabled,
+  }: {
+    icon: React.ReactNode;
+    label: string;
+    danger?: boolean;
+    primary?: boolean;
+    disabled?: boolean;
+    onClick?: () => void;
+  }) => (
+    <button
+      type="button"
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      style={{
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '10px 12px',
+        borderRadius: 10,
+        border: primary ? 'none' : '1px solid #e8eaed',
+        background: primary ? '#3b5bdb' : '#fff',
+        color: primary ? '#fff' : danger ? '#b91c1c' : '#111827',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.7 : 1,
+        fontSize: 13,
+        fontWeight: primary ? 700 : 600,
+        textAlign: 'left',
+      }}
+    >
+      <span style={{ color: primary ? '#fff' : danger ? '#ef4444' : '#6b7280' }}>{icon}</span>
+      <span style={{ flex: 1 }}>{label}</span>
+    </button>
+  );
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 220,
+        background: 'rgba(15, 15, 35, 0.45)',
+        backdropFilter: 'blur(3px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+      }}
+      onClick={busy ? undefined : onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: 'min(420px, calc(100vw - 32px))',
+          background: '#fff',
+          borderRadius: 14,
+          border: '1px solid #e8eaed',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid #f3f4f6' }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: '#0f0f23', marginBottom: 4 }}>Manage paper</div>
+          <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.4 }}>{paper.title}</div>
+          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
+            Status: {paper.status}{' '}
+            {!paper.ownerKnown ? '· Loading permissions…' : canManage ? '· Manageable' : '· View/download only'}
+          </div>
+        </div>
+
+        <div style={{ padding: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {isDraft && canManage && (
+            <>
+              <Btn icon={<Pencil size={16} />} label="Edit draft" onClick={onEdit} disabled={busy} />
+              <Btn icon={<Send size={16} />} label={busy ? 'Publishing…' : 'Publish'} primary onClick={onPublish} disabled={busy} />
+            </>
+          )}
+
+          {isPublished && canManage && (
+            <>
+              <Btn icon={<RotateCcw size={16} />} label={busy ? 'Rolling back…' : 'Rollback to draft'} onClick={onUnpublish} disabled={busy} />
+              <Btn icon={<Trash2 size={16} />} label="Delete paper" danger onClick={onDelete} disabled={busy} />
+            </>
+          )}
+
+          {!canManage && (
+            <div style={{ gridColumn: '1 / -1', padding: '8px 2px', fontSize: 12, color: '#6b7280', lineHeight: 1.6 }}>
+              This paper is not owned by you. Use “View/Download” at the bottom of the card.
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: '0 16px 16px' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              borderRadius: 10,
+              border: '1px solid #e8eaed',
+              background: '#fff',
+              color: '#374151',
+              fontSize: 13,
+              cursor: busy ? 'not-allowed' : 'pointer',
+            }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmDeleteModal({
+  paper,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  paper: Paper;
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 230,
+        background: 'rgba(15, 15, 35, 0.55)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+      }}
+      onClick={busy ? undefined : onCancel}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: 'min(420px, calc(100vw - 32px))',
+          background: '#fff',
+          borderRadius: 14,
+          border: '1px solid #e8eaed',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
+          padding: 18,
+        }}
+      >
+        <div style={{ fontSize: 15, fontWeight: 900, color: '#0f0f23', marginBottom: 8 }}>Delete this paper?</div>
+        <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.55, marginBottom: 14 }}>
+          This will permanently delete: <strong style={{ color: '#111827' }}>{paper.title}</strong>
+          <br />
+          If the paper has attempts or is referenced by quizzes, deletion will be rejected.
+        </div>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={busy}
+            style={{
+              padding: '9px 14px',
+              borderRadius: 10,
+              border: '1px solid #e8eaed',
+              background: '#fff',
+              color: '#374151',
+              fontSize: 13,
+              cursor: busy ? 'not-allowed' : 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={busy}
+            style={{
+              padding: '9px 14px',
+              borderRadius: 10,
+              border: 'none',
+              background: busy ? '#fca5a5' : '#ef4444',
+              color: '#fff',
+              fontSize: 13,
+              fontWeight: 800,
+              cursor: busy ? 'wait' : 'pointer',
+            }}
+          >
+            {busy ? 'Deleting…' : 'Delete'}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -19,6 +19,7 @@ class PaperListItem(BaseModel):
     semester: str | None = None
     exam_type: str
     status: PaperStatusView
+    is_owner: bool = False
     total_score: int
     duration_min: int
     question_count: int
@@ -74,6 +75,7 @@ class PaperDetailResponse(BaseModel):
     semester: str | None = None
     exam_type: str
     status: PaperStatusView
+    is_owner: bool = False
     total_score: int
     duration_min: int
     question_count: int
@@ -129,3 +131,9 @@ class PaperCreateResponse(BaseModel):
 # Draft update uses the same body shape as create (replace all questions).
 PaperUpdateRequest = PaperCreateRequest
 PaperUpdateResponse = PaperCreateResponse
+
+
+class PaperPdfParseResponse(BaseModel):
+    paper_draft: PaperCreateRequest
+    warnings: list[str] = []
+    extracted_text_preview: str = ""
