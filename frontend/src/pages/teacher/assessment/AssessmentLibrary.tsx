@@ -82,6 +82,38 @@ function mapQuestionBankDtoToSet(d: QuestionBankSetDto): QuestionSet {
   };
 }
 
+function cleanMathDelimiters(s: string): string {
+  if (!s) return s;
+  return s.replace(/\$+/g, '').trim();
+}
+
+function parseOptionLine(opt: string): { letter: string; text: string } {
+  const t = opt.trim();
+  const m = t.match(/^([A-Za-z0-9]+)[\).\s]\s*(.*)$/s);
+  if (m) {
+    const letter = m[1].replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 1) || '?';
+    return { letter, text: cleanMathDelimiters(m[2] ?? '') };
+  }
+  return { letter: (t[0] || '?').toUpperCase(), text: cleanMathDelimiters(t.slice(1).trim()) };
+}
+
+function parseAnswerKeySet(answer: string | undefined): Set<string> {
+  const out = new Set<string>();
+  if (!answer) return out;
+  const u = answer.trim().toUpperCase();
+  if (/^[A-D]+$/i.test(u) && u.length > 1 && !/[,\s;]/.test(answer)) {
+    for (const c of u) {
+      if ('ABCD'.includes(c)) out.add(c);
+    }
+    return out;
+  }
+  for (const part of u.split(/[\s,;/]+/)) {
+    const tok = part.trim().replace(/[^A-DTFG]/gi, '');
+    if (tok) out.add(tok[0]!);
+  }
+  return out;
+}
+
 const isDefault = (val: string) =>
   ['All Subjects','All Grades','All Semesters','All Difficulties','All Types'].includes(val);
 
@@ -283,8 +315,11 @@ function QuestionSetCard({ set, onView }: { set: QuestionSet; onView: () => void
               {tc.label}
             </div>
             <div style={{ fontSize: '11px', color: '#9ca3af', lineHeight: 1.45 }}>
+              <span style={{ color: '#9ca3af' }}>{set.grade} · </span>
               <span style={{ color: sc.color, fontWeight: 500 }}>{set.subject}</span>
-              {' · '}{set.grade} · {set.semester}
+              {set.semester && set.semester !== '—' ? (
+                <span style={{ color: '#9ca3af' }}>{' · '}{set.semester}</span>
+              ) : null}
               {' · '}{dc.label}
               {set.aiGenerated && (
                 <>
@@ -433,14 +468,27 @@ function DetailModal({ set, onClose }: { set: QuestionSet; onClose: () => void }
                   {/* Q body */}
                   <div style={{ padding: '12px' }}>
                     <p style={{ margin: '0 0 10px', fontSize: '13px', color: '#374151', lineHeight: 1.65 }}>
-                      {q.prompt}
+                      {cleanMathDelimiters(q.prompt)}
                     </p>
                     {/* MCQ options */}
                     {q.options && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {(!q.answer || !String(q.answer).trim()) && (
+                          <div style={{
+                            marginBottom: '4px', padding: '6px 10px', borderRadius: '6px',
+                            background: '#fffbeb', border: '1px solid #fde68a',
+                            fontSize: '11px', color: '#92400e',
+                          }}>
+                            No answer key stored for this item.
+                          </div>
+                        )}
                         {q.options.map(opt => {
-                          const letter = opt[0];
-                          const isCorrect = q.answer === letter;
+                          const { letter, text } = parseOptionLine(opt);
+                          const correct = parseAnswerKeySet(q.answer);
+                          const isCorrect =
+                            correct.size > 0
+                              ? correct.has(letter)
+                              : (q.answer?.trim().toUpperCase() === letter);
                           return (
                             <div key={opt} style={{
                               display: 'flex', alignItems: 'center', gap: '10px',
@@ -458,7 +506,7 @@ function DetailModal({ set, onClose }: { set: QuestionSet; onClose: () => void }
                                 {letter}
                               </span>
                               <span style={{ fontSize: '13px', color: isCorrect ? '#15803d' : '#374151', fontWeight: isCorrect ? 500 : 400 }}>
-                                {opt.slice(3)}
+                                {text}
                               </span>
                               {isCorrect && (
                                 <Check size={12} style={{ color: '#16a34a', marginLeft: 'auto' }} />
@@ -475,7 +523,7 @@ function DetailModal({ set, onClose }: { set: QuestionSet; onClose: () => void }
                         background: '#f0fdf4', border: '1px solid #bbf7d0',
                         fontSize: '12px', color: '#15803d',
                       }}>
-                        <span style={{ fontWeight: 600 }}>Answer: </span>{q.answer}
+                        <span style={{ fontWeight: 600 }}>Answer: </span>{cleanMathDelimiters(q.answer)}
                       </div>
                     )}
                   </div>

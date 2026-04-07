@@ -1,0 +1,14 @@
+[
+  {
+    "type": "paper",
+    "path": "normalized_hf/hf_arc_train.json"
+  },
+  {
+    "type": "paper",
+    "path": "normalized_hf/hf_ceval_train.json"
+  },
+  {
+    "type": "paper",
+    "path": "normalized_hf/hf_gsm8k_train.json"
+  }
+]

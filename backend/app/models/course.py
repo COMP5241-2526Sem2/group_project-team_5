@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Integer, JSON, Text, UniqueConstraint, func
 from sqlalchemy import Enum as SQLEnum
@@ -22,11 +23,11 @@ class Course(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     subject: Mapped[str] = mapped_column(Text, nullable=False)
-    grades: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
-    period: Mapped[str | None] = mapped_column(Text, nullable=True)
-    room: Mapped[str | None] = mapped_column(Text, nullable=True)
-    weekdays: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
-    max_students: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    grades: Mapped[Optional[list[str]]] = mapped_column(JSON, nullable=True)
+    period: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    room: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    weekdays: Mapped[Optional[list[str]]] = mapped_column(JSON, nullable=True)
+    max_students: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     status: Mapped[CourseStatus] = mapped_column(
         SQLEnum(CourseStatus, name="course_status"), nullable=False, default=CourseStatus.DRAFT
     )

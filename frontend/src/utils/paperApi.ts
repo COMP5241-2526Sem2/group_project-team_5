@@ -137,6 +137,33 @@ export async function fetchPaperDetailApi(paperId: number): Promise<PaperDetailD
   return apiRequest<PaperDetailDto>(`/papers/${paperId}`, {}, "teacher");
 }
 
+/** Distinct grades / subjects / publishers for AI paper wizard; backend may omit this route. */
+export interface PaperMetaOptionsDto {
+  grades?: string[];
+  subjects?: string[];
+  publishers?: string[];
+  publisher_source?: string;
+}
+
+export async function fetchPaperMetaOptionsApi(params?: {
+  grade?: string;
+  subject?: string;
+  semester?: string | null;
+}): Promise<PaperMetaOptionsDto> {
+  try {
+    const search = new URLSearchParams();
+    if (params?.grade?.trim()) search.set("grade", params.grade.trim());
+    if (params?.subject?.trim()) search.set("subject", params.subject.trim());
+    if (params?.semester != null && String(params.semester).trim() !== "") {
+      search.set("semester", String(params.semester).trim());
+    }
+    const suffix = search.toString() ? `?${search.toString()}` : "";
+    return await apiRequest<PaperMetaOptionsDto>(`/papers/meta/options${suffix}`, {}, "teacher");
+  } catch {
+    return {};
+  }
+}
+
 export async function createPaperApi(payload: PaperCreateRequestDto): Promise<PaperCreateResponseDto> {
   return apiRequest<PaperCreateResponseDto>("/papers", {
     method: "POST",

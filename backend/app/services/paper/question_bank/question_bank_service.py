@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from collections import defaultdict
 from collections.abc import Iterable
 
@@ -62,6 +63,75 @@ def _build_source(row: QuestionBankItem) -> str:
     if row.source_id is not None:
         return f"{row.source_type} #{row.source_id}"
     return row.source_type or "bank"
+
+
+def _sanitize_prompt(prompt: str) -> str:
+    p = (prompt or "").strip()
+    p = re.sub(r"\s+", " ", p)
+    return p[:4000]
+
+
+def _looks_like_non_question(prompt: str) -> bool:
+    p = (prompt or "").strip()
+    if len(p) < 10:
+        return True
+    low = p.lower()
+    head = low[:220]
+
+    starters = (
+        "instructions",
+        "directions:",
+        "direction:",
+        "read the following",
+        "answer all questions",
+        "time allowed",
+        "total marks",
+        "total mark",
+        "candidate number",
+        "write your name",
+        "student name",
+        "do not open",
+        "turn over",
+        "end of paper",
+        "this paper consists of",
+    )
+    if any(head.startswith(s) or head.startswith(f"{s} ") for s in starters):
+        return True
+
+    if re.match(r"^(section|part)\s+[a-z0-9]+\s*([.:]|\s*$)", head, re.I):
+        if "?" not in low and len(p) < 120:
+            return True
+
+    if "?" not in low and low.count("·") + low.count("•") >= 4:
+        return True
+
+    return False
+
+
+def _is_garbled_prompt(prompt: str) -> bool:
+    p = (prompt or "").strip()
+    if not p:
+        return True
+    letters = sum(1 for c in p if c.isalpha())
+    if letters < 6:
+        return True
+    cjk = sum(1 for c in p if "\u4e00" <= c <= "\u9fff")
+    weird = sum(1 for c in p if ord(c) > 127 and not ("\u4e00" <= c <= "\u9fff"))
+    if cjk == 0 and weird > len(p) * 0.4:
+        return True
+    return False
+
+
+def _has_valid_answer(row: QuestionBankItem) -> bool:
+    raw = (row.answer_text or "").strip()
+    if not raw:
+        return False
+    upper = raw.upper()
+    if upper in {"TBD", "N/A", "NA", "NONE", "UNKNOWN", "NULL", "PENDING"}:
+        return False
+    if upper in {".", "-", "—", "?", "??"}:
+        return False
+    return True
 
 
 class QuestionBankService:
@@ -131,10 +201,17 @@ class QuestionBankService:
             set_id = "db-" + hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:16]
 
             any_ai = any((it.source_type or "").lower() == "ai_generated" for it in items)
-            source = _build_source(items[0])
 
             questions: list[QuestionBankSetQuestionOut] = []
+            kept: list[QuestionBankItem] = []
             for it in items:
+                prompt = _sanitize_prompt(it.prompt)
+                if _looks_like_non_question(prompt) or _is_garbled_prompt(prompt):
+                    continue
+                if not _has_valid_answer(it):
+                    continue
+
+                kept.append(it)
                 opts = _options_to_strings(list(it.options)) if it.options else None
                 if ui_type == "MCQ" and not opts:
                     opts = None
@@ -142,12 +219,17 @@ class QuestionBankService:
                     QuestionBankSetQuestionOut(
                         id=str(it.id),
                         type=ui_type,
-                        prompt=it.prompt,
+                        prompt=prompt,
                         options=opts if ui_type == "MCQ" else None,
                         answer=(it.answer_text or None),
                         difficulty=_norm_difficulty(it.difficulty),
                     )
                 )
+
+            if not questions:
+                continue
+
+            source = _build_source(kept[0])
 
             sets_out.append(
                 QuestionBankSetOut(
@@ -156,7 +238,7 @@ class QuestionBankService:
                     subject=subj,
                     grade=grd,
                     semester=sem or "—",
-                    difficulty=_set_difficulty(items),
+                    difficulty=_set_difficulty(kept),
                     chapter=chap,
                     source=source,
                     ai_generated=any_ai,

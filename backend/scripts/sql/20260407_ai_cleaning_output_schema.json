@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "QuestionCleaningOutput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "normalized_prompt",
+    "normalized_answer_text",
+    "normalized_explanation",
+    "normalized_chapter",
+    "normalized_difficulty",
+    "clean_confidence",
+    "clean_version"
+  ],
+  "properties": {
+    "normalized_prompt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 20000
+    },
+    "normalized_answer_text": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 12000
+    },
+    "normalized_explanation": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 20000
+    },
+    "normalized_chapter": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 255
+    },
+    "normalized_difficulty": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "easy",
+        "medium",
+        "hard",
+        null
+      ]
+    },
+    "clean_confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "clean_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    }
+  }
+}

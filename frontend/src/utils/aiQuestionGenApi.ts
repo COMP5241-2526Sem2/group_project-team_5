@@ -22,6 +22,7 @@ export interface AIQuestionGenPreviewRequestDto {
   difficulty: "easy" | "medium" | "hard";
   question_count: number;
   type_targets?: Record<string, number>;
+  require_ai?: boolean;
 }
 
 export interface AIQuestionGenPreviewResponseDto {

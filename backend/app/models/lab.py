@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import JSON, BigInteger, CheckConstraint, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -49,21 +50,21 @@ class LabDefinition(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     registry_key: Mapped[str] = mapped_column(String(100), nullable=False, unique=True, index=True)
     title: Mapped[str] = mapped_column(Text, nullable=False)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     subject_lab: Mapped[SubjectLab] = mapped_column(String(20), nullable=False, index=True)
     renderer_profile: Mapped[str] = mapped_column(String(50), nullable=False)
     dimension: Mapped[Dimension] = mapped_column(String(5), nullable=False)
     initial_state: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
-    reducer_spec: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    lab_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    reducer_spec: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    lab_metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     lab_type: Mapped[LabType] = mapped_column(String(20), nullable=False, index=True)
     status: Mapped[LabStatus] = mapped_column(
         String(20), nullable=False, default=LabStatus.DRAFT, index=True
     )
-    visual_profile: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    visual_hint: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    render_code: Mapped[str | None] = mapped_column(Text, nullable=True)
-    teacher_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
+    visual_profile: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    visual_hint: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    render_code: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    teacher_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -84,14 +85,14 @@ class LabGenerationSession(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     teacher_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
-    lab_definition_id: Mapped[int | None] = mapped_column(
+    lab_definition_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("lab_definitions.id", ondelete="SET NULL"), nullable=True, index=True
     )
     mode: Mapped[SessionMode] = mapped_column(String(20), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     messages: Mapped[list[LabChatMessage]] = relationship(
         back_populates="session", cascade="all, delete-orphan", lazy="selectin"
@@ -107,9 +108,9 @@ class LabChatMessage(Base):
     )
     role: Mapped[MessageRole] = mapped_column(String(20), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    commands: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    definition: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    token_used: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    commands: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    definition: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    token_used: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import BigInteger, DateTime, ForeignKey, Text, UniqueConstraint, func
 from sqlalchemy import Enum as SQLEnum
@@ -26,14 +27,14 @@ class User(Base):
     account_type: Mapped[AccountType] = mapped_column(
         SQLEnum(AccountType, name="account_type"), nullable=False, index=True
     )
-    phone: Mapped[str | None] = mapped_column(Text, nullable=True)
-    id_card: Mapped[str | None] = mapped_column(Text, nullable=True)
-    accessibility: Mapped[str | None] = mapped_column(Text, nullable=True)
+    phone: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    id_card: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    accessibility: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     registered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_login: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    student_profile: Mapped[StudentProfile | None] = relationship(back_populates="user", cascade="all, delete-orphan")
-    teacher_profile: Mapped[TeacherProfile | None] = relationship(back_populates="user", cascade="all, delete-orphan")
+    student_profile: Mapped[Optional[StudentProfile]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    teacher_profile: Mapped[Optional[TeacherProfile]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class StudentProfile(Base):
@@ -42,9 +43,9 @@ class StudentProfile(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
     student_id: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
-    department: Mapped[str | None] = mapped_column(Text, nullable=True)
-    major: Mapped[str | None] = mapped_column(Text, nullable=True)
-    homeroom: Mapped[str | None] = mapped_column(Text, nullable=True)
+    department: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    major: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    homeroom: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     user: Mapped[User] = relationship(back_populates="student_profile")
 
@@ -55,7 +56,7 @@ class TeacherProfile(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
     employee_id: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
-    department: Mapped[str | None] = mapped_column(Text, nullable=True)
+    department: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     user: Mapped[User] = relationship(back_populates="teacher_profile")
 

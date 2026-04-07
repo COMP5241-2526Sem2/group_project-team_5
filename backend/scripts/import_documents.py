@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -10,12 +11,16 @@ from typing import Any
 
 from sqlalchemy import delete, func, select
 
+BACKEND_ROOT = Path(__file__).resolve().parent.parent
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
+
 from app.database import SessionLocal, engine
 from app.models.assessment import Paper, PaperQuestion, PaperQuestionOption, PaperSection, PaperStatus, QuestionBankItem, QuestionBankOption
 from app.models.textbook import Textbook, TextbookSemester
 
 
-@dataclass(slots=True)
+@dataclass
 class ImportSummary:
     textbooks_created: int = 0
     papers_created: int = 0
@@ -301,6 +306,14 @@ async def find_or_create_bank_item(
         context="question",
     )
 
+    normalized_type, normalized_answer = normalize_objective_fields(
+        question_type=str(question_payload.get("question_type", "")),
+        answer_text=question_payload.get("answer_text"),
+        options=question_payload.get("options", []),
+    )
+    question_payload["question_type"] = normalized_type
+    question_payload["answer_text"] = normalized_answer
+
     result = await db.execute(
         select(QuestionBankItem).where(
             QuestionBankItem.grade == question_payload["grade"],
@@ -325,6 +338,16 @@ async def find_or_create_bank_item(
         incoming_answer = fit_mysql_text(question_payload.get("answer_text"))
         if incoming_answer and incoming_answer != "TBD":
             existing.answer_text = incoming_answer
+
+        if existing.question_type in {"MCQ_SINGLE", "MCQ_MULTI"} and question_payload.get("options"):
+            normalized_existing_type, derived_answer = normalize_objective_fields(
+                question_type=existing.question_type,
+                answer_text=existing.answer_text,
+                options=question_payload.get("options", []),
+            )
+            existing.question_type = normalized_existing_type
+            if derived_answer and derived_answer != "TBD":
+                existing.answer_text = fit_mysql_text(derived_answer)
 
         option_count = await db.scalar(
             select(func.count()).select_from(QuestionBankOption).where(QuestionBankOption.bank_question_id == existing.id)
@@ -448,6 +471,35 @@ def dedupe_option_payloads(options: list[dict[str, Any]]) -> list[dict[str, Any]
         seen.add(key)
         unique.append(option)
     return unique
+
+
+def normalize_objective_fields(
+    *,
+    question_type: str,
+    answer_text: Any,
+    options: list[dict[str, Any]] | None,
+) -> tuple[str, str | None]:
+    qtype = str(question_type or "").strip().upper()
+    if qtype not in {"MCQ_SINGLE", "MCQ_MULTI", "TRUE_FALSE"}:
+        return qtype or "SHORT_ANSWER", fit_mysql_text(answer_text)
+
+    option_rows = options or []
+    correct_keys = [
+        str(opt.get("option_key", "")).strip().upper()
+        for opt in option_rows
+        if bool(opt.get("is_correct"))
+    ]
+    correct_keys = [k for k in correct_keys if k]
+
+    normalized_answer = fit_mysql_text(answer_text)
+    if correct_keys:
+        normalized_answer = ",".join(correct_keys)
+        if len(correct_keys) > 1 and qtype == "MCQ_SINGLE":
+            qtype = "MCQ_MULTI"
+        elif len(correct_keys) == 1 and qtype == "MCQ_MULTI":
+            qtype = "MCQ_SINGLE"
+
+    return qtype, normalized_answer
 
 
 if __name__ == "__main__":

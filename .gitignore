@@ -32,3 +32,4 @@ backend/app/api/v1/llm_raw_session_*.txt
 *.user
 *.userosscache
 *.sln.docstates
+.vercel

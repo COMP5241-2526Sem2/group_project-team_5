@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { LucideIcon } from 'lucide-react';
+import { fetchPaperMetaOptionsApi } from '../../../utils/paperApi';
 import {
   ChevronRight, ChevronLeft, Check, Sparkles, Loader2,
   FileText, Clock, Award, BookOpen, Target, Layers,
@@ -60,9 +61,9 @@ const EXAM_TYPES: { id: ExamType; Icon: LucideIcon; label: string; desc: string 
   { id: 'contest', Icon: Medal,         label: 'Contest Mock',     desc: 'Competition-level simulation exam' },
 ];
 
-const GRADES = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'];
-const SUBJECTS = ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'English', 'History', 'Geography', 'Political Science'];
-const PUBLISHERS = ["PEP (People's Education Press)", 'Beijing Normal University Press', 'Oxford University Press', 'Jiangsu Education Press'];
+const DEFAULT_GRADES = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'];
+const DEFAULT_SUBJECTS = ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'English', 'History', 'Geography', 'Political Science'];
+const DEFAULT_PUBLISHERS = ["PEP (People's Education Press)", 'Beijing Normal University Press', 'Oxford University Press', 'Jiangsu Education Press'];
 
 const CHAPTERS_BY_SUBJECT: Record<string, string[]> = {
   Biology:     ['Ch.1 Cell Structure', 'Ch.2 Cell Function', 'Ch.3 Photosynthesis', 'Ch.4 Cellular Respiration', 'Ch.5 Genetics'],
@@ -381,8 +382,53 @@ export default function AssessmentAIPaper() {
   const [paper,      setPaper]        = useState<GeneratedSection[]>([]);
   const [draftSaved, setDraftSaved]   = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [gradeOptions, setGradeOptions] = useState<string[]>(DEFAULT_GRADES);
+  const [subjectOptions, setSubjectOptions] = useState<string[]>(DEFAULT_SUBJECTS);
+  const [publisherOptions, setPublisherOptions] = useState<string[]>(DEFAULT_PUBLISHERS);
+  const [publisherSourceNote, setPublisherSourceNote] = useState('');
 
   const chapters = CHAPTERS_BY_SUBJECT[subject] || CHAPTERS_BY_SUBJECT['default'];
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const meta = await fetchPaperMetaOptionsApi();
+        if (cancelled) return;
+        if (meta.grades?.length) setGradeOptions(meta.grades);
+        if (meta.subjects?.length) setSubjectOptions(meta.subjects);
+        if (meta.publishers?.length) setPublisherOptions(meta.publishers);
+      } catch {
+        // Keep default local options if backend metadata is unavailable.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const semesterValue = semester === 'Vol.1' ? 'vol1' : 'vol2';
+        const meta = await fetchPaperMetaOptionsApi({ grade, subject, semester: semesterValue });
+        if (cancelled) return;
+        if (meta.publishers?.length) setPublisherOptions(meta.publishers);
+        setPublisherSourceNote(
+          meta.publisher_source === 'ai_generated'
+            ? 'Publisher list is AI-recommended (no exact database match).'
+            : meta.publisher_source === 'fallback_default'
+              ? 'Showing default publisher list (no database/AI result).'
+              : ''
+        );
+        if (publisher && meta.publishers?.length && !meta.publishers.includes(publisher)) {
+          setPublisher('');
+        }
+      } catch {
+        if (!cancelled) setPublisherSourceNote('');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [grade, subject, semester]);
 
   function toggleChapter(ch: string) {
     setSelectedChapters(prev =>
@@ -645,8 +691,8 @@ export default function AssessmentAIPaper() {
                     <BookOpen size={14} style={{ color: '#3b5bdb' }} /> Scope
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
-                    <SimpleSelect label="Grade" options={GRADES} value={grade} onChange={setGrade} placeholder="Select grade" required />
-                    <SimpleSelect label="Subject" options={SUBJECTS} value={subject} onChange={setSubject} placeholder="Select subject" required />
+                    <SimpleSelect label="Grade" options={gradeOptions} value={grade} onChange={setGrade} placeholder="Select grade" required />
+                    <SimpleSelect label="Subject" options={subjectOptions} value={subject} onChange={setSubject} placeholder="Select subject" required />
                   </div>
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '14px' }}>
                     <span style={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>Semester</span>
@@ -657,7 +703,12 @@ export default function AssessmentAIPaper() {
                       </button>
                     ))}
                   </div>
-                  <SimpleSelect label="Textbook Publisher" options={PUBLISHERS} value={publisher} onChange={setPublisher} placeholder="Select publisher (optional)" />
+                  <SimpleSelect label="Textbook Publisher" options={publisherOptions} value={publisher} onChange={setPublisher} placeholder="Select publisher (optional)" />
+                  {publisherSourceNote && (
+                    <div style={{ marginTop: '6px', fontSize: '11px', color: '#9ca3af' }}>
+                      {publisherSourceNote}
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ background: '#fff', border: '1px solid #e8eaed', borderRadius: '14px', padding: '22px 24px', marginBottom: '16px' }}>

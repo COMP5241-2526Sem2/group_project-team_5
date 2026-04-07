@@ -1,0 +1,3723 @@
+{
+  "title": "HF C-Eval high_school_biology (test)",
+  "course_id": 1,
+  "grade": "Unknown",
+  "subject": "General",
+  "semester": "vol1",
+  "exam_type": "hf_ceval",
+  "total_score": 50,
+  "duration_min": 60,
+  "quality_score": null,
+  "sections": [
+    {
+      "title": "Main",
+      "question_type": "MIXED",
+      "score_each": 1,
+      "total_score": 50,
+      "questions": [
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "小麦粒色受独立遗传的三对基因A/a、B/b、C/c-控制．A、B和C决定红色，每个基因对粒色增加效应相同且具叠加性，a、b和c决定白色．将粒色最浅和最深的植株杂交得到F1．Fl的自交后代中，与基因型为Aabbcc的个体表现型相同的概率是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "$1/64$",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "$3/32$",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "$15/64$",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "$5/16$",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "通常情况下，分子式为C63H103O45N17S2的化合物最可能属于：____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "多肽",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "氨基酸",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "核苷酸",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "肝糖元",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "下列关于人类性别决定与伴性遗传的叙述，正确的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "C",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "生殖细胞中只表达性染色体上的基因",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "性染色体上的基因都与性别决定有关",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "性染色体上的基因都伴随性染色体遗传",
+              "is_correct": true
+            },
+            {
+              "option_key": "D",
+              "option_text": "精母细胞和次级精母细胞中一定都含有X染色体",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "假说一演绎法是现代科学研究中常用的一种科学方法，其基本思路是发现问题→提出假说→演绎推理→实验检验→得出结论。下列属于孟德尔在发现基因分离定律时的“演绎推理”内容的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "若遗传因子位于染色体上,则遗传因子在体细胞中成对存在",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "由F2出现了“3：1”的表现型比，推测生物体产生配子时，成对遗传因子彼此分离",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "若F1产生配子时成对遗传因子分离，则F2中三种基因型个体比接近1:2：1",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "若F1产生配子时成对遗传因子分离,则测交后代会出现接近1：1的两种性状比",
+              "is_correct": true
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "下列不能解除植物顶端优势的措施是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "去掉顶芽",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "在去掉顶芽的断口处放一块含有生长素的羊毛脂",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "在去掉顶芽的断口处放一块含有细胞分裂素的羊毛脂",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "在去掉顶芽的断口处放上琼脂小块",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "某种基因型为Aa的高等植物产生的雌雄配子的数目是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "雄配子很多，雌配子很少",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "雌配子：雄配子=1：3",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "A雌配子：a雄配子=1：1",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "雌配子：雄配子=1：1",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "RNA聚合酶能以一条DNA链或RNA链为模板催化RNA的合成，因为在细胞内遗传信息转录与RNA有关,所以也称转录酶。下列有关叙述中错误的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "RNA聚合酶催化RNA合成期间，一定有腺嘌呤与胸腺嘧啶的配对现象",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "DNA的复制和基因的转录，DNA双链都要先解旋,前者需要用到解旋酶",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "转录过程消耗的原料是核糖核苷酸，而逆转录消耗脱氧核苷酸",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "肌细胞内有蛋白质的更新，其细胞核内应存在有活性的RNA聚合酶",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "下列关于隔离的叙述不正确的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "阻止了种群的基因交流",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "对所有的物种来说，地理隔离必然导致生殖隔离",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "东北虎与华南虎之间存在地理隔离",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "不同的物种之间必然存在着生殖隔离",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "肥胖症周大会公布了肥胖症新药司美格鲁肽( Wegovy)。数据显示，接受Wegovy治疗的成人患者，在两年研究期间实现了显著和持续的体重减轻。下列叙述错误的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "C",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "Wegovy只能注射不能口服",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "组成Wegovy的基本单位在人体中有21种",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "Wegovy彻底水解后能和双缩脲试剂发生紫色反应",
+              "is_correct": true
+            },
+            {
+              "option_key": "D",
+              "option_text": "Wegovy是一种信息分子，不能直接参与细胞的生命活动",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "红细胞吸收无机盐和葡萄糖的共同点是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "C",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "都可以从低浓度到高浓度一边",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "都需要供给ATP",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "都需要载体协助",
+              "is_correct": true
+            },
+            {
+              "option_key": "D",
+              "option_text": "既需要载体协助又需要消耗能量",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "减数分裂过程中，染色体数目减半发生在____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "初级精母细胞形成时",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "次级精母细胞形成时",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "精子细胞形成时",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "精子形成时",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "下列名称中，通常属于活细胞的一组是____?①血小板   ②植物的导管   ③木纤维     ④花粉   ⑤抗体     ⑥胃蛋白酶     ⑦大肠杆菌",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "①②③",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "④⑤⑥",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "②④⑥",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "①④⑦",
+              "is_correct": true
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "沙漠中旱生植物细胞中含量最多的物质是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "蛋白质",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "糖类",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "脂肪",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "水",
+              "is_correct": true
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "细菌、真菌等营腐生生活的微生物，在生态系统中占有重要地位，主要是因为它们____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "数量极多，分布广",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "是食物链中的一个环节",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "分解者的营养级别最高",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "能把有机物分解成无机物，归还到无机环境中",
+              "is_correct": true
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "由于实验材料用品所限，有时候需要设法替代，下列各项中正确的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "做低温诱导染色体数目变化的实验时，可用龙胆紫代替改良苯酚品红染液",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "在观察植物细胞的有丝分裂实验时，用洋葱表皮代替根尖",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "制备细胞膜的实验用新鲜鸡血作为替代材料",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "诱导植物细胞染色体数目加倍必须使用一定浓度的秋水仙素处理",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "以下关于真核细胞和原核细胞的说法中，正确的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "发菜细胞群体呈黑蓝色，无叶绿素，不能进行光合作用",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "细菌和酵母菌在结构上的相同点：都有细胞壁、细胞膜、核糖体等",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "哺乳动物成熟的红细胞中没有细胞核，属于原核细胞",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "念珠藻是由许多细胞构成的真核生物",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "1903年美国遗传学家萨顿关于“基因位于染色体上”的假说是如何提出的____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "C",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "通过做实验研究得出的",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "运用假说—演绎法提出的",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "运用类比推理提出的",
+              "is_correct": true
+            },
+            {
+              "option_key": "D",
+              "option_text": "运用系统分析法提出的",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "为验证光是植物生长发育的必要条件，设计如下实验：选择生长状况一致的小麦幼苗200株，随机均分为实验组和对照组，分别处理并预期结果。下面是关于实验组或对照组的处理方法和预期结果的几种组合，其中正确的是____\r\n①实验组 ②对照组 ③黑暗中培养 ④在光下培养 ⑤生长良好 ⑥生长不良",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "②③⑤",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "①③⑥",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "①④⑤",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "②④⑥",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "经查发现，某地区青菜虫种群的抗药性不断增强，其原因是连续多年对青菜虫使用农药.下列叙述正确的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "C",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "使用农药导致青菜虫发生抗药性变异",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "青菜虫抗药性的增强是人工选择的结果",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "通过选择导致青菜虫抗药性不断积累",
+              "is_correct": true
+            },
+            {
+              "option_key": "D",
+              "option_text": "环境是造成青菜虫抗药性不断增强的动力",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "鉴定可溶性还原糖、蛋白质、脂肪，观察DNA、RNA在细胞中的分布，所用实验材料均合理的一组是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "韭菜叶、豆浆、大豆、洋葱鳞片叶内表皮",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "梨、鸡蛋清、花生子叶、人口腔上皮细胞",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "苹果、花生子叶、大豆、洋葱鳞片叶外表皮",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "番茄、豆浆、花生子叶、人口腔上皮细胞",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "下列有关细胞增殖的意义表述不正确的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "草履虫通过细胞增殖而繁衍。",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "牛从受精卵开始，要经过细胞的增殖和分化逐渐发育为成体",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "蛙的红细胞通过无丝分裂的方式增殖，补充体内衰老死亡的红细胞",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "人衰老时，人体内的细胞的增殖就停止了",
+              "is_correct": true
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "对可溶性还原糖、脂肪、蛋白质的鉴定实验叙述正确的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "甘蔗中含有较多的糖且近于白色，用于进行可溶性还原糖的鉴定",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "脂肪鉴定实验中要用蒸馏水洗去浮色后在显微镜下观察花生子叶切片",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "将斐林试剂加入葡萄糖溶液中即出现砖红色沉淀",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "蛋白质鉴定时应先向2ml样液中加入1mL双缩脲试剂A液摇匀，再加入B液4滴",
+              "is_correct": true
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "下列有关变异的说法正确的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "细菌产生的可遗传变异一般只能来自基因突变",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "染色体变异、基因突变均可以用光学显微镜直接观察",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "基因型为Aa的个体自交，因基因重组而导致子代性状分离",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "秋水仙素诱导多倍体形成的原因是促进染色单体分离使染色体增倍",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "下列关于肺炎双球菌转化实验的说法，正确的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "C",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "肺炎双球菌转化实验说明DNA是主要的遗传物质",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "将S型细菌的DNA与R型细菌混合，R型细菌可全部转化为S型细菌",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "艾弗里的体外转化实验对S型细菌中的物质进行了提纯和鉴定",
+              "is_correct": true
+            },
+            {
+              "option_key": "D",
+              "option_text": "肺炎双球菌转化实验中，若给小鼠注射S型细菌的DNA，则小鼠死亡",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "研究表明缺硒将导致克山病.克山病是一种地方性心肌病，急重病人可发生猝死.营养学和流行病学界专家认为，成人每天硒的摄取量约在40～400μg之间就可满足人体需要.根据资料，下列解释不正确的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "C",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "硒是人体必需的化学元素",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "硒在人体的生长发育过程中的作用不可替代",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "硒的作用重大，只要有了硒，人体就能正常生长发育",
+              "is_correct": true
+            },
+            {
+              "option_key": "D",
+              "option_text": "硒是人体必需的微量元素",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "C、H、N三种化学元素的质量分数共占人体化学成分的73％左右，而这三种元素在组成岩石圈的化学成分中，质量分数不到1％，这个事实说明____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "生物界和非生物界具有统一性",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "生物界与非生物界本质是不同的",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "生物界没有一种元素是生物所特有的，生物和非生物从本质上看是相同的",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "生物界和非生物界存在着本质的区别，两者还具有差异性",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "真核细胞单位面积的核孔数目与细胞类型和代谢水平有关。以下细胞中核孔数目最少的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "胰岛细胞",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "造血干细胞",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "癌细胞",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "口腔上皮细胞",
+              "is_correct": true
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "细胞核控制合成的RNA进入细胞质以及细胞质中合成的蛋白质分子进入细胞核的通道是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "核膜",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "核孔",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "胞间连丝",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "内质网",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "以下行为容易传染艾滋病的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "与艾滋病人共同进餐",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "与艾滋病人共用注射器",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "与艾滋病人握手",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "与艾滋病人拥抱",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "果蝇缺失1条Ⅳ号常染色体仍能正常生存和繁殖,缺失2条则致死。一对都缺失1条Ⅳ号常染色体的果蝇杂交,理论上F1中染色体数正常的雌果蝇所占比例为____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "$1:6$",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "$1:4$",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "$1:3$",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "$1:2$",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "观察在一天内任何时间制作的洋葱根尖细胞有丝分裂装片时，都能看到的时期是：____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "分裂间期",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "分裂前期",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "分裂中期",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "分裂后期",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "生物学家认为病毒是生物，其主要理由是:____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "C",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "由蛋白质和核酸组成",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "能够侵染其他生物",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "能够在寄主细胞内复制并产生后代",
+              "is_correct": true
+            },
+            {
+              "option_key": "D",
+              "option_text": "具有细胞结构",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "下列关于基因工程安全性的说法中不正确的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "C",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "转基因作物可通过花粉扩散到它的近亲作物上，可能出现对农业不利的“超级植物”",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "杂草、害虫从它的近亲获得抗性基因，可能破坏生态系统的稳定性",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "转基因必须在人为控制下才能完成，自然条件下基因污染是不增殖和不被扩散的",
+              "is_correct": true
+            },
+            {
+              "option_key": "D",
+              "option_text": "转基因食品转入的蛋白质有可能使人引起食物过敏",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "能将细胞中的有机物分解并释放出能量的结构是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "C",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "细胞膜",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "细胞核",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "线粒体",
+              "is_correct": true
+            },
+            {
+              "option_key": "D",
+              "option_text": "叶绿体",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "以下环境能发生初生演替的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "火灾过后的草原",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "过量砍伐的森林",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "弃耕的农田",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "沙丘",
+              "is_correct": true
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "下列各项叙述中，不正确的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "C",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "双亲表现型正常，生出一个患病女儿为常染色体隐性遗传",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "母亲患病，父亲正常，子代中有正常儿子，不是X染色体隐性遗传",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "一个具有n对等位基因的杂合体，必定产生2n种具各类型数量相等的配子",
+              "is_correct": true
+            },
+            {
+              "option_key": "D",
+              "option_text": "双亲表型正常，生出一个色盲女儿的几率为零",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "下列有关酶的叙述中，正确的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "人体内的酶在不断地更新",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "酶是活细胞产生的，只在细胞内起催化作用",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "酶催化反应能放出更多的能量",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "强酸、强碱或高温、低温都会使酶永久失活",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "下列关于光合作用的叙述，错误的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "鲁宾和卡门用同位素标记法证明了光合作用释放的氧气来自水",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "一般情况下，光合作用所利用的光都是可见光",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "在暗反应阶段，C3可被[H]还原为C5和糖类",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "温度的变化不会影响光合作用的光反应阶段",
+              "is_correct": true
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "下列关于DNA分子结构的叙述，正确的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "每个DNA分子都是以四种脱氧核苷酸为基本单位连接而成的单链结构",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "DNA分子中的每个磷酸基团均连接着两个脱氧核糖和-个碱基",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "DNA分子一条链上的相邻碱基通过磷酸一脱氧核糖一磷酸相连",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "双链DNA分子的两条链之间总是嘌呤和嘧啶形成碱基对",
+              "is_correct": true
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "某生物体内能发生如下反应：淀粉→麦芽糖→葡萄糖→糖原。则下面的说法不正确的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "C",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "此生物一定是动物，因为能合成糖原",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "淀粉和糖原都属于多糖",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "此生物一定是动物，因为能利用葡萄糖",
+              "is_correct": true
+            },
+            {
+              "option_key": "D",
+              "option_text": "糖类在生物体内是主要的能源物质",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "炎热的夏天，人剧烈运动大汗淋漓，此时会导致人低血压的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "血容量上升",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "心输出量上升",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "心率下降",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "血管管壁舒张",
+              "is_correct": true
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "以下生物体的结构最简单的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "细菌",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "植物",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "动物",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "肝炎病毒",
+              "is_correct": true
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "关于染色体组的叙述，不正确的有____\r\n①一个染色体组中不含同源染色体 ②一个染色体组中染色体大小形态一般不同\r\n③人的一个染色体组中应含有24条染色体 ④含有一个染色体组的细胞，一定是配子",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "①③",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "③④",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "①④",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "②④",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "现有两块农田，农田A混合种植了杂合高茎豌豆和矮茎豌豆,而农田B混合种植了甜玉米和杂合非甜玉米。豌豆的高茎和矮茎与玉米的甜和非甜均受一对等位基因控制，不考虑其他植物，下列相关叙述，错误的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "C",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "豌豆的高茎对矮茎为显性，玉米的非甜对甜为显性",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "农田A中矮茎豌豆所结种子长成的植株均表现为矮茎",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "农田B中杂合非甜玉米所结种子长成的植株1/4为甜玉米",
+              "is_correct": true
+            },
+            {
+              "option_key": "D",
+              "option_text": "农田A中各植株自花受粉,而农田B中各植株随机受粉",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "“假说—演绎法”是现代科学研究中常用的一种方法，下列属于孟德尔在发现基因分离定律时的“演绎”过程的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "C",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "生物的性状是遗传因子决定的",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "由F2出现了“3∶1”推测，生物体产生配子时成对遗传因子彼此分离",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "若F1产生配子时成对遗传因子分离，则测交后代会出现两种性状，比例接近1∶1",
+              "is_correct": true
+            },
+            {
+              "option_key": "D",
+              "option_text": "若F1产生配子时成对遗传因子分离，则F2中三种基因型个体比接近1∶2∶1",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "现用高秆抗病（AABB）品系和矮轩不抗病（aabb）品系培育矮秆抗病（aaBB）品系.下列对其过程分析错误的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "F1中虽未表现出矮秆抗病的性状组合，但巳经集中了相关基因",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "F2中出现重组性状的原因是产生配子时发生了基因重组",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "选种一般从F2开始，因为F2出现了性状分离",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "通常利用F2的花粉进行单倍体育种,可以明显缩短育种年限",
+              "is_correct": true
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "医生常常给病人输水，其实是生理盐水。为什么不输蒸馏水或浓盐水，下面说法正确的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "蒸馏水不含营养",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "无机盐离子容易进入细胞",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "血液中的红细胞的特性决定的",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "无机盐对维持细胞的形态和功能有重要作用",
+              "is_correct": true
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "下列关于细胞无丝分裂和有丝分裂的叙述，正确的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "C",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "有丝分裂过程需要进行染色体的复制，无丝分裂过程不需要",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "真核细胞可进行有丝分裂，原核细胞可进行无丝分裂",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "两种分裂过程中可能见到一个细胞内同时含有2个细胞核的情况",
+              "is_correct": true
+            },
+            {
+              "option_key": "D",
+              "option_text": "都会出现核膜、核仁的周期性的消失和重现",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "高等植物体内能产生ATP的生理过程有：____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "呼吸作用",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "渗透作用",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "吸胀作用",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "蒸腾作用",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "General",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "下列关于稳态的生理意义的描述，较准确的是____",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from C-Eval.",
+          "chapter": null,
+          "source_type": "hf_ceval",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "使内环境的渗透压处于相对平衡",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "使体液的PH保持相对稳定",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "使体温维持相对恒定",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "是机体进行正常生命活动的必要条件",
+              "is_correct": true
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "小麦粒色受独立遗传的三对基因A/a、B/b、C/c-控制．A、B和C决定红色，每个基因对粒色增加效应相同且具叠加性，a、b和c决定白色．将粒色最浅和最深的植株杂交得到F1．Fl的自交后代中，与基因型为Aabbcc的个体表现型相同的概率是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "$1/64$",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "$3/32$",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "$15/64$",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "$5/16$",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "通常情况下，分子式为C63H103O45N17S2的化合物最可能属于：____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "多肽",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "氨基酸",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "核苷酸",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "肝糖元",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "下列关于人类性别决定与伴性遗传的叙述，正确的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "C",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "生殖细胞中只表达性染色体上的基因",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "性染色体上的基因都与性别决定有关",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "性染色体上的基因都伴随性染色体遗传",
+          "is_correct": true
+        },
+        {
+          "option_key": "D",
+          "option_text": "精母细胞和次级精母细胞中一定都含有X染色体",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "假说一演绎法是现代科学研究中常用的一种科学方法，其基本思路是发现问题→提出假说→演绎推理→实验检验→得出结论。下列属于孟德尔在发现基因分离定律时的“演绎推理”内容的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "若遗传因子位于染色体上,则遗传因子在体细胞中成对存在",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "由F2出现了“3：1”的表现型比，推测生物体产生配子时，成对遗传因子彼此分离",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "若F1产生配子时成对遗传因子分离，则F2中三种基因型个体比接近1:2：1",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "若F1产生配子时成对遗传因子分离,则测交后代会出现接近1：1的两种性状比",
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "下列不能解除植物顶端优势的措施是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "去掉顶芽",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "在去掉顶芽的断口处放一块含有生长素的羊毛脂",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "在去掉顶芽的断口处放一块含有细胞分裂素的羊毛脂",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "在去掉顶芽的断口处放上琼脂小块",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "某种基因型为Aa的高等植物产生的雌雄配子的数目是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "雄配子很多，雌配子很少",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "雌配子：雄配子=1：3",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "A雌配子：a雄配子=1：1",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "雌配子：雄配子=1：1",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "RNA聚合酶能以一条DNA链或RNA链为模板催化RNA的合成，因为在细胞内遗传信息转录与RNA有关,所以也称转录酶。下列有关叙述中错误的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "RNA聚合酶催化RNA合成期间，一定有腺嘌呤与胸腺嘧啶的配对现象",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "DNA的复制和基因的转录，DNA双链都要先解旋,前者需要用到解旋酶",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "转录过程消耗的原料是核糖核苷酸，而逆转录消耗脱氧核苷酸",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "肌细胞内有蛋白质的更新，其细胞核内应存在有活性的RNA聚合酶",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "下列关于隔离的叙述不正确的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "阻止了种群的基因交流",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "对所有的物种来说，地理隔离必然导致生殖隔离",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "东北虎与华南虎之间存在地理隔离",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "不同的物种之间必然存在着生殖隔离",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "肥胖症周大会公布了肥胖症新药司美格鲁肽( Wegovy)。数据显示，接受Wegovy治疗的成人患者，在两年研究期间实现了显著和持续的体重减轻。下列叙述错误的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "C",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "Wegovy只能注射不能口服",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "组成Wegovy的基本单位在人体中有21种",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "Wegovy彻底水解后能和双缩脲试剂发生紫色反应",
+          "is_correct": true
+        },
+        {
+          "option_key": "D",
+          "option_text": "Wegovy是一种信息分子，不能直接参与细胞的生命活动",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "红细胞吸收无机盐和葡萄糖的共同点是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "C",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "都可以从低浓度到高浓度一边",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "都需要供给ATP",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "都需要载体协助",
+          "is_correct": true
+        },
+        {
+          "option_key": "D",
+          "option_text": "既需要载体协助又需要消耗能量",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "减数分裂过程中，染色体数目减半发生在____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "初级精母细胞形成时",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "次级精母细胞形成时",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "精子细胞形成时",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "精子形成时",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "下列名称中，通常属于活细胞的一组是____?①血小板   ②植物的导管   ③木纤维     ④花粉   ⑤抗体     ⑥胃蛋白酶     ⑦大肠杆菌",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "①②③",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "④⑤⑥",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "②④⑥",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "①④⑦",
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "沙漠中旱生植物细胞中含量最多的物质是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "蛋白质",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "糖类",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "脂肪",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "水",
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "细菌、真菌等营腐生生活的微生物，在生态系统中占有重要地位，主要是因为它们____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "数量极多，分布广",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "是食物链中的一个环节",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "分解者的营养级别最高",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "能把有机物分解成无机物，归还到无机环境中",
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "由于实验材料用品所限，有时候需要设法替代，下列各项中正确的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "做低温诱导染色体数目变化的实验时，可用龙胆紫代替改良苯酚品红染液",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "在观察植物细胞的有丝分裂实验时，用洋葱表皮代替根尖",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "制备细胞膜的实验用新鲜鸡血作为替代材料",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "诱导植物细胞染色体数目加倍必须使用一定浓度的秋水仙素处理",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "以下关于真核细胞和原核细胞的说法中，正确的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "发菜细胞群体呈黑蓝色，无叶绿素，不能进行光合作用",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "细菌和酵母菌在结构上的相同点：都有细胞壁、细胞膜、核糖体等",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "哺乳动物成熟的红细胞中没有细胞核，属于原核细胞",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "念珠藻是由许多细胞构成的真核生物",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "1903年美国遗传学家萨顿关于“基因位于染色体上”的假说是如何提出的____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "C",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "通过做实验研究得出的",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "运用假说—演绎法提出的",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "运用类比推理提出的",
+          "is_correct": true
+        },
+        {
+          "option_key": "D",
+          "option_text": "运用系统分析法提出的",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "为验证光是植物生长发育的必要条件，设计如下实验：选择生长状况一致的小麦幼苗200株，随机均分为实验组和对照组，分别处理并预期结果。下面是关于实验组或对照组的处理方法和预期结果的几种组合，其中正确的是____\r\n①实验组 ②对照组 ③黑暗中培养 ④在光下培养 ⑤生长良好 ⑥生长不良",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "②③⑤",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "①③⑥",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "①④⑤",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "②④⑥",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "经查发现，某地区青菜虫种群的抗药性不断增强，其原因是连续多年对青菜虫使用农药.下列叙述正确的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "C",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "使用农药导致青菜虫发生抗药性变异",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "青菜虫抗药性的增强是人工选择的结果",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "通过选择导致青菜虫抗药性不断积累",
+          "is_correct": true
+        },
+        {
+          "option_key": "D",
+          "option_text": "环境是造成青菜虫抗药性不断增强的动力",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "鉴定可溶性还原糖、蛋白质、脂肪，观察DNA、RNA在细胞中的分布，所用实验材料均合理的一组是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "韭菜叶、豆浆、大豆、洋葱鳞片叶内表皮",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "梨、鸡蛋清、花生子叶、人口腔上皮细胞",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "苹果、花生子叶、大豆、洋葱鳞片叶外表皮",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "番茄、豆浆、花生子叶、人口腔上皮细胞",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "下列有关细胞增殖的意义表述不正确的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "草履虫通过细胞增殖而繁衍。",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "牛从受精卵开始，要经过细胞的增殖和分化逐渐发育为成体",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "蛙的红细胞通过无丝分裂的方式增殖，补充体内衰老死亡的红细胞",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "人衰老时，人体内的细胞的增殖就停止了",
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "对可溶性还原糖、脂肪、蛋白质的鉴定实验叙述正确的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "甘蔗中含有较多的糖且近于白色，用于进行可溶性还原糖的鉴定",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "脂肪鉴定实验中要用蒸馏水洗去浮色后在显微镜下观察花生子叶切片",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "将斐林试剂加入葡萄糖溶液中即出现砖红色沉淀",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "蛋白质鉴定时应先向2ml样液中加入1mL双缩脲试剂A液摇匀，再加入B液4滴",
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "下列有关变异的说法正确的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "细菌产生的可遗传变异一般只能来自基因突变",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "染色体变异、基因突变均可以用光学显微镜直接观察",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "基因型为Aa的个体自交，因基因重组而导致子代性状分离",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "秋水仙素诱导多倍体形成的原因是促进染色单体分离使染色体增倍",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "下列关于肺炎双球菌转化实验的说法，正确的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "C",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "肺炎双球菌转化实验说明DNA是主要的遗传物质",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "将S型细菌的DNA与R型细菌混合，R型细菌可全部转化为S型细菌",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "艾弗里的体外转化实验对S型细菌中的物质进行了提纯和鉴定",
+          "is_correct": true
+        },
+        {
+          "option_key": "D",
+          "option_text": "肺炎双球菌转化实验中，若给小鼠注射S型细菌的DNA，则小鼠死亡",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "研究表明缺硒将导致克山病.克山病是一种地方性心肌病，急重病人可发生猝死.营养学和流行病学界专家认为，成人每天硒的摄取量约在40～400μg之间就可满足人体需要.根据资料，下列解释不正确的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "C",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "硒是人体必需的化学元素",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "硒在人体的生长发育过程中的作用不可替代",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "硒的作用重大，只要有了硒，人体就能正常生长发育",
+          "is_correct": true
+        },
+        {
+          "option_key": "D",
+          "option_text": "硒是人体必需的微量元素",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "C、H、N三种化学元素的质量分数共占人体化学成分的73％左右，而这三种元素在组成岩石圈的化学成分中，质量分数不到1％，这个事实说明____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "生物界和非生物界具有统一性",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "生物界与非生物界本质是不同的",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "生物界没有一种元素是生物所特有的，生物和非生物从本质上看是相同的",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "生物界和非生物界存在着本质的区别，两者还具有差异性",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "真核细胞单位面积的核孔数目与细胞类型和代谢水平有关。以下细胞中核孔数目最少的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "胰岛细胞",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "造血干细胞",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "癌细胞",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "口腔上皮细胞",
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "细胞核控制合成的RNA进入细胞质以及细胞质中合成的蛋白质分子进入细胞核的通道是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "核膜",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "核孔",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "胞间连丝",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "内质网",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "以下行为容易传染艾滋病的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "与艾滋病人共同进餐",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "与艾滋病人共用注射器",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "与艾滋病人握手",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "与艾滋病人拥抱",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "果蝇缺失1条Ⅳ号常染色体仍能正常生存和繁殖,缺失2条则致死。一对都缺失1条Ⅳ号常染色体的果蝇杂交,理论上F1中染色体数正常的雌果蝇所占比例为____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "$1:6$",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "$1:4$",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "$1:3$",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "$1:2$",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "观察在一天内任何时间制作的洋葱根尖细胞有丝分裂装片时，都能看到的时期是：____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "分裂间期",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "分裂前期",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "分裂中期",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "分裂后期",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "生物学家认为病毒是生物，其主要理由是:____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "C",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "由蛋白质和核酸组成",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "能够侵染其他生物",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "能够在寄主细胞内复制并产生后代",
+          "is_correct": true
+        },
+        {
+          "option_key": "D",
+          "option_text": "具有细胞结构",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "下列关于基因工程安全性的说法中不正确的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "C",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "转基因作物可通过花粉扩散到它的近亲作物上，可能出现对农业不利的“超级植物”",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "杂草、害虫从它的近亲获得抗性基因，可能破坏生态系统的稳定性",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "转基因必须在人为控制下才能完成，自然条件下基因污染是不增殖和不被扩散的",
+          "is_correct": true
+        },
+        {
+          "option_key": "D",
+          "option_text": "转基因食品转入的蛋白质有可能使人引起食物过敏",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "能将细胞中的有机物分解并释放出能量的结构是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "C",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "细胞膜",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "细胞核",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "线粒体",
+          "is_correct": true
+        },
+        {
+          "option_key": "D",
+          "option_text": "叶绿体",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "以下环境能发生初生演替的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "火灾过后的草原",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "过量砍伐的森林",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "弃耕的农田",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "沙丘",
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "下列各项叙述中，不正确的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "C",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "双亲表现型正常，生出一个患病女儿为常染色体隐性遗传",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "母亲患病，父亲正常，子代中有正常儿子，不是X染色体隐性遗传",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "一个具有n对等位基因的杂合体，必定产生2n种具各类型数量相等的配子",
+          "is_correct": true
+        },
+        {
+          "option_key": "D",
+          "option_text": "双亲表型正常，生出一个色盲女儿的几率为零",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "下列有关酶的叙述中，正确的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "人体内的酶在不断地更新",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "酶是活细胞产生的，只在细胞内起催化作用",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "酶催化反应能放出更多的能量",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "强酸、强碱或高温、低温都会使酶永久失活",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "下列关于光合作用的叙述，错误的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "鲁宾和卡门用同位素标记法证明了光合作用释放的氧气来自水",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "一般情况下，光合作用所利用的光都是可见光",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "在暗反应阶段，C3可被[H]还原为C5和糖类",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "温度的变化不会影响光合作用的光反应阶段",
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "下列关于DNA分子结构的叙述，正确的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "每个DNA分子都是以四种脱氧核苷酸为基本单位连接而成的单链结构",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "DNA分子中的每个磷酸基团均连接着两个脱氧核糖和-个碱基",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "DNA分子一条链上的相邻碱基通过磷酸一脱氧核糖一磷酸相连",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "双链DNA分子的两条链之间总是嘌呤和嘧啶形成碱基对",
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "某生物体内能发生如下反应：淀粉→麦芽糖→葡萄糖→糖原。则下面的说法不正确的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "C",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "此生物一定是动物，因为能合成糖原",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "淀粉和糖原都属于多糖",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "此生物一定是动物，因为能利用葡萄糖",
+          "is_correct": true
+        },
+        {
+          "option_key": "D",
+          "option_text": "糖类在生物体内是主要的能源物质",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "炎热的夏天，人剧烈运动大汗淋漓，此时会导致人低血压的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "血容量上升",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "心输出量上升",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "心率下降",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "血管管壁舒张",
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "以下生物体的结构最简单的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "细菌",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "植物",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "动物",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "肝炎病毒",
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "关于染色体组的叙述，不正确的有____\r\n①一个染色体组中不含同源染色体 ②一个染色体组中染色体大小形态一般不同\r\n③人的一个染色体组中应含有24条染色体 ④含有一个染色体组的细胞，一定是配子",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "①③",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "③④",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "①④",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "②④",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "现有两块农田，农田A混合种植了杂合高茎豌豆和矮茎豌豆,而农田B混合种植了甜玉米和杂合非甜玉米。豌豆的高茎和矮茎与玉米的甜和非甜均受一对等位基因控制，不考虑其他植物，下列相关叙述，错误的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "C",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "豌豆的高茎对矮茎为显性，玉米的非甜对甜为显性",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "农田A中矮茎豌豆所结种子长成的植株均表现为矮茎",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "农田B中杂合非甜玉米所结种子长成的植株1/4为甜玉米",
+          "is_correct": true
+        },
+        {
+          "option_key": "D",
+          "option_text": "农田A中各植株自花受粉,而农田B中各植株随机受粉",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "“假说—演绎法”是现代科学研究中常用的一种方法，下列属于孟德尔在发现基因分离定律时的“演绎”过程的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "C",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "生物的性状是遗传因子决定的",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "由F2出现了“3∶1”推测，生物体产生配子时成对遗传因子彼此分离",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "若F1产生配子时成对遗传因子分离，则测交后代会出现两种性状，比例接近1∶1",
+          "is_correct": true
+        },
+        {
+          "option_key": "D",
+          "option_text": "若F1产生配子时成对遗传因子分离，则F2中三种基因型个体比接近1∶2∶1",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "现用高秆抗病（AABB）品系和矮轩不抗病（aabb）品系培育矮秆抗病（aaBB）品系.下列对其过程分析错误的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "F1中虽未表现出矮秆抗病的性状组合，但巳经集中了相关基因",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "F2中出现重组性状的原因是产生配子时发生了基因重组",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "选种一般从F2开始，因为F2出现了性状分离",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "通常利用F2的花粉进行单倍体育种,可以明显缩短育种年限",
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "医生常常给病人输水，其实是生理盐水。为什么不输蒸馏水或浓盐水，下面说法正确的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "蒸馏水不含营养",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "无机盐离子容易进入细胞",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "血液中的红细胞的特性决定的",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "无机盐对维持细胞的形态和功能有重要作用",
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "下列关于细胞无丝分裂和有丝分裂的叙述，正确的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "C",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "有丝分裂过程需要进行染色体的复制，无丝分裂过程不需要",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "真核细胞可进行有丝分裂，原核细胞可进行无丝分裂",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "两种分裂过程中可能见到一个细胞内同时含有2个细胞核的情况",
+          "is_correct": true
+        },
+        {
+          "option_key": "D",
+          "option_text": "都会出现核膜、核仁的周期性的消失和重现",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "高等植物体内能产生ATP的生理过程有：____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "呼吸作用",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "渗透作用",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "吸胀作用",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "蒸腾作用",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "General",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "下列关于稳态的生理意义的描述，较准确的是____",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from C-Eval.",
+      "chapter": null,
+      "source_type": "hf_ceval",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "使内环境的渗透压处于相对平衡",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "使体液的PH保持相对稳定",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "使体温维持相对恒定",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "是机体进行正常生命活动的必要条件",
+          "is_correct": true
+        }
+      ]
+    }
+  ]
+}

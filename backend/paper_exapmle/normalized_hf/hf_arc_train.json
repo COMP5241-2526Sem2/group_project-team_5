@@ -1,0 +1,3723 @@
+{
+  "title": "HF ARC Easy (train)",
+  "course_id": 1,
+  "grade": "Unknown",
+  "subject": "Science",
+  "semester": "vol1",
+  "exam_type": "hf_arc",
+  "total_score": 50,
+  "duration_min": 60,
+  "quality_score": null,
+  "sections": [
+    {
+      "title": "Main",
+      "question_type": "MIXED",
+      "score_each": 1,
+      "total_score": 50,
+      "questions": [
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which factor will most likely cause a person to develop a fever?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "a leg muscle relaxing after exercise",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "a bacterial population in the bloodstream",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "several viral particles on the skin",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "carbohydrates being digested in the stomach",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Lichens are symbiotic organisms made of green algae and fungi. What do the green algae supply to the fungi in this symbiotic relationship?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "carbon dioxide",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "food",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "protection",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "water",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "When a switch is used in an electrical circuit, the switch can",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "cause the charge to build.",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "increase and decrease the voltage.",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "cause the current to change direction.",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "stop and start the flow of current.",
+              "is_correct": true
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which of the following is an example of an assistive device?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "contact lens",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "motorcycle",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "raincoat",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "coffee pot",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Rocks are classified as igneous, metamorphic, or sedimentary according to",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "3",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "1",
+              "option_text": "their color",
+              "is_correct": false
+            },
+            {
+              "option_key": "2",
+              "option_text": "their shape",
+              "is_correct": false
+            },
+            {
+              "option_key": "3",
+              "option_text": "how they formed",
+              "is_correct": true
+            },
+            {
+              "option_key": "4",
+              "option_text": "the minerals they contain",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "A chewable calcium carbonate tablet is a common treatment for stomach discomfort. Calcium carbonate is most likely used as this type of medicine because calcium carbonate",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "C",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "has a pleasant flavor.",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "is inexpensive to produce.",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "neutralizes digestive acid.",
+              "is_correct": true
+            },
+            {
+              "option_key": "D",
+              "option_text": "occurs naturally in the body.",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which two body systems are directly involved in movement?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "muscular and skeletal",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "digestive and muscular",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "skeletal and respiratory",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "respiratory and digestive",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which change in the state of water particles causes the particles to become arranged in a fixed position?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "C",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "boiling",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "melting",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "freezing",
+              "is_correct": true
+            },
+            {
+              "option_key": "D",
+              "option_text": "evaporating",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Earth's core is primarily composed of which of the following materials?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "basalt",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "iron",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "magma",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "quartz",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which of the following events during meiosis contributes most to the variation within a species?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "C",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "pairing of chromosomes",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "creation of haploid gametes",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "segregation of alleles",
+              "is_correct": true
+            },
+            {
+              "option_key": "D",
+              "option_text": "separation of chromatids",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which of the following was probably most important in the formation of dark, fertile soil that is good for farming?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "plant decomposition",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "radioactive decay",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "water erosion",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "wind erosion",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "When igneous rock is changed into metamorphic rock, which form of energy is this process?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "heat",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "chemical",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "magnetic",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "light",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "In humans, the digestion process begins in",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "the intestine, with squeezing.",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "the mouth, with chewing and saliva.",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "the stomach, with churning and acid.",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "the esophagus, with pushing towards the stomach.",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which of these items contains only a solution?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "a jar of pickles",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "a bottle of juice",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "a bag of peanuts",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "a can of mixed fruit",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Many natural rock formations change color over time. In Utah, for example, iron oxidized and formed red, orange, and yellow rock. Which of the following is the cause of this change?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "chemical weathering",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "mechanical weathering",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "water erosion",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "wind erosion",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "A population of small, plant-eating beetles lives in a forest. About half of the beetles are light brown and the others are dark green. If years of drought cause the area to become dry with few trees, what would the beetle population most likely look like after several generations?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "It would be mostly light brown beetles.",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "It would be mostly dark green beetles.",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "It would be mostly carnivorous beetles.",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "It would be mostly very large beetles.",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "A scientist wanting to document a change in a river's flow pattern should observe a river over a period of",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "days.",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "weeks.",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "months.",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "years.",
+              "is_correct": true
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Automobile engines built today are designed to be gas efficient. Gas-efficient engines most likely affect a city by reducing",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "air pollution.",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "heat pollution.",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "noise pollution.",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "light pollution.",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "A student in an empty classroom shouts, \"Hello!\" Which best explains what the student hears after the shout?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "an increased loudness of sound",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "a reflection of sound",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "an increased frequency of sound",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "a refraction of sound",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which type of energy in gasoline is transformed into mechanical energy in a motorcycle engine?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "1",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "1",
+              "option_text": "chemical",
+              "is_correct": true
+            },
+            {
+              "option_key": "2",
+              "option_text": "nuclear",
+              "is_correct": false
+            },
+            {
+              "option_key": "3",
+              "option_text": "magnetic",
+              "is_correct": false
+            },
+            {
+              "option_key": "4",
+              "option_text": "electrical",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "A student standing near a campfire feels warmer as the fire grows. Which process most likely transfers heat from the campfire to the student?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "C",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "conduction",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "convection",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "radiation",
+              "is_correct": true
+            },
+            {
+              "option_key": "D",
+              "option_text": "transformation",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "In snapdragon plants, red flowers are dominant to white flowers. When red-flowered plants are crossed with white-flowered plants, pink flowers are produced. If a researcher wants to produce plants with only white flowers, what color should the parent plants be?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "both red",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "both white",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "one red and one white",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "one white and one pink",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Scientists use the term \"light year\" to describe",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "how fast light travels in space.",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "the distance light travels in one year.",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "how large the diameters of different stars are.",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "the time it takes the Sun to move through the galaxy.",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Plate movement can form different features on Earth. The movement of tectonic plates can be both a constructive and a destructive force. At which type of plate boundary is new crust formed?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "convergent",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "subduction",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "transform",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "divergent",
+              "is_correct": true
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which group of organisms can show significant trait changes in the shortest period of time?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "1",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "1",
+              "option_text": "bacteria",
+              "is_correct": true
+            },
+            {
+              "option_key": "2",
+              "option_text": "birds",
+              "is_correct": false
+            },
+            {
+              "option_key": "3",
+              "option_text": "fish",
+              "is_correct": false
+            },
+            {
+              "option_key": "4",
+              "option_text": "reptiles",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Peach trees have sweet-smelling blossoms and produce rich fruit. What is the main purpose of the flowers of a peach tree?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "to attract bees for pollination",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "to create flower arrangements",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "to protect the tree from disease",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "to feed migratory birds",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "A group of students are researching changes in climate in their region. Which of these would best provide evidence of changes in temperature and rainfall over a period of years?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "tree rings",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "pollen samples",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "harvest production",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "carbon dating",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which of these would help to prevent infections from occurring in small cuts and scrapes?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "apply a cold ice pack",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "raise the injured area",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "apply pressure to stop bleeding",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "wash the area with warm, soapy water",
+              "is_correct": true
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which best describes why winds at the beach change direction between day and night?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "because the temperatures over land and over water change",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "because warm air over land sinks and stays in place over land",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "because cool air rises and is replaced by warm air from the ocean",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "because cool air sinks and stays in place over land",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Soil erosion can be best prevented by",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "removing grass from the steepest slope.",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "building terraces into the sides of a slope.",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "heavily watering the vegetation on the slope.",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "increasing the slope of the land by adding more soil.",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which of the following properties provides the BEST way to identify a mineral?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "hardness",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "shape",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "size",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "temperature",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which sequence represents the order of development for many plants?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "1",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "1",
+              "option_text": "seed develops inside fruit -> seed is dispersed -> seed germinates -> plant grows",
+              "is_correct": true
+            },
+            {
+              "option_key": "2",
+              "option_text": "seed is dispersed -> seed develops inside fruit -> seed germinates -> plant grows",
+              "is_correct": false
+            },
+            {
+              "option_key": "3",
+              "option_text": "seed germinates -> plant grows -> seed is dispersed -> seed develops inside fruit",
+              "is_correct": false
+            },
+            {
+              "option_key": "4",
+              "option_text": "seed is dispersed -> plant grows -> seed germinates -> seed develops inside fruit",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "When ice cream is left out of a freezer, the ice cream changes from a ___.",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "C",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "solid to a gas",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "gas to a liquid",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "solid to a liquid",
+              "is_correct": true
+            },
+            {
+              "option_key": "D",
+              "option_text": "liquid to a gas",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which equipment will best separate a mixture of iron filings and black pepper?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "1",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "1",
+              "option_text": "magnet",
+              "is_correct": true
+            },
+            {
+              "option_key": "2",
+              "option_text": "filter paper",
+              "is_correct": false
+            },
+            {
+              "option_key": "3",
+              "option_text": "triple-beam balance",
+              "is_correct": false
+            },
+            {
+              "option_key": "4",
+              "option_text": "voltmeter",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which characteristic is shared by all cells?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "They need energy.",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "They reproduce sexually.",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "They make their own food.",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "They move from place to place.",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "On a small, isolated island, a hurricane destroyed all the trees that produced a large, hard-shelled nut. Which bird population would most likely decrease?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "birds with long, probing beaks",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "birds with thick, strong beaks",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "birds with thin, short beaks",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "birds with large, pouch beaks",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "A cow and a frog have similar bone structures in their forelimbs. Both have phalanges, radius, ulna, and humerus bones. However, the cow and frog are animals with very different life cycles from each other. Which most likely describes why the body structures of these animals are so similar?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "Both have undergone similar mutations.",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "Both descended from a common ancestor.",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "Both reacted similarly to environmental pressures.",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "Both spread out from the same geographical region.",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "A cell that is unable to import substances required to process chemical energy is most likely a result of a malfunctioning",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "cell membrane.",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "endoplasmic reticulum.",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "Golgi body.",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "nuclear envelope.",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which best describes all unicellular organisms?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "Every cell is round.",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "Every cell can make food.",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "Every cell can move on its own.",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "Every cell performs all life functions.",
+              "is_correct": true
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "When a transverse wave passes from right to left through a medium, what happens to the particles of the medium?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "Particles travel from right to left along the wave.",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "Particles travel from left to right along the wave.",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "Particles move back and forth parallel to the wave.",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "Particles move back and forth perpendicular to the wave.",
+              "is_correct": true
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which characteristic below most likely accounts for our limited knowledge of galaxies?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "their tiny size",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "their magnetic cores",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "their inability to produce light",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "their great distance from Earth",
+              "is_correct": true
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Decomposers increase the fertility of the soil and prevent dead organisms from building up in the environment. In which way do decomposers make the soil more fertile?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "by adding carbon",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "by adding nitrogen",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "by removing excess water",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "by removing excess minerals",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "When oxygen combines with hydrogen, which substance is formed?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "water",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "vinegar",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "hydrochloric acid",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "hydrogen dioxide",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "When plants undergo photosynthesis, a reaction produces sugar, oxygen, and water. During respiration, stored energy from the products of photosynthesis is converted to usable energy. In what form is the energy stored prior to use in respiration?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "A",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "chemical energy",
+              "is_correct": true
+            },
+            {
+              "option_key": "B",
+              "option_text": "kinetic energy",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "light energy",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "heat energy",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which of the following is a typical example of a unicellular organism?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "earthworm",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "bacteria",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "fungi",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "green algae",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Over geologic time, global mean sea level has varied significantly. Which change is most likely responsible for an increase in global mean sea level?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "erosion of sediment from a mountain range",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "mass extinction of marine organisms",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "formation of an ocean trench",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "melting of polar ice caps",
+              "is_correct": true
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which body system is most responsible for the removal of waste?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "D",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "skeletal system",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "nervous system",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "muscular system",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "excretory system",
+              "is_correct": true
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "In which environment is white fur color an advantage for survival?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "C",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "desert",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "grassland",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "arctic tundra",
+              "is_correct": true
+            },
+            {
+              "option_key": "D",
+              "option_text": "temperate forest",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which of these will best separate iron filings from sand?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "C",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "water",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "a magnifying glass",
+              "is_correct": false
+            },
+            {
+              "option_key": "C",
+              "option_text": "a magnet",
+              "is_correct": true
+            },
+            {
+              "option_key": "D",
+              "option_text": "rubbing alcohol",
+              "is_correct": false
+            }
+          ]
+        },
+        {
+          "publisher": "huggingface",
+          "grade": "Unknown",
+          "subject": "Science",
+          "semester": null,
+          "question_type": "MCQ_SINGLE",
+          "prompt": "Which of these is the chemical symbol for magnesium?",
+          "difficulty": "medium",
+          "score": 1,
+          "answer_text": "B",
+          "explanation": "Imported from ARC-Easy.",
+          "chapter": null,
+          "source_type": "hf_arc",
+          "source_id": null,
+          "options": [
+            {
+              "option_key": "A",
+              "option_text": "Ma",
+              "is_correct": false
+            },
+            {
+              "option_key": "B",
+              "option_text": "Mg",
+              "is_correct": true
+            },
+            {
+              "option_key": "C",
+              "option_text": "Mn",
+              "is_correct": false
+            },
+            {
+              "option_key": "D",
+              "option_text": "Mu",
+              "is_correct": false
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which factor will most likely cause a person to develop a fever?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "a leg muscle relaxing after exercise",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "a bacterial population in the bloodstream",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "several viral particles on the skin",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "carbohydrates being digested in the stomach",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Lichens are symbiotic organisms made of green algae and fungi. What do the green algae supply to the fungi in this symbiotic relationship?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "carbon dioxide",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "food",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "protection",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "water",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "When a switch is used in an electrical circuit, the switch can",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "cause the charge to build.",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "increase and decrease the voltage.",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "cause the current to change direction.",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "stop and start the flow of current.",
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which of the following is an example of an assistive device?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "contact lens",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "motorcycle",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "raincoat",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "coffee pot",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Rocks are classified as igneous, metamorphic, or sedimentary according to",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "3",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "1",
+          "option_text": "their color",
+          "is_correct": false
+        },
+        {
+          "option_key": "2",
+          "option_text": "their shape",
+          "is_correct": false
+        },
+        {
+          "option_key": "3",
+          "option_text": "how they formed",
+          "is_correct": true
+        },
+        {
+          "option_key": "4",
+          "option_text": "the minerals they contain",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "A chewable calcium carbonate tablet is a common treatment for stomach discomfort. Calcium carbonate is most likely used as this type of medicine because calcium carbonate",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "C",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "has a pleasant flavor.",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "is inexpensive to produce.",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "neutralizes digestive acid.",
+          "is_correct": true
+        },
+        {
+          "option_key": "D",
+          "option_text": "occurs naturally in the body.",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which two body systems are directly involved in movement?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "muscular and skeletal",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "digestive and muscular",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "skeletal and respiratory",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "respiratory and digestive",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which change in the state of water particles causes the particles to become arranged in a fixed position?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "C",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "boiling",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "melting",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "freezing",
+          "is_correct": true
+        },
+        {
+          "option_key": "D",
+          "option_text": "evaporating",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Earth's core is primarily composed of which of the following materials?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "basalt",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "iron",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "magma",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "quartz",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which of the following events during meiosis contributes most to the variation within a species?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "C",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "pairing of chromosomes",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "creation of haploid gametes",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "segregation of alleles",
+          "is_correct": true
+        },
+        {
+          "option_key": "D",
+          "option_text": "separation of chromatids",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which of the following was probably most important in the formation of dark, fertile soil that is good for farming?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "plant decomposition",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "radioactive decay",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "water erosion",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "wind erosion",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "When igneous rock is changed into metamorphic rock, which form of energy is this process?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "heat",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "chemical",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "magnetic",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "light",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "In humans, the digestion process begins in",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "the intestine, with squeezing.",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "the mouth, with chewing and saliva.",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "the stomach, with churning and acid.",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "the esophagus, with pushing towards the stomach.",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which of these items contains only a solution?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "a jar of pickles",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "a bottle of juice",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "a bag of peanuts",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "a can of mixed fruit",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Many natural rock formations change color over time. In Utah, for example, iron oxidized and formed red, orange, and yellow rock. Which of the following is the cause of this change?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "chemical weathering",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "mechanical weathering",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "water erosion",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "wind erosion",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "A population of small, plant-eating beetles lives in a forest. About half of the beetles are light brown and the others are dark green. If years of drought cause the area to become dry with few trees, what would the beetle population most likely look like after several generations?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "It would be mostly light brown beetles.",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "It would be mostly dark green beetles.",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "It would be mostly carnivorous beetles.",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "It would be mostly very large beetles.",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "A scientist wanting to document a change in a river's flow pattern should observe a river over a period of",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "days.",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "weeks.",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "months.",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "years.",
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Automobile engines built today are designed to be gas efficient. Gas-efficient engines most likely affect a city by reducing",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "air pollution.",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "heat pollution.",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "noise pollution.",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "light pollution.",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "A student in an empty classroom shouts, \"Hello!\" Which best explains what the student hears after the shout?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "an increased loudness of sound",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "a reflection of sound",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "an increased frequency of sound",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "a refraction of sound",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which type of energy in gasoline is transformed into mechanical energy in a motorcycle engine?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "1",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "1",
+          "option_text": "chemical",
+          "is_correct": true
+        },
+        {
+          "option_key": "2",
+          "option_text": "nuclear",
+          "is_correct": false
+        },
+        {
+          "option_key": "3",
+          "option_text": "magnetic",
+          "is_correct": false
+        },
+        {
+          "option_key": "4",
+          "option_text": "electrical",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "A student standing near a campfire feels warmer as the fire grows. Which process most likely transfers heat from the campfire to the student?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "C",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "conduction",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "convection",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "radiation",
+          "is_correct": true
+        },
+        {
+          "option_key": "D",
+          "option_text": "transformation",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "In snapdragon plants, red flowers are dominant to white flowers. When red-flowered plants are crossed with white-flowered plants, pink flowers are produced. If a researcher wants to produce plants with only white flowers, what color should the parent plants be?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "both red",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "both white",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "one red and one white",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "one white and one pink",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Scientists use the term \"light year\" to describe",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "how fast light travels in space.",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "the distance light travels in one year.",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "how large the diameters of different stars are.",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "the time it takes the Sun to move through the galaxy.",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Plate movement can form different features on Earth. The movement of tectonic plates can be both a constructive and a destructive force. At which type of plate boundary is new crust formed?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "convergent",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "subduction",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "transform",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "divergent",
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which group of organisms can show significant trait changes in the shortest period of time?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "1",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "1",
+          "option_text": "bacteria",
+          "is_correct": true
+        },
+        {
+          "option_key": "2",
+          "option_text": "birds",
+          "is_correct": false
+        },
+        {
+          "option_key": "3",
+          "option_text": "fish",
+          "is_correct": false
+        },
+        {
+          "option_key": "4",
+          "option_text": "reptiles",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Peach trees have sweet-smelling blossoms and produce rich fruit. What is the main purpose of the flowers of a peach tree?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "to attract bees for pollination",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "to create flower arrangements",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "to protect the tree from disease",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "to feed migratory birds",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "A group of students are researching changes in climate in their region. Which of these would best provide evidence of changes in temperature and rainfall over a period of years?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "tree rings",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "pollen samples",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "harvest production",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "carbon dating",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which of these would help to prevent infections from occurring in small cuts and scrapes?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "apply a cold ice pack",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "raise the injured area",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "apply pressure to stop bleeding",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "wash the area with warm, soapy water",
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which best describes why winds at the beach change direction between day and night?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "because the temperatures over land and over water change",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "because warm air over land sinks and stays in place over land",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "because cool air rises and is replaced by warm air from the ocean",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "because cool air sinks and stays in place over land",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Soil erosion can be best prevented by",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "removing grass from the steepest slope.",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "building terraces into the sides of a slope.",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "heavily watering the vegetation on the slope.",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "increasing the slope of the land by adding more soil.",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which of the following properties provides the BEST way to identify a mineral?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "hardness",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "shape",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "size",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "temperature",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which sequence represents the order of development for many plants?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "1",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "1",
+          "option_text": "seed develops inside fruit -> seed is dispersed -> seed germinates -> plant grows",
+          "is_correct": true
+        },
+        {
+          "option_key": "2",
+          "option_text": "seed is dispersed -> seed develops inside fruit -> seed germinates -> plant grows",
+          "is_correct": false
+        },
+        {
+          "option_key": "3",
+          "option_text": "seed germinates -> plant grows -> seed is dispersed -> seed develops inside fruit",
+          "is_correct": false
+        },
+        {
+          "option_key": "4",
+          "option_text": "seed is dispersed -> plant grows -> seed germinates -> seed develops inside fruit",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "When ice cream is left out of a freezer, the ice cream changes from a ___.",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "C",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "solid to a gas",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "gas to a liquid",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "solid to a liquid",
+          "is_correct": true
+        },
+        {
+          "option_key": "D",
+          "option_text": "liquid to a gas",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which equipment will best separate a mixture of iron filings and black pepper?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "1",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "1",
+          "option_text": "magnet",
+          "is_correct": true
+        },
+        {
+          "option_key": "2",
+          "option_text": "filter paper",
+          "is_correct": false
+        },
+        {
+          "option_key": "3",
+          "option_text": "triple-beam balance",
+          "is_correct": false
+        },
+        {
+          "option_key": "4",
+          "option_text": "voltmeter",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which characteristic is shared by all cells?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "They need energy.",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "They reproduce sexually.",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "They make their own food.",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "They move from place to place.",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "On a small, isolated island, a hurricane destroyed all the trees that produced a large, hard-shelled nut. Which bird population would most likely decrease?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "birds with long, probing beaks",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "birds with thick, strong beaks",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "birds with thin, short beaks",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "birds with large, pouch beaks",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "A cow and a frog have similar bone structures in their forelimbs. Both have phalanges, radius, ulna, and humerus bones. However, the cow and frog are animals with very different life cycles from each other. Which most likely describes why the body structures of these animals are so similar?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "Both have undergone similar mutations.",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "Both descended from a common ancestor.",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "Both reacted similarly to environmental pressures.",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "Both spread out from the same geographical region.",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "A cell that is unable to import substances required to process chemical energy is most likely a result of a malfunctioning",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "cell membrane.",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "endoplasmic reticulum.",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "Golgi body.",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "nuclear envelope.",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which best describes all unicellular organisms?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "Every cell is round.",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "Every cell can make food.",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "Every cell can move on its own.",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "Every cell performs all life functions.",
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "When a transverse wave passes from right to left through a medium, what happens to the particles of the medium?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "Particles travel from right to left along the wave.",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "Particles travel from left to right along the wave.",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "Particles move back and forth parallel to the wave.",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "Particles move back and forth perpendicular to the wave.",
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which characteristic below most likely accounts for our limited knowledge of galaxies?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "their tiny size",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "their magnetic cores",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "their inability to produce light",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "their great distance from Earth",
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Decomposers increase the fertility of the soil and prevent dead organisms from building up in the environment. In which way do decomposers make the soil more fertile?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "by adding carbon",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "by adding nitrogen",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "by removing excess water",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "by removing excess minerals",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "When oxygen combines with hydrogen, which substance is formed?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "water",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "vinegar",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "hydrochloric acid",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "hydrogen dioxide",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "When plants undergo photosynthesis, a reaction produces sugar, oxygen, and water. During respiration, stored energy from the products of photosynthesis is converted to usable energy. In what form is the energy stored prior to use in respiration?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "A",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "chemical energy",
+          "is_correct": true
+        },
+        {
+          "option_key": "B",
+          "option_text": "kinetic energy",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "light energy",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "heat energy",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which of the following is a typical example of a unicellular organism?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "earthworm",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "bacteria",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "fungi",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "green algae",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Over geologic time, global mean sea level has varied significantly. Which change is most likely responsible for an increase in global mean sea level?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "erosion of sediment from a mountain range",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "mass extinction of marine organisms",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "formation of an ocean trench",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "melting of polar ice caps",
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which body system is most responsible for the removal of waste?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "D",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "skeletal system",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "nervous system",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "muscular system",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "excretory system",
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "In which environment is white fur color an advantage for survival?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "C",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "desert",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "grassland",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "arctic tundra",
+          "is_correct": true
+        },
+        {
+          "option_key": "D",
+          "option_text": "temperate forest",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which of these will best separate iron filings from sand?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "C",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "water",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "a magnifying glass",
+          "is_correct": false
+        },
+        {
+          "option_key": "C",
+          "option_text": "a magnet",
+          "is_correct": true
+        },
+        {
+          "option_key": "D",
+          "option_text": "rubbing alcohol",
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "publisher": "huggingface",
+      "grade": "Unknown",
+      "subject": "Science",
+      "semester": null,
+      "question_type": "MCQ_SINGLE",
+      "prompt": "Which of these is the chemical symbol for magnesium?",
+      "difficulty": "medium",
+      "score": 1,
+      "answer_text": "B",
+      "explanation": "Imported from ARC-Easy.",
+      "chapter": null,
+      "source_type": "hf_arc",
+      "source_id": null,
+      "options": [
+        {
+          "option_key": "A",
+          "option_text": "Ma",
+          "is_correct": false
+        },
+        {
+          "option_key": "B",
+          "option_text": "Mg",
+          "is_correct": true
+        },
+        {
+          "option_key": "C",
+          "option_text": "Mn",
+          "is_correct": false
+        },
+        {
+          "option_key": "D",
+          "option_text": "Mu",
+          "is_correct": false
+        }
+      ]
+    }
+  ]
+}
