@@ -53,7 +53,7 @@ export default function AssessmentPaperImport() {
       // Defensive: backend guarantees >=1, but keep UI stable.
       const safeQuestions = (d.questions || []).length
         ? d.questions
-        : [{ type: "Short Answer", prompt: "[占位] 请编辑题目内容", options: [] } as PaperCreateQuestionDto];
+        : [{ type: "Short Answer", prompt: "[Placeholder] Please edit the question content.", options: [] } as PaperCreateQuestionDto];
       setParseState({
         status: "parsed",
         draft: { ...d, questions: safeQuestions },
@@ -61,22 +61,22 @@ export default function AssessmentPaperImport() {
         preview: res.extracted_text_preview || "",
       });
     } catch (e) {
-      setParseState({ status: "error", message: e instanceof Error ? e.message : "解析失败" });
+      setParseState({ status: "error", message: e instanceof Error ? e.message : "Failed to parse" });
     }
   }
 
   async function handleSave(target: "draft" | "published") {
     if (!file || !draft) return;
     if (!draft.title?.trim()) {
-      window.alert("请填写试卷标题。");
+      window.alert("Please enter a paper title.");
       return;
     }
     if (!draft.grade?.trim() || !draft.subject?.trim()) {
-      window.alert("请填写年级与学科。");
+      window.alert("Please enter grade and subject.");
       return;
     }
     if (!draft.questions?.length) {
-      window.alert("请至少保留一道题目。");
+      window.alert("Please keep at least one question.");
       return;
     }
 
@@ -104,7 +104,7 @@ export default function AssessmentPaperImport() {
 
       navigate("/teacher/assessment/papers");
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : "保存失败");
+      window.alert(e instanceof Error ? e.message : "Save failed");
     } finally {
       setSaving("none");
     }
@@ -114,8 +114,10 @@ export default function AssessmentPaperImport() {
     <div style={{ height: "calc(100vh - 48px)", background: "#fafafa", overflow: "hidden", display: "flex", flexDirection: "column" }}>
       <div style={{ flexShrink: 0, padding: "18px 22px", borderBottom: "1px solid #e8eaed", background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 16, fontWeight: 800, color: "#0f0f23" }}>上传试卷 PDF 并解析</div>
-          <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>解析后可编辑草稿，并保存为 draft / published</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: "#0f0f23" }}>Import PDF exam paper</div>
+          <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>
+            Parse into an editable draft, then save as draft / published
+          </div>
         </div>
         <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
           <button
@@ -123,7 +125,7 @@ export default function AssessmentPaperImport() {
             onClick={() => navigate("/teacher/assessment/papers")}
             style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid #e8eaed", background: "#fff", cursor: "pointer", fontSize: 13, color: "#374151" }}
           >
-            返回试卷库
+            Back to library
           </button>
           <button
             type="button"
@@ -132,7 +134,7 @@ export default function AssessmentPaperImport() {
             style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid #e8eaed", background: !draft || saving !== "none" ? "#f3f4f6" : "#fff", cursor: !draft || saving !== "none" ? "not-allowed" : "pointer", fontSize: 13, color: "#374151", display: "inline-flex", alignItems: "center", gap: 8 }}
           >
             {saving === "draft" ? <Loader2 size={14} style={{ animation: "spin 0.8s linear infinite" }} /> : <Save size={14} />}
-            保存为 Draft
+            Save as Draft
           </button>
           <button
             type="button"
@@ -141,7 +143,7 @@ export default function AssessmentPaperImport() {
             style={{ padding: "9px 14px", borderRadius: 10, border: "none", background: !draft || saving !== "none" ? "#93a6e8" : "#3b5bdb", cursor: !draft || saving !== "none" ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 700, color: "#fff", display: "inline-flex", alignItems: "center", gap: 8 }}
           >
             {saving === "published" ? <Loader2 size={14} style={{ animation: "spin 0.8s linear infinite" }} /> : <Send size={14} />}
-            保存并发布
+            Save & Publish
           </button>
         </div>
       </div>
@@ -151,7 +153,7 @@ export default function AssessmentPaperImport() {
           <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: 12, alignItems: "start" }}>
             <div style={{ background: "#fff", border: "1px solid #e8eaed", borderRadius: 12, padding: 16 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 12 }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "#0f0f23" }}>1) 上传 PDF</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#0f0f23" }}>1) Upload PDF</div>
                 <input
                   ref={inputRef}
                   type="file"
@@ -169,13 +171,13 @@ export default function AssessmentPaperImport() {
                   style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid #e8eaed", background: "#fff", cursor: "pointer", fontSize: 13, color: "#374151", display: "inline-flex", alignItems: "center", gap: 8 }}
                 >
                   <Upload size={14} style={{ color: "#6b7280" }} />
-                  选择文件
+                  Choose file
                 </button>
               </div>
 
               {!file && parseState.status === "idle" && (
                 <div style={{ padding: "18px 12px", borderRadius: 10, border: "1px dashed #d1d5db", background: "#fafafa", color: "#6b7280", fontSize: 13, lineHeight: 1.6 }}>
-                  支持 PDF（非扫描件效果更好）。上传后将尝试解析题目结构，结果可在右侧预览并编辑。
+                  Supports PDF (digital PDFs work best). After uploading, we will try to parse questions. You can preview and edit the result on the right.
                 </div>
               )}
 
@@ -192,13 +194,13 @@ export default function AssessmentPaperImport() {
               {parseState.status === "parsing" && (
                 <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10, color: "#6b7280", fontSize: 13 }}>
                   <Loader2 size={16} style={{ animation: "spin 0.8s linear infinite" }} />
-                  正在解析 PDF…
+                  Parsing PDF…
                 </div>
               )}
 
               {parseState.status === "error" && (
                 <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 10, border: "1px solid #fecaca", background: "#fef2f2", color: "#b91c1c", fontSize: 13 }}>
-                  解析失败：{parseState.message}
+                  Failed to parse: {parseState.message}
                 </div>
               )}
 
@@ -208,7 +210,7 @@ export default function AssessmentPaperImport() {
                     <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 10, border: "1px solid #fde68a", background: "#fffbeb" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 800, color: "#92400e", marginBottom: 6 }}>
                         <AlertTriangle size={14} />
-                        解析提示
+                        Parse warnings
                       </div>
                       <ul style={{ margin: 0, paddingLeft: 18, color: "#92400e", fontSize: 12, lineHeight: 1.7 }}>
                         {parseState.warnings.map((w, i) => <li key={i}>{w}</li>)}
@@ -217,10 +219,10 @@ export default function AssessmentPaperImport() {
                   )}
 
                   <div style={{ marginTop: 14 }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: "#0f0f23", marginBottom: 8 }}>2) 基本信息</div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: "#0f0f23", marginBottom: 8 }}>2) Paper info</div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                       <label style={{ gridColumn: "1 / -1" }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>标题</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>Title</div>
                         <input
                           value={draft?.title ?? ""}
                           onChange={(e) => setDraftPatch({ title: e.target.value })}
@@ -228,7 +230,7 @@ export default function AssessmentPaperImport() {
                         />
                       </label>
                       <label>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>年级</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>Grade</div>
                         <input
                           value={draft?.grade ?? ""}
                           onChange={(e) => setDraftPatch({ grade: e.target.value })}
@@ -236,7 +238,7 @@ export default function AssessmentPaperImport() {
                         />
                       </label>
                       <label>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>学科</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>Subject</div>
                         <input
                           value={draft?.subject ?? ""}
                           onChange={(e) => setDraftPatch({ subject: e.target.value })}
@@ -250,14 +252,14 @@ export default function AssessmentPaperImport() {
             </div>
 
             <div style={{ background: "#fff", border: "1px solid #e8eaed", borderRadius: 12, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: "#0f0f23", marginBottom: 10 }}>抽取文本预览（用于排错）</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#0f0f23", marginBottom: 10 }}>Extracted text preview (for debugging)</div>
               {parseState.status === "parsed" ? (
                 <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word", fontSize: 12, color: "#374151", lineHeight: 1.6, maxHeight: 220, overflow: "auto", background: "#fafafa", border: "1px solid #f0f2f5", borderRadius: 10, padding: 10 }}>
-                  {parseState.preview || "[空] 未抽取到足够文本（可能是扫描件）"}
+                  {parseState.preview || "[Empty] No extractable text (possibly a scanned PDF)."}
                 </pre>
               ) : (
                 <div style={{ padding: "14px 12px", borderRadius: 10, border: "1px solid #f0f2f5", background: "#fafafa", color: "#9ca3af", fontSize: 12 }}>
-                  上传并解析后显示
+                  Shown after upload & parse
                 </div>
               )}
             </div>
@@ -266,7 +268,7 @@ export default function AssessmentPaperImport() {
           {parseState.status === "parsed" && (
             <div style={{ marginTop: 12, background: "#fff", border: "1px solid #e8eaed", borderRadius: 12, padding: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 800, color: "#0f0f23", marginBottom: 12 }}>
-                3) 题目预览与编辑（{draft?.questions.length ?? 0}）
+                3) Questions (preview & edit) ({draft?.questions.length ?? 0})
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {draft!.questions.map((q, i) => (
@@ -276,7 +278,7 @@ export default function AssessmentPaperImport() {
                         #{i + 1} · {q.type}
                       </div>
                       <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#374151" }}>
-                        分值
+                        Score
                         <input
                           type="number"
                           min={0}
@@ -295,7 +297,7 @@ export default function AssessmentPaperImport() {
                     />
                     {(q.options || []).length > 0 && (
                       <div style={{ marginTop: 10 }}>
-                        <div style={{ fontSize: 12, fontWeight: 800, color: "#374151", marginBottom: 6 }}>选项</div>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: "#374151", marginBottom: 6 }}>Options</div>
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                           {(q.options || []).map((opt, j) => (
                             <div key={j} style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -319,7 +321,7 @@ export default function AssessmentPaperImport() {
                 ))}
               </div>
               <div style={{ marginTop: 10, fontSize: 12, color: "#9ca3af", lineHeight: 1.6 }}>
-                提示：本次解析为启发式规则，扫描版 PDF 可能抽不到文本；你仍可在此直接编辑后保存。
+                Tip: This is heuristic parsing. Scanned PDFs may contain no extractable text. You can still edit and save manually.
               </div>
             </div>
           )}

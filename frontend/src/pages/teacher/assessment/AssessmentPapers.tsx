@@ -719,7 +719,7 @@ export default function AssessmentPapers() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f0f23' }}>Exam Papers</div>
-            <div style={{ fontSize: '12px', color: '#9ca3af' }}>Upload a paper file and parse it into an editable draft.</div>
+            <div style={{ fontSize: '12px', color: '#9ca3af' }}>Upload a PDF and parse it into an editable draft.</div>
           </div>
           <button
             type="button"
@@ -741,7 +741,7 @@ export default function AssessmentPapers() {
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff'; }}
           >
             <Upload size={14} style={{ color: '#6b7280' }} />
-            Upload & parse
+            Import PDF
           </button>
         </div>
 
