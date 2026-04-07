@@ -14,11 +14,21 @@ function inferCodespacesApiBaseUrl(): string | null {
   return `https://${matched[1]}-8000.app.github.dev/api/v1`;
 }
 
-const API_BASE_URL =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() ||
-  (import.meta.env.DEV ? "/api/v1" : null) ||
-  inferCodespacesApiBaseUrl() ||
-  "http://127.0.0.1:8000/api/v1";
+function inferApiBaseUrl(): string {
+  const fromEnv = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+
+  if (import.meta.env.DEV) return "/api/v1";
+
+  const codespaces = inferCodespacesApiBaseUrl();
+  if (codespaces) return codespaces;
+
+  // Production default should never point to localhost.
+  // Use same-origin API prefix unless explicitly overridden by VITE_API_BASE_URL.
+  return "/api/v1";
+}
+
+const API_BASE_URL = inferApiBaseUrl();
 
 function toNumber(value: string | null | undefined): number | null {
   if (!value) return null;

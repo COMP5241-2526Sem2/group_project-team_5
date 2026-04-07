@@ -95,6 +95,11 @@ function normDiffFromApi(d: string | null | undefined): Diff {
   return 'medium';
 }
 
+function cleanMathDelimiters(s: string): string {
+  if (!s) return s;
+  return s.replace(/\$+/g, '').trim();
+}
+
 function mapDetailToExamPaperEntry(detail: PaperDetailDto): ExamPaperEntry {
   const questions: LibQ[] = [];
   const sections = [...detail.sections].sort((a, b) => a.order - b.order);
@@ -103,7 +108,9 @@ function mapDetailToExamPaperEntry(detail: PaperDetailDto): ExamPaperEntry {
     for (const q of qs) {
       const qt = detailTypeToQType(q.type);
       const options =
-        q.options && q.options.length > 0 ? q.options.map((o) => `${o.key}. ${o.text}`) : undefined;
+        q.options && q.options.length > 0
+          ? q.options.map((o) => `${o.key}. ${cleanMathDelimiters(o.text)}`)
+          : undefined;
       questions.push({
         id: `pq_${detail.paper_id}_${q.paper_question_id}`,
         type: qt,
@@ -141,7 +148,10 @@ function flattenQuestionBankSetsToLibQ(sets: QuestionBankSetDto[]): LibQ[] {
         grade: s.grade,
         chapter: s.chapter,
         prompt: q.prompt,
-        options: q.options && q.options.length > 0 ? q.options : undefined,
+        options:
+          q.options && q.options.length > 0
+            ? q.options.map((line) => cleanMathDelimiters(line))
+            : undefined,
         answer: q.answer ?? undefined,
         source: s.source,
       });
@@ -964,7 +974,7 @@ function CanvasQCard({ q, globalIdx, isEditing, isReplaceTarget, onEdit, onCance
             {q.options && (
               <div style={{ marginTop:'5px', display:'flex', flexDirection:'column', gap:'2px' }}>
                 {q.options.map(opt=>(
-                  <div key={opt} style={{ fontSize:'10px', color:'#6b7280', padding:'2px 6px', borderRadius:'4px', background:'#fff', border:'1px solid #e8eaed' }}>{opt}</div>
+                  <div key={opt} style={{ fontSize:'10px', color:'#6b7280', padding:'2px 6px', borderRadius:'4px', background:'#fff', border:'1px solid #e8eaed' }}>{cleanMathDelimiters(opt)}</div>
                 ))}
               </div>
             )}

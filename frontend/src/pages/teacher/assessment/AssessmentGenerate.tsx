@@ -494,7 +494,7 @@ export default function AssessmentGenerate() {
   const [examGenMode, setExamGenMode] = useState<ExamGenMode>('error-questions');
   const [examMatchMode, setExamMatchMode] = useState<'type' | 'knowledge'>('type');
   const [examDifficulty, setExamDifficulty] = useState<'basic' | 'solid' | 'advanced'>('solid');
-  const [examFiles, setExamFiles] = useState<{ name: string; size: number; url: string }[]>([]);
+  const [examFiles, setExamFiles] = useState<{ name: string; size: number; url: string; file?: File; extractedText?: string }[]>([]);
   const [examDragging, setExamDragging] = useState(false);
   const examFileRef = useRef<HTMLInputElement>(null);
   const [bankSearch, setBankSearch] = useState('');
@@ -596,7 +596,7 @@ export default function AssessmentGenerate() {
 
   function buildSourceMaterialText(): string {
     if (sourceTab === 'upload') {
-      return uploadedFile?.extractedText || uploadedFile?.name || '';
+      return uploadedFile?.extractedText || '';
     }
     if (sourceTab === 'text') {
       return textInput;
@@ -608,8 +608,10 @@ export default function AssessmentGenerate() {
       return [tbPublisher, tbGrade, tbSubject, tbSemester, tbEdition, chosenSections].filter(Boolean).join(' ');
     }
     if (sourceTab === 'exam') {
-      const fileNames = examFiles.map((f) => f.name).join(' ');
-      return [fileNames, examGenMode, examMatchMode, examDifficulty].filter(Boolean).join(' ');
+      return examFiles
+        .map((f) => (f.extractedText || '').trim())
+        .filter(Boolean)
+        .join('\n\n');
     }
 
     if (qInputMode === 'paste') {
@@ -752,6 +754,8 @@ export default function AssessmentGenerate() {
     const newFiles = Array.from(files).slice(0, Math.max(0, 5 - examFiles.length)).map(f => ({
       name: f.name, size: f.size,
       url: f.type.startsWith('image/') ? URL.createObjectURL(f) : '',
+      file: f,
+      extractedText: '',
     }));
     setExamFiles(prev => [...prev, ...newFiles].slice(0, 5));
   }
@@ -794,13 +798,48 @@ export default function AssessmentGenerate() {
     }
     const effectiveSubject = inferEffectiveSubject();
     let sourceMaterial = buildSourceMaterialText();
-    if (sourceTab === 'upload' && uploadedFile?.file) {
+    if (sourceTab === 'upload') {
+      if (!uploadedFile?.file) {
+        window.alert('Please upload a file first.');
+        setGenerating(false);
+        return;
+      }
       try {
         const extracted = await extractSourceTextApi(uploadedFile.file);
-        sourceMaterial = extracted.source_text;
+        sourceMaterial = (extracted.source_text || '').trim();
         setUploadedFile((prev) => prev ? { ...prev, extractedText: extracted.source_text } : prev);
       } catch {
-        // fallback to filename when extraction fails
+        window.alert('Failed to extract text from uploaded file. Please try another file.');
+        setGenerating(false);
+        return;
+      }
+      if (!sourceMaterial) {
+        window.alert('Uploaded file text is empty. Please upload a readable file.');
+        setGenerating(false);
+        return;
+      }
+    }
+    if (sourceTab === 'exam') {
+      const extractedChunks: string[] = [];
+      for (let i = 0; i < examFiles.length; i += 1) {
+        const item = examFiles[i];
+        if (!item.file) continue;
+        try {
+          const extracted = await extractSourceTextApi(item.file);
+          const text = (extracted.source_text || '').trim();
+          if (text) extractedChunks.push(text);
+          setExamFiles((prev) =>
+            prev.map((f, idx) => (idx === i ? { ...f, extractedText: extracted.source_text } : f)),
+          );
+        } catch {
+          // continue with the remaining files
+        }
+      }
+      sourceMaterial = extractedChunks.join('\n\n').trim();
+      if (!sourceMaterial) {
+        window.alert('No readable text extracted from exam files. Please upload actual source files.');
+        setGenerating(false);
+        return;
       }
     }
     const materialKeywords = extractKeywords(sourceMaterial);
@@ -821,12 +860,13 @@ export default function AssessmentGenerate() {
     let qs = buildGeneratedQuestions(effectiveSubject, topicPool, seedKey);
     try {
       const preview = await previewGenerateQuestionsApi({
-        source_text: sourceMaterial || `${effectiveSubject} ${tbGrade || 'Grade 7'} ${difficulty}`,
+        source_text: sourceMaterial,
         subject: effectiveSubject,
         grade: tbGrade || 'Grade 7',
         difficulty,
         question_count: totalQ(),
         type_targets: typeTargets,
+        require_ai: true,
       });
       if (preview.questions.length > 0) {
         qs = preview.questions.map((q, idx) => ({
@@ -841,8 +881,11 @@ export default function AssessmentGenerate() {
           imageStyle: illustStyle,
         }));
       }
-    } catch {
-      // keep local fallback generation when preview API is unavailable
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'AI generation failed';
+      window.alert(`Generate questions failed: ${message}`);
+      setGenerating(false);
+      return;
     }
 
     setQuestions(qs);
