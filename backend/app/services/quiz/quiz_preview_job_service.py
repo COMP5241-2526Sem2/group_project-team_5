@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
+import asyncio
 from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import HTTPException
-from redis.asyncio import Redis
+from upstash_redis import Redis
 
 from app.config import settings
 from app.schemas.quiz.quiz_generation import (
@@ -27,11 +29,11 @@ class QuizPreviewJobService:
 
     @staticmethod
     def _ensure_redis_configured() -> None:
-        if settings.redis_url.strip():
+        if os.getenv("UPSTASH_REDIS_REST_URL") and os.getenv("UPSTASH_REDIS_REST_TOKEN"):
             return
         raise HTTPException(
             status_code=503,
-            detail="redis_url is not configured; preview async jobs are unavailable.",
+            detail="UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN is not configured; preview async jobs are unavailable.",
         )
 
     @staticmethod
@@ -46,11 +48,7 @@ class QuizPreviewJobService:
     async def _client() -> Redis:
         QuizPreviewJobService._ensure_redis_configured()
         if QuizPreviewJobService._redis is None:
-            QuizPreviewJobService._redis = Redis.from_url(
-                settings.redis_url,
-                encoding="utf-8",
-                decode_responses=True,
-            )
+            QuizPreviewJobService._redis = Redis.from_env()
         return QuizPreviewJobService._redis
 
     @staticmethod
@@ -72,7 +70,8 @@ class QuizPreviewJobService:
             "created_at": now,
             "updated_at": now,
         }
-        await redis.setex(
+        await asyncio.to_thread(
+            redis.setex,
             QuizPreviewJobService._key(job_id),
             settings.quiz_preview_job_ttl_sec,
             json.dumps(record, ensure_ascii=False),
@@ -94,7 +93,7 @@ class QuizPreviewJobService:
 
     @staticmethod
     async def _load_record(redis: Redis, *, job_id: str, user_id: int) -> dict:
-        raw = await redis.get(QuizPreviewJobService._key(job_id))
+        raw = await asyncio.to_thread(redis.get, QuizPreviewJobService._key(job_id))
         if not raw:
             raise HTTPException(status_code=404, detail="Preview job not found or expired.")
         try:
@@ -108,7 +107,8 @@ class QuizPreviewJobService:
     @staticmethod
     async def _save_record(redis: Redis, record: dict) -> None:
         record["updated_at"] = QuizPreviewJobService._now_iso()
-        await redis.setex(
+        await asyncio.to_thread(
+            redis.setex,
             QuizPreviewJobService._key(record["job_id"]),
             settings.quiz_preview_job_ttl_sec,
             json.dumps(record, ensure_ascii=False),
@@ -119,7 +119,13 @@ class QuizPreviewJobService:
         if record["status"] == "running":
             return
         lock_key = QuizPreviewJobService._lock_key(record["job_id"])
-        locked = await redis.set(lock_key, "1", ex=settings.quiz_preview_job_lock_sec, nx=True)
+        locked = await asyncio.to_thread(
+            redis.set,
+            lock_key,
+            "1",
+            ex=settings.quiz_preview_job_lock_sec,
+            nx=True,
+        )
         if not locked:
             return
         record["status"] = "running"
