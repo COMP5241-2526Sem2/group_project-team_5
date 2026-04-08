@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +16,7 @@ from app.services.quiz.ai_question_gen_service import AIQuestionGenService, LLMG
 from app.services.quiz.quiz_generation_service import QuizGenerationService
 
 router = APIRouter(prefix="/quiz-generation", tags=["quiz-generation"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("", response_model=QuizGenerateResponse)
@@ -38,6 +41,16 @@ async def preview_generate_questions(
     try:
         return await AIQuestionGenService.preview_generate(payload)
     except LLMGenerationError as exc:
+        logger.warning(
+            "Quiz preview failed with LLMGenerationError (user_id=%s, question_count=%s, difficulty=%s, task_type=%s, match_mode=%s, source_chars=%s, error=%s)",
+            x_user_id,
+            payload.question_count,
+            payload.difficulty,
+            payload.task_type,
+            payload.match_mode,
+            len((payload.source_text or "").strip()),
+            str(exc),
+        )
         raise HTTPException(
             status_code=502,
             detail={

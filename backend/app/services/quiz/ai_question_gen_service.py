@@ -88,10 +88,12 @@ class AIQuestionGenService:
                         generation_mode="llm",
                     )
                 logger.warning(
-                    "AI question preview got empty LLM output (attempt=%s/%s, provider=%s)",
+                    "AI question preview got empty LLM output after parse/enforce (attempt=%s/%s, provider=%s, source_chars=%s, requested_count=%s)",
                     attempt,
                     max_attempts,
                     provider,
+                    len((effective_payload.source_text or "").strip()),
+                    effective_payload.question_count,
                 )
             except Exception as exc:
                 last_error = exc
@@ -261,21 +263,41 @@ class AIQuestionGenService:
 
         raw = response.choices[0].message.content if response.choices else None
         if not raw:
+            logger.warning(
+                "LLM preview response has empty message.content; switching to text-mode parse (provider=%s, model=%s)",
+                settings.quiz_generation_provider,
+                settings.quiz_generation_model,
+            )
             return await AIQuestionGenService._llm_generate_text_mode(payload, type_targets)
 
-        parsed = AIQuestionGenService._parse_json_object(raw)
+        parsed = AIQuestionGenService._parse_json_value(raw)
         if parsed is None:
+            logger.warning(
+                "LLM preview JSON parse failed; trying markdown parse (chars=%s, snippet=%s)",
+                len(raw),
+                AIQuestionGenService._log_snippet(raw),
+            )
             markdown_parsed = AIQuestionGenService._parse_markdown_questions(raw, payload.difficulty)
             if markdown_parsed:
                 return markdown_parsed
             return await AIQuestionGenService._llm_generate_text_mode(payload, type_targets)
-        raw_questions = parsed.get("questions", []) if isinstance(parsed, dict) else []
-        if not isinstance(raw_questions, list):
+        raw_questions = AIQuestionGenService._extract_raw_questions(parsed)
+        if not raw_questions:
+            logger.warning(
+                "LLM preview JSON parsed but no question list found (parsed_type=%s, top_keys=%s)",
+                type(parsed).__name__,
+                ",".join(parsed.keys())[:120] if isinstance(parsed, dict) else "n/a",
+            )
             return await AIQuestionGenService._llm_generate_text_mode(payload, type_targets)
         result = AIQuestionGenService._map_raw_questions(raw_questions, payload)
 
         if result:
             return result
+        logger.warning(
+            "LLM preview mapped zero valid questions (raw_count=%s, requested=%s)",
+            len(raw_questions),
+            payload.question_count,
+        )
         return await AIQuestionGenService._llm_generate_text_mode(payload, type_targets)
 
     @staticmethod
@@ -407,23 +429,24 @@ class AIQuestionGenService:
         )
         raw = response.choices[0].message.content if response.choices else None
         if not raw:
+            logger.warning("LLM preview text-mode response also empty.")
             return []
 
-        parsed = AIQuestionGenService._parse_json_object(raw)
-        if parsed is not None and isinstance(parsed.get("questions"), list):
-            # Reuse the strict path by feeding back as string for normalized mapping.
-            try:
-                normalized_raw = json.dumps(parsed, ensure_ascii=False)
-            except Exception:
-                normalized_raw = raw
-            reparsed = AIQuestionGenService._parse_json_object(normalized_raw)
-            if reparsed and isinstance(reparsed.get("questions"), list):
-                raw_questions = reparsed.get("questions", [])
-                mapped = AIQuestionGenService._map_raw_questions(raw_questions, payload)
-                if mapped:
-                    return mapped
+        parsed = AIQuestionGenService._parse_json_value(raw)
+        raw_questions = AIQuestionGenService._extract_raw_questions(parsed)
+        if raw_questions:
+            mapped = AIQuestionGenService._map_raw_questions(raw_questions, payload)
+            if mapped:
+                return mapped
 
         return AIQuestionGenService._parse_markdown_questions(raw, payload.difficulty)
+
+    @staticmethod
+    def _log_snippet(text: str, limit: int = 200) -> str:
+        compact = re.sub(r"\s+", " ", (text or "")).strip()
+        if len(compact) <= limit:
+            return compact
+        return compact[:limit] + "...[truncated]"
 
     @staticmethod
     def _map_raw_questions(
@@ -506,6 +529,11 @@ class AIQuestionGenService:
 
     @staticmethod
     def _parse_json_object(raw: str) -> dict | None:
+        parsed = AIQuestionGenService._parse_json_value(raw)
+        return parsed if isinstance(parsed, dict) else None
+
+    @staticmethod
+    def _parse_json_value(raw: str) -> dict | list | None:
         text = raw.strip()
         if not text:
             return None
@@ -517,19 +545,55 @@ class AIQuestionGenService:
 
         try:
             parsed = json.loads(text)
-            return parsed if isinstance(parsed, dict) else None
+            if isinstance(parsed, (dict, list)):
+                return parsed
+            return None
         except Exception:
             pass
 
-        # Fallback: extract the first JSON object span from mixed text.
-        match = re.search(r"\{[\s\S]*\}", text)
+        # Fallback: extract first JSON object or array span from mixed text.
+        match = re.search(r"(\{[\s\S]*\}|\[[\s\S]*\])", text)
         if not match:
             return None
         try:
             parsed = json.loads(match.group(0))
-            return parsed if isinstance(parsed, dict) else None
+            if isinstance(parsed, (dict, list)):
+                return parsed
+            return None
         except Exception:
             return None
+
+    @staticmethod
+    def _extract_raw_questions(parsed: dict | list | None) -> list[dict]:
+        if isinstance(parsed, list):
+            return [x for x in parsed if isinstance(x, dict)]
+        if not isinstance(parsed, dict):
+            return []
+
+        direct = parsed.get("questions")
+        if isinstance(direct, list):
+            return [x for x in direct if isinstance(x, dict)]
+
+        queue: list[dict] = [parsed]
+        seen_ids: set[int] = set()
+        candidate_keys = ("items", "data", "result", "output")
+        while queue:
+            node = queue.pop(0)
+            node_id = id(node)
+            if node_id in seen_ids:
+                continue
+            seen_ids.add(node_id)
+            for key in candidate_keys:
+                value = node.get(key)
+                if isinstance(value, list):
+                    dict_items = [x for x in value if isinstance(x, dict)]
+                    if dict_items:
+                        return dict_items
+                elif isinstance(value, dict):
+                    if isinstance(value.get("questions"), list):
+                        return [x for x in value["questions"] if isinstance(x, dict)]
+                    queue.append(value)
+        return []
 
     @staticmethod
     def _parse_markdown_questions(raw: str, difficulty: str) -> list[AIQuestionGenQuestion]:
