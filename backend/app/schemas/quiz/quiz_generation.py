@@ -92,6 +92,8 @@ class AIQuestionGenPreviewRequest(BaseModel):
     source_text: str = Field(min_length=1)
     subject: str | None = None
     grade: str | None = None
+    task_type: Literal["simulation", "error_based"] | None = None
+    match_mode: Literal["type", "knowledge"] | None = None
     difficulty: Difficulty
     question_count: int = Field(ge=1)
     type_targets: dict[str, int] | None = None

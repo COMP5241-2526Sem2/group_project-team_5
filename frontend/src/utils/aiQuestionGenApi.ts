@@ -20,6 +20,10 @@ export interface AIQuestionGenPreviewRequestDto {
   /** Omitted when user provides free-form text only (e.g. Enter Text source). */
   subject?: string;
   grade?: string;
+  /** Only used in Exam Paper source mode. */
+  task_type?: "simulation" | "error_based";
+  /** Only used in Exam Paper source mode. */
+  match_mode?: "type" | "knowledge";
   difficulty: "easy" | "medium" | "hard";
   question_count: number;
   type_targets?: Record<string, number>;

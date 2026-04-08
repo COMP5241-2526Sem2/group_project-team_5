@@ -494,7 +494,7 @@ export default function AssessmentGenerate() {
   const [examGenMode, setExamGenMode] = useState<ExamGenMode>('error-questions');
   const [examMatchMode, setExamMatchMode] = useState<'type' | 'knowledge'>('type');
   const [examDifficulty, setExamDifficulty] = useState<'basic' | 'solid' | 'advanced'>('solid');
-  const [examFiles, setExamFiles] = useState<{ name: string; size: number; url: string }[]>([]);
+  const [examFiles, setExamFiles] = useState<{ name: string; size: number; url: string; file?: File; extractedText?: string }[]>([]);
   const [examDragging, setExamDragging] = useState(false);
   const examFileRef = useRef<HTMLInputElement>(null);
   const [bankSearch, setBankSearch] = useState('');
@@ -609,7 +609,7 @@ export default function AssessmentGenerate() {
     }
     if (sourceTab === 'exam') {
       const fileNames = examFiles.map((f) => f.name).join(' ');
-      return [fileNames, examGenMode, examMatchMode, examDifficulty].filter(Boolean).join(' ');
+      return [fileNames, examGenMode, examMatchMode].filter(Boolean).join(' ');
     }
 
     if (qInputMode === 'paste') {
@@ -754,6 +754,7 @@ export default function AssessmentGenerate() {
     if (!files) return;
     const newFiles = Array.from(files).slice(0, Math.max(0, 5 - examFiles.length)).map(f => ({
       name: f.name, size: f.size,
+      file: f,
       url: f.type.startsWith('image/') ? URL.createObjectURL(f) : '',
     }));
     setExamFiles(prev => [...prev, ...newFiles].slice(0, 5));
@@ -764,6 +765,14 @@ export default function AssessmentGenerate() {
   }
 
   function totalQ() { return qTypes.filter(t => t.active).reduce((s, t) => s + t.count, 0); }
+
+  function examDifficultyToApiDifficulty(
+    d: 'basic' | 'solid' | 'advanced'
+  ): 'easy' | 'medium' | 'hard' {
+    if (d === 'basic') return 'easy';
+    if (d === 'advanced') return 'hard';
+    return 'medium';
+  }
 
   function canProceedStep1() {
     if (sourceTab === 'upload') return !!uploadedFile;
@@ -806,10 +815,34 @@ export default function AssessmentGenerate() {
         // fallback to filename when extraction fails
       }
     }
+    if (sourceTab === 'exam' && examFiles.length > 0) {
+      const extractedChunks: string[] = [];
+      const nextExamFiles = [...examFiles];
+      for (let i = 0; i < nextExamFiles.length; i += 1) {
+        const ef = nextExamFiles[i];
+        if (!ef.file) continue;
+        try {
+          const extracted = await extractSourceTextApi(ef.file);
+          const txt = (extracted.source_text || '').trim();
+          if (txt) {
+            extractedChunks.push(txt);
+            nextExamFiles[i] = { ...ef, extractedText: txt };
+          }
+        } catch {
+          // keep fallback path by filename if extraction fails
+        }
+      }
+      if (extractedChunks.length > 0) {
+        sourceMaterial = extractedChunks.join('\n\n');
+      }
+      setExamFiles(nextExamFiles);
+    }
+    const effectiveDifficulty =
+      sourceTab === 'exam' ? examDifficultyToApiDifficulty(examDifficulty) : difficulty;
     const materialKeywords = extractKeywords(sourceMaterial);
     const subjectDefaults = SUBJECT_TOPICS[effectiveSubject] ?? SUBJECT_TOPICS.Biology;
     const topicPool = uniqueKeepOrder([...materialKeywords, ...subjectDefaults]).slice(0, 20);
-    const seedKey = `${effectiveSubject}|${sourceMaterial}|${difficulty}|${sourceTab}|${nextNonce}`;
+    const seedKey = `${effectiveSubject}|${sourceMaterial}|${effectiveDifficulty}|${sourceTab}|${nextNonce}`;
     const typeTargets = qTypes
       .filter((qt) => qt.active)
       .reduce<Record<string, number>>((acc, qt) => {
@@ -829,7 +862,7 @@ export default function AssessmentGenerate() {
         }
         if (sourceTab === 'textbook') {
           const m = sourceMaterial.trim();
-          return m || `${effectiveSubject} ${tbGrade || 'Grade 7'} ${difficulty}`.trim();
+          return m || `${effectiveSubject} ${tbGrade || 'Grade 7'} ${effectiveDifficulty}`.trim();
         }
         const m = sourceMaterial.trim();
         if (m) return m;
@@ -842,13 +875,17 @@ export default function AssessmentGenerate() {
 
       const previewPayload: Parameters<typeof previewGenerateQuestionsApi>[0] = {
         source_text: previewSourceText,
-        difficulty,
+        difficulty: effectiveDifficulty,
         question_count: totalQ(),
         type_targets: typeTargets,
       };
       if (sourceTab === 'textbook') {
         previewPayload.subject = effectiveSubject;
         previewPayload.grade = tbGrade || 'Grade 7';
+      }
+      if (sourceTab === 'exam') {
+        previewPayload.task_type = examGenMode === 'simulation' ? 'simulation' : 'error_based';
+        previewPayload.match_mode = examMatchMode;
       }
       const preview = await previewGenerateQuestionsApi(previewPayload);
       if (preview.questions.length > 0) {
@@ -1997,9 +2034,18 @@ export default function AssessmentGenerate() {
                     ...(sourceTab === 'textbook'
                       ? [{ label: 'Grade & Subject', val: `${tbGrade || '—'} · ${tbSubject || '—'}` }]
                       : []),
-                    { label: 'Difficulty', val: difficulty },
+                    { label: 'Difficulty', val: sourceTab === 'exam' ? examDifficultyToApiDifficulty(examDifficulty) : difficulty },
+                    ...(sourceTab === 'exam'
+                      ? [
+                          { label: 'Task Type', val: examGenMode === 'simulation' ? 'Question Simulation' : 'Error-Based Questions' },
+                          { label: 'Match Mode', val: examMatchMode === 'type' ? 'Match Question Type' : 'Match Knowledge Point' },
+                          { label: 'Question Structure', val: 'Controlled by exam mode + backend constraints' },
+                        ]
+                      : []),
                     { label: 'Illustrations', val: illustEnabled ? `${ILLUST_STYLES.find(s => s.id === illustStyle)?.label} · ${illustTypes.size} type(s)` : 'Disabled' },
-                    ...qTypes.filter(t => t.active).map(t => ({ label: t.label, val: `${t.count} questions` })),
+                    ...(sourceTab === 'exam'
+                      ? []
+                      : qTypes.filter(t => t.active).map(t => ({ label: t.label, val: `${t.count} questions` }))),
                   ].map((row, i) => (
                     <div key={i} style={{ minWidth: 0 }}>
                       <div style={{ fontSize: '10px', color: '#9ca3af', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{row.label}</div>

@@ -43,6 +43,23 @@ class AIQuestionGenService:
     @staticmethod
     async def preview_generate(payload: AIQuestionGenPreviewRequest) -> AIQuestionGenPreviewResponse:
         type_targets = payload.type_targets or AIQuestionGenService._default_type_targets(payload.question_count)
+        effective_payload = payload
+        effective_type_targets = type_targets
+
+        # Simulation mode: first analyze source structure, then generate by analyzed structure.
+        if payload.task_type == "simulation":
+            analyzed_targets, analyzed_outline = await AIQuestionGenService._analyze_exam_source(
+                payload=payload,
+                requested_type_targets=type_targets,
+            )
+            if analyzed_targets:
+                effective_type_targets = analyzed_targets
+            if analyzed_outline:
+                enhanced_source = (
+                    f"[EXAM SOURCE ANALYSIS]\n{analyzed_outline}\n\n"
+                    f"[ORIGINAL SOURCE]\n{payload.source_text}"
+                )
+                effective_payload = payload.model_copy(update={"source_text": enhanced_source})
 
         provider = settings.quiz_generation_provider.strip().lower()
         if AIQuestionGenService._llm_enabled():
@@ -50,11 +67,15 @@ class AIQuestionGenService:
             last_error: Exception | None = None
             for attempt in range(1, max_attempts + 1):
                 try:
-                    generated = await AIQuestionGenService._llm_generate(payload, type_targets)
-                    generated = AIQuestionGenService._enforce_type_targets(generated, payload, type_targets)
+                    generated = await AIQuestionGenService._llm_generate(effective_payload, effective_type_targets)
+                    generated = AIQuestionGenService._enforce_type_targets(
+                        generated,
+                        effective_payload,
+                        effective_type_targets,
+                    )
                     if generated:
                         return AIQuestionGenPreviewResponse(
-                            questions=generated[: payload.question_count],
+                            questions=generated[: effective_payload.question_count],
                             generation_mode="llm",
                         )
                     logger.warning(
@@ -75,13 +96,17 @@ class AIQuestionGenService:
                 if attempt < max_attempts:
                     await asyncio.sleep(min(0.5 * attempt, 1.5))
 
-            fallback = AIQuestionGenService._heuristic_generate(payload, type_targets)
-            fallback = AIQuestionGenService._enforce_type_targets(fallback, payload, type_targets)
+            fallback = AIQuestionGenService._heuristic_generate(effective_payload, effective_type_targets)
+            fallback = AIQuestionGenService._enforce_type_targets(
+                fallback,
+                effective_payload,
+                effective_type_targets,
+            )
             warning = "LLM unavailable or returned empty output; heuristic fallback was used."
             if last_error is not None:
                 warning = f"LLM call failed ({type(last_error).__name__}); heuristic fallback was used."
             return AIQuestionGenPreviewResponse(
-                questions=fallback[: payload.question_count],
+                questions=fallback[: effective_payload.question_count],
                 generation_mode="heuristic",
                 warning=warning,
             )
@@ -89,18 +114,129 @@ class AIQuestionGenService:
         key_missing = provider in {"openai", "ohmygpt"} and not settings.ohmygpt_api_key.strip()
         provider_mismatch = provider not in {"openai", "ohmygpt", "heuristic"}
 
-        fallback = AIQuestionGenService._heuristic_generate(payload, type_targets)
-        fallback = AIQuestionGenService._enforce_type_targets(fallback, payload, type_targets)
+        fallback = AIQuestionGenService._heuristic_generate(effective_payload, effective_type_targets)
+        fallback = AIQuestionGenService._enforce_type_targets(
+            fallback,
+            effective_payload,
+            effective_type_targets,
+        )
         warning: str | None = None
         if key_missing:
             warning = "LLM provider is enabled but API key is missing; heuristic fallback was used."
         elif provider_mismatch:
             warning = f"Unknown provider '{provider}'; heuristic fallback was used."
         return AIQuestionGenPreviewResponse(
-            questions=fallback[: payload.question_count],
+            questions=fallback[: effective_payload.question_count],
             generation_mode="heuristic",
             warning=warning,
         )
+
+    @staticmethod
+    async def _analyze_exam_source(
+        payload: AIQuestionGenPreviewRequest,
+        requested_type_targets: dict[str, int],
+    ) -> tuple[dict[str, int], str]:
+        """Two-stage simulation: infer source exam structure before generation."""
+        if not payload.source_text.strip():
+            return requested_type_targets, ""
+
+        client = AIQuestionGenService._get_client()
+        response = await client.chat.completions.create(
+            model=settings.quiz_generation_model,
+            temperature=0.1,
+            **AIQuestionGenService._token_limit_kwargs(
+                model=settings.quiz_generation_model,
+                max_tokens=max(400, min(1200, settings.quiz_generation_max_tokens)),
+            ),
+            response_format={"type": "json_object"},
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an exam structure analyzer. "
+                        "Extract question-type distribution and concise source question outlines from exam content. "
+                        "Return JSON only."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"question_count={payload.question_count}\n"
+                        "Output JSON schema:\n"
+                        '{ "type_targets": {"MCQ":int,"True/False":int,"Fill-blank":int,"Short Answer":int,"Essay":int}, '
+                        '"source_outline": [string, ...] }\n'
+                        "Rules:\n"
+                        "1) Infer structure from source_text.\n"
+                        "2) Keep only positive counts.\n"
+                        "3) type_targets should be close to inferred structure and sum to question_count.\n"
+                        "4) source_outline should contain concise question intent lines.\n"
+                        "source_text:\n"
+                        f"{payload.source_text[:12000]}"
+                    ),
+                },
+            ],
+        )
+        raw = response.choices[0].message.content if response.choices else None
+        if not raw:
+            return requested_type_targets, ""
+        parsed = AIQuestionGenService._parse_json_object(raw)
+        if not parsed:
+            return requested_type_targets, ""
+
+        raw_targets = parsed.get("type_targets", {})
+        outline = parsed.get("source_outline", [])
+        normalized_targets = (
+            AIQuestionGenService._normalize_type_targets(raw_targets)
+            if isinstance(raw_targets, dict)
+            else {}
+        )
+        if normalized_targets:
+            normalized_targets = AIQuestionGenService._rebalance_type_targets(
+                normalized_targets,
+                payload.question_count,
+            )
+        else:
+            normalized_targets = requested_type_targets
+
+        outline_text = ""
+        if isinstance(outline, list):
+            lines = [str(x).strip() for x in outline if str(x).strip()]
+            if lines:
+                outline_text = "\n".join(f"- {x}" for x in lines[:30])
+
+        return normalized_targets, outline_text
+
+    @staticmethod
+    def _rebalance_type_targets(type_targets: dict[str, int], total: int) -> dict[str, int]:
+        normalized = {k: max(0, int(v)) for k, v in type_targets.items() if int(v) > 0}
+        if not normalized:
+            return AIQuestionGenService._default_type_targets(total)
+        s = sum(normalized.values())
+        if s == total:
+            return normalized
+        if s <= 0:
+            return AIQuestionGenService._default_type_targets(total)
+
+        # Proportional rescale then distribute remainder deterministically.
+        scaled: dict[str, int] = {}
+        fracs: list[tuple[str, float]] = []
+        for k, v in normalized.items():
+            f = (v * total) / s
+            base = int(f)
+            scaled[k] = base
+            fracs.append((k, f - base))
+        remainder = total - sum(scaled.values())
+        fracs.sort(key=lambda x: x[1], reverse=True)
+        i = 0
+        while remainder > 0 and fracs:
+            k = fracs[i % len(fracs)][0]
+            scaled[k] += 1
+            remainder -= 1
+            i += 1
+        # Ensure at least one item for top dominant type if all rounded to zero.
+        if sum(scaled.values()) == 0 and fracs:
+            scaled[fracs[0][0]] = total
+        return {k: v for k, v in scaled.items() if v > 0}
 
     @staticmethod
     def _llm_enabled() -> bool:
@@ -171,9 +307,21 @@ class AIQuestionGenService:
             meta_lines.append(f"subject={subj}")
         if grade:
             meta_lines.append(f"grade={grade}")
+        if payload.task_type:
+            meta_lines.append(f"task_type={payload.task_type}")
+        if payload.match_mode:
+            meta_lines.append(f"match_mode={payload.match_mode}")
         if not subj and not grade:
             meta_lines.append(
                 "subject and grade: infer only from source_text; do not assume a default subject or grade."
+            )
+        if payload.task_type == "simulation":
+            meta_lines.append(
+                "simulation mode: infer and follow the source exam's question-type structure before generating questions."
+            )
+        elif payload.task_type == "error_based":
+            meta_lines.append(
+                "error_based mode: generate targeted remediation questions based on likely mistakes in source material."
             )
         meta_block = "\n".join(meta_lines)
         return (
