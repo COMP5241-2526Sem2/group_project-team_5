@@ -1,7 +1,7 @@
 import json
 import logging
 from datetime import datetime
-from typing import Any, AsyncGenerator
+from typing import Annotated, Any, AsyncGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -81,12 +81,15 @@ async def list_labs(
     type: LabTypeEnum | None = None,
     dimension: DimensionEnum | None = None,
     status: LabStatusEnum | None = None,
+    statuses: Annotated[list[LabStatusEnum] | None, Query()] = None,
     search: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ) -> PaginatedLabList:
-    """获取 Lab 列表，支持多维过滤与全文搜索。"""
+    """获取 Lab 列表，支持多维过滤与全文搜索。
+    若传 `statuses`（可重复 query，如 statuses=published&statuses=draft），则按状态集合筛选，并忽略单字段 `status`。
+    """
     stmt = select(LabDefinition)
     count_stmt = select(func.count(LabDefinition.id))
 
@@ -99,7 +102,10 @@ async def list_labs(
     if dimension:
         stmt = stmt.where(LabDefinition.dimension == dimension)
         count_stmt = count_stmt.where(LabDefinition.dimension == dimension)
-    if status:
+    if statuses:
+        stmt = stmt.where(LabDefinition.status.in_(tuple(statuses)))
+        count_stmt = count_stmt.where(LabDefinition.status.in_(tuple(statuses)))
+    elif status:
         stmt = stmt.where(LabDefinition.status == status)
         count_stmt = count_stmt.where(LabDefinition.status == status)
     if search:

@@ -627,14 +627,16 @@ export default function AILabRuntime({
 
   const stateObj = state as Record<string, unknown>;
   return (
-    <Compiled
-      state={stateObj}
-      initial_state={stateObj}
-      initialState={stateObj}
-      createElement={createElement}
-      onStateChange={stableOnPatch}
-      readonly={readonly}
-      t={externalT}
-    />
+    <div style={{ display: 'inline-block', verticalAlign: 'top', width: 'fit-content', maxWidth: '100%' }}>
+      <Compiled
+        state={stateObj}
+        initial_state={stateObj}
+        initialState={stateObj}
+        createElement={createElement}
+        onStateChange={stableOnPatch}
+        readonly={readonly}
+        t={externalT}
+      />
+    </div>
   );
 }

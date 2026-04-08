@@ -11,7 +11,7 @@ import { parseLabDefinitionJson, sanitizeLabDefinitionFileText } from '../../com
 import { labsApi, fromBackend } from '@/api/labs';
 import {
   FlaskConical, Upload, Sparkles, FileJson,
-  Trash2, Send, Search, X, Eye, Tag, Cpu, Layers, ChevronRight, Save,
+  Trash2, Send, Search, X, Eye, Tag, Cpu, Layers, ChevronRight,
 } from 'lucide-react';
 
 const SOURCE_META: Record<string, { emoji: string; label: string; color: string; bg: string }> = {
@@ -215,7 +215,6 @@ export default function LabsDrafts() {
   const [showChat, setShowChat] = useState(true);
   const [selectedKey, setSelectedKey] = useState<string>('');
   const [pendingDraftSelectKey, setPendingDraftSelectKey] = useState<string | null>(null);
-  const [savingToServer, setSavingToServer] = useState(false);
 
   const filtered = useMemo(() => workspaceLabs.filter(e => {
     const q = search.toLowerCase();
@@ -256,7 +255,7 @@ export default function LabsDrafts() {
   useEffect(() => {
     if (chatMode !== 'drive_lab') return;
     if (selectedEntry) {
-      setWidgetType(selectedEntry.def.registryKey);
+      setWidgetType(selectedEntry.def.registryKey, selectedEntry.def.title);
     } else {
       setWidgetType(undefined);
     }
@@ -314,24 +313,6 @@ export default function LabsDrafts() {
     startTransition(() => setSelectedKey(def.registryKey));
     if (options?.status === 'published') {
       await publishLab(def.registryKey);
-    }
-  }
-
-  /** 将当前选中实验同步到数据库（与对话内「Save as draft」等价） */
-  async function handleSaveSelectedToServer() {
-    if (!selectedEntry) return;
-    setSavingToServer(true);
-    try {
-      const { raw } = await labsApi.saveLabDefinition(
-        { ...selectedEntry.def, status: 'draft' },
-        'save_draft',
-      );
-      const { content_unchanged: _c, ...row } = raw;
-      mergeLab(fromBackend(row as Parameters<typeof fromBackend>[0]), selectedEntry.source);
-    } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSavingToServer(false);
     }
   }
 

@@ -316,9 +316,9 @@ export default function MoleculeViewer({ state:rawState, onStateChange, readonly
   const uniqueEls=mol.atoms.filter((a,i,arr)=>arr.findIndex(b=>b.el===a.el)===i);
 
   return (
-    <div style={{ background:'#050912', borderRadius:'10px', overflow:'hidden' }}>
+    <div style={{ background:'#050912', borderRadius:'10px', overflow:'hidden', display: 'inline-block', verticalAlign: 'top', width: W, boxSizing: 'border-box' }}>
       <canvas ref={canvasRef} width={W} height={H}
-        style={{ width:'100%', display:'block', cursor: readonly?'default':dragRef.current?'grabbing':'grab' }}
+        style={{ width: W, height: H, display:'block', cursor: readonly?'default':dragRef.current?'grabbing':'grab' }}
         onMouseDown={onMouseDown} onMouseMove={onMouseMove}
         onMouseUp={onMouseUp} onMouseLeave={onMouseUp}
         onClick={handleClick} />

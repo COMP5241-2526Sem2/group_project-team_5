@@ -151,3 +151,12 @@ export async function publishTaskApi(taskId: number): Promise<TaskStatusMutation
     "teacher",
   );
 }
+
+/** 已发布任务回滚为草稿，之后可再次编辑 */
+export async function unpublishTaskApi(taskId: number): Promise<TaskStatusMutationResponseDto> {
+  return apiRequest<TaskStatusMutationResponseDto>(
+    `/tasks/${taskId}/unpublish`,
+    { method: "POST" },
+    "teacher",
+  );
+}

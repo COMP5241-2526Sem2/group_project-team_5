@@ -379,3 +379,31 @@ class TaskService:
             status=TaskService._map_status(task.status),
             changed_at=datetime.now(timezone.utc),
         )
+
+    @staticmethod
+    async def unpublish_task(db: AsyncSession, actor_id: int, task_id: int) -> TaskStatusMutationResponse:
+        """Revert a published task to draft so it can be edited again (owner/admin)."""
+        actor = await TaskService._require_teacher_or_admin(db, actor_id)
+        row = await db.execute(
+            select(TeacherTask, Course)
+            .join(Course, Course.id == TeacherTask.course_id)
+            .where(TeacherTask.id == task_id)
+        )
+        resolved = row.first()
+        if resolved is None:
+            raise HTTPException(status_code=404, detail="task not found")
+        task, course = resolved
+        TaskService._assert_scope(actor, course)
+
+        if task.status != TeacherTaskStatus.PUBLISHED.value:
+            raise HTTPException(status_code=400, detail="only published tasks can be reverted to draft")
+
+        task.status = TeacherTaskStatus.DRAFT.value
+        task.published_at = None
+        await db.commit()
+
+        return TaskStatusMutationResponse(
+            task_id=task.id,
+            status=TaskService._map_status(task.status),
+            changed_at=datetime.now(timezone.utc),
+        )

@@ -318,9 +318,9 @@ export default function FunctionGraph({ state:rawState, onStateChange, readonly 
   const activeCurve=s.curves[0];
 
   return (
-    <div style={{ background:'#0f1117', borderRadius:'10px', overflow:'hidden', userSelect:'none' }}>
+    <div style={{ background:'#0f1117', borderRadius:'10px', overflow:'hidden', userSelect:'none', display: 'inline-block', verticalAlign: 'top', width: W, boxSizing: 'border-box' }}>
       <canvas ref={canvasRef} width={W} height={H}
-        style={{ width:'100%', display:'block', cursor: is3D?(dragRef3D.current?'grabbing':'grab'):(dragging?'grabbing':'crosshair') }}
+        style={{ width: W, height: H, display: 'block', cursor: is3D?(dragRef3D.current?'grabbing':'grab'):(dragging?'grabbing':'crosshair') }}
         onMouseMove={is3D?onMouseMove3D:onMouseMove2D}
         onMouseLeave={()=>{ setHoverX(null); dragRef3D.current=null; }}
         onMouseDown={e=>{

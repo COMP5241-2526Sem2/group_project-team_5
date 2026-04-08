@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { toast } from 'sonner@2.0.3';
 import {
   fetchPaperListApi,
   fetchPaperDetailApi,
@@ -11,6 +13,7 @@ import {
   updateTaskApi,
   deleteTaskApi,
   publishTaskApi,
+  unpublishTaskApi,
   type TaskListItemDto,
   type TaskDetailDto,
   type TaskCreateRequestDto,
@@ -18,6 +21,8 @@ import {
   type TaskSourceKind,
 } from '../../../utils/taskApi';
 import { listQuestionBankSetsApi, type QuestionBankSetDto } from '../../../utils/questionBankApi';
+import { teacherKeys } from '../../../query/teacherKeys';
+import { TEACHER_STALE_MS } from '../../../query/queryClient';
 import {
   Search, Plus, X, Check, ChevronDown, ChevronLeft, ChevronRight,
   FileText, Clock, Award, AlertCircle, CheckCircle2,
@@ -357,7 +362,7 @@ function Pill({ label, active, onClick }: { label:string; active:boolean; onClic
     </button>
   );
 }
-function MiniSelect({ label, value, onChange, options }: { label:string; value:string; onChange:(v:string)=>void; options:string[] }) {
+function MiniSelect({ label, value, onChange, options, disabled }: { label:string; value:string; onChange:(v:string)=>void; options:string[]; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -366,8 +371,8 @@ function MiniSelect({ label, value, onChange, options }: { label:string; value:s
     return () => document.removeEventListener('mousedown', h);
   }, []);
   return (
-    <div ref={ref} style={{ position:'relative', flexShrink:0 }}>
-      <button onClick={()=>setOpen(o=>!o)} style={{ display:'flex', alignItems:'center', gap:'5px', padding:'6px 11px', borderRadius:'8px', border:`1.5px solid ${open?'#3b5bdb':'#e8eaed'}`, background:'#fff', cursor:'pointer', fontSize:'12px', color:'#374151', fontWeight:500, whiteSpace:'nowrap' }}>
+    <div ref={ref} style={{ position:'relative', flexShrink:0, opacity:disabled?0.55:1, pointerEvents:disabled?'none':'auto' }}>
+      <button type="button" disabled={disabled} onClick={()=>{ if(!disabled) setOpen(o=>!o); }} style={{ display:'flex', alignItems:'center', gap:'5px', padding:'6px 11px', borderRadius:'8px', border:`1.5px solid ${open?'#3b5bdb':'#e8eaed'}`, background:'#fff', cursor:disabled?'default':'pointer', fontSize:'12px', color:'#374151', fontWeight:500, whiteSpace:'nowrap' }}>
         <span style={{ color:'#9ca3af', fontSize:'11px' }}>{label}</span>
         <span style={{ color:'#0f0f23' }}>{value}</span>
         <ChevronDown size={11} style={{ color:'#9ca3af', transform:open?'rotate(180deg)':'none', transition:'transform 0.15s' }}/>
@@ -439,10 +444,38 @@ function QuestionBankBrowser({
   const [debouncedQ, setDebouncedQ] = useState('');
   const [typeFilters, setTypeFilters] = useState<QType[]>([]);
   const [typeDropOpen, setTypeDropOpen] = useState(false);
-  const [bankRows, setBankRows] = useState<LibQ[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const typeRef = useRef<HTMLDivElement>(null);
+
+  const qbParams = useMemo(
+    () => ({
+      grade,
+      subject,
+      ...(debouncedQ ? { q: debouncedQ } : {}),
+    }),
+    [grade, subject, debouncedQ],
+  );
+  const {
+    data: qbRes,
+    isPending: loading,
+    isError: qbErrFlag,
+    error: qbErr,
+  } = useQuery({
+    queryKey: teacherKeys.questionBankSets(qbParams),
+    queryFn: () =>
+      listQuestionBankSetsApi({
+        grade,
+        subject,
+        q: debouncedQ || undefined,
+      }),
+    placeholderData: keepPreviousData,
+  });
+  const bankRows = useMemo(
+    () => (qbRes ? flattenQuestionBankSetsToLibQ(qbRes.sets) : []),
+    [qbRes],
+  );
+  const loadError = qbErrFlag
+    ? (qbErr instanceof Error ? qbErr.message : 'Failed to load question bank')
+    : null;
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedQ(qSearch.trim()), 300);
@@ -459,31 +492,6 @@ function QuestionBankBrowser({
     if (replaceMode && replaceTargetType) setTypeFilters([replaceTargetType]);
     else if (!replaceMode) setTypeFilters([]);
   }, [replaceMode, replaceTargetType]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setLoadError(null);
-      try {
-        const res = await listQuestionBankSetsApi({
-          grade,
-          subject,
-          q: debouncedQ || undefined,
-        });
-        if (cancelled) return;
-        setBankRows(flattenQuestionBankSetsToLibQ(res.sets));
-      } catch (e) {
-        if (!cancelled) {
-          setBankRows([]);
-          setLoadError(e instanceof Error ? e.message : 'Failed to load question bank');
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [grade, subject, debouncedQ]);
 
   const filtered = useMemo(
     () => bankRows.filter(
@@ -638,59 +646,42 @@ interface PaperPickerProps {
   loadedPaperId: string | null;
 }
 function ExamPaperPicker({ grade, subject, onLoad, canvasHasContent, loadedPaperId }: PaperPickerProps) {
+  const queryClient = useQueryClient();
   const [expandId, setExpandId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [pendingEp, setPendingEp] = useState<ExamPaperEntry | null>(null);
-  const [papers, setPapers] = useState<PaperListItemDto[]>([]);
-  const [listLoading, setListLoading] = useState(true);
-  const [listError, setListError] = useState<string | null>(null);
-  const [detailById, setDetailById] = useState<Record<string, ExamPaperEntry>>({});
-  const detailByIdRef = useRef<Record<string, ExamPaperEntry>>({});
-  detailByIdRef.current = detailById;
-  const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
+  const listParams = useMemo(
+    () => ({ grade, subject, page: 1, page_size: 50 }),
+    [grade, subject],
+  );
+  const {
+    data: listRes,
+    isPending: listLoading,
+    isError: listErrFlag,
+    error: listErr,
+  } = useQuery({
+    queryKey: teacherKeys.paperList(listParams),
+    queryFn: () => fetchPaperListApi({ grade, subject, page: 1, page_size: 50 }),
+    placeholderData: keepPreviousData,
+  });
+  const papers = listRes?.items ?? [];
+  const listError = listErrFlag
+    ? (listErr instanceof Error ? listErr.message : 'Failed to load papers')
+    : null;
+
+  const expandNum = expandId ? Number(expandId) : NaN;
+  const { data: detailDto, isPending: detailLoadingExpand } = useQuery({
+    queryKey: teacherKeys.paperDetail(expandNum),
+    queryFn: () => fetchPaperDetailApi(expandNum),
+    enabled: Number.isFinite(expandNum) && expandNum > 0,
+  });
+  const epExpanded = detailDto ? mapDetailToExamPaperEntry(detailDto) : undefined;
 
   useEffect(() => {
     setExpandId(null);
-    setDetailById({});
-    let cancelled = false;
-    (async () => {
-      setListLoading(true);
-      setListError(null);
-      try {
-        const res = await fetchPaperListApi({ grade, subject, page: 1, page_size: 50 });
-        if (!cancelled) setPapers(res.items);
-      } catch (e) {
-        if (!cancelled) {
-          setPapers([]);
-          setListError(e instanceof Error ? e.message : 'Failed to load papers');
-        }
-      } finally {
-        if (!cancelled) setListLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
   }, [grade, subject]);
-
-  useEffect(() => {
-    if (!expandId) return;
-    if (detailByIdRef.current[expandId]) return;
-    const id = Number(expandId);
-    if (!Number.isFinite(id)) return;
-    let cancelled = false;
-    (async () => {
-      setDetailLoadingId(expandId);
-      try {
-        const d = await fetchPaperDetailApi(id);
-        if (cancelled) return;
-        const ep = mapDetailToExamPaperEntry(d);
-        setDetailById((prev) => ({ ...prev, [expandId]: ep }));
-      } finally {
-        if (!cancelled) setDetailLoadingId(null);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [expandId]);
 
   function qByType(ep: ExamPaperEntry) {
     const m: Partial<Record<QType, number>> = {};
@@ -702,12 +693,12 @@ function ExamPaperPicker({ grade, subject, onLoad, canvasHasContent, loadedPaper
     const sid = String(meta.paper_id);
     setActionLoadingId(sid);
     try {
-      let ep = detailById[sid];
-      if (!ep) {
-        const d = await fetchPaperDetailApi(meta.paper_id);
-        ep = mapDetailToExamPaperEntry(d);
-        setDetailById((prev) => ({ ...prev, [sid]: ep }));
-      }
+      const d = await queryClient.ensureQueryData({
+        queryKey: teacherKeys.paperDetail(meta.paper_id),
+        queryFn: () => fetchPaperDetailApi(meta.paper_id),
+        staleTime: TEACHER_STALE_MS,
+      });
+      const ep = mapDetailToExamPaperEntry(d);
       if (canvasHasContent && loadedPaperId !== ep.id) {
         setConfirmId(ep.id);
         setPendingEp(ep);
@@ -745,12 +736,12 @@ function ExamPaperPicker({ grade, subject, onLoad, canvasHasContent, loadedPaper
         ) : (
           papers.map((meta) => {
             const sid = String(meta.paper_id);
-            const ep = detailById[sid];
             const isLoaded = loadedPaperId === sid;
             const isExpanded = expandId === sid;
+            const ep = isExpanded ? epExpanded : undefined;
             const confirming = confirmId === sid;
             const qmap = ep ? qByType(ep) : {};
-            const loadingDetail = detailLoadingId === sid && !ep;
+            const loadingDetail = isExpanded && detailLoadingExpand && !ep;
             return (
               <div
                 key={sid}
@@ -916,11 +907,12 @@ function ExamPaperPicker({ grade, subject, onLoad, canvasHasContent, loadedPaper
 interface CanvasQCardProps {
   q: SectionQ; globalIdx: number; secId: string;
   isEditing: boolean; isReplaceTarget: boolean;
+  readOnly?: boolean;
   onEdit: () => void; onCancelEdit: () => void;
   onSaveEdit: (newPrompt: string) => void;
   onReplace: () => void; onRemove: () => void;
 }
-function CanvasQCard({ q, globalIdx, isEditing, isReplaceTarget, onEdit, onCancelEdit, onSaveEdit, onReplace, onRemove }: CanvasQCardProps) {
+function CanvasQCard({ q, globalIdx, isEditing, isReplaceTarget, readOnly, onEdit, onCancelEdit, onSaveEdit, onReplace, onRemove }: CanvasQCardProps) {
   const [editText, setEditText] = useState(q.prompt);
   useEffect(()=>{ setEditText(q.prompt); }, [q.prompt, isEditing]);
 
@@ -932,7 +924,7 @@ function CanvasQCard({ q, globalIdx, isEditing, isReplaceTarget, onEdit, onCance
         <DiffBadge d={q.diff}/>
         <span style={{ fontSize:'10px', fontWeight:600, color:'#6b7280', marginLeft:'auto', flexShrink:0 }}>{q.pts}pt</span>
         <div style={{ display:'flex', gap:'2px', marginLeft:'4px' }}>
-          {!isEditing && (
+          {!readOnly && !isEditing && (
             <>
               <button title="Edit" onClick={onEdit}
                 style={{ width:'20px', height:'20px', borderRadius:'5px', border:'none', cursor:'pointer', background:'transparent', color:'#9ca3af', display:'flex', alignItems:'center', justifyContent:'center' }}
@@ -948,12 +940,14 @@ function CanvasQCard({ q, globalIdx, isEditing, isReplaceTarget, onEdit, onCance
               </button>
             </>
           )}
+          {!readOnly && (
           <button title="Remove" onClick={onRemove}
             style={{ width:'20px', height:'20px', borderRadius:'5px', border:'none', cursor:'pointer', background:'transparent', color:'#d1d5db', display:'flex', alignItems:'center', justifyContent:'center' }}
             onMouseEnter={e=>{ (e.currentTarget as HTMLElement).style.background='#fee2e2'; (e.currentTarget as HTMLElement).style.color='#b91c1c'; }}
             onMouseLeave={e=>{ (e.currentTarget as HTMLElement).style.background='transparent'; (e.currentTarget as HTMLElement).style.color='#d1d5db'; }}>
             <X size={10}/>
           </button>
+          )}
         </div>
       </div>
       <div style={{ padding:'5px 8px 7px' }}>
@@ -993,10 +987,14 @@ function CanvasQCard({ q, globalIdx, isEditing, isReplaceTarget, onEdit, onCance
 ═══════════════════════════════════════════════════════════════════════════ */
 function AssembleView({
   editingTaskId,
+  readOnly = false,
+  onExitReadOnly,
   onSaved,
   onTaskCreated,
 }: {
   editingTaskId: number | null;
+  readOnly?: boolean;
+  onExitReadOnly?: () => void;
   onSaved: () => void;
   onTaskCreated: (taskId: number) => void;
 }) {
@@ -1117,6 +1115,7 @@ function AssembleView({
   const totalPts = sections.reduce((n,s)=>n+s.qs.length*s.ptsEach, 0);
 
   async function handleSave() {
+    if (readOnly) return;
     if (totalQ === 0 || saving) return;
     setSaving(true);
     try {
@@ -1146,25 +1145,37 @@ function AssembleView({
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
+      {readOnly && (
+        <div style={{ padding:'8px 18px', background:'#fffbeb', borderBottom:'1px solid #fde68a', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px', flexWrap:'wrap' }}>
+          <span style={{ fontSize:'12px', color:'#92400e', fontWeight:600 }}>已发布 · 仅可查看题目与分值</span>
+          <button
+            type="button"
+            onClick={() => onExitReadOnly?.()}
+            style={{ padding:'5px 12px', borderRadius:'7px', border:'1px solid #fde68a', background:'#fff', color:'#92400e', fontSize:'11px', fontWeight:600, cursor:'pointer' }}
+          >
+            返回发布列表
+          </button>
+        </div>
+      )}
       {/* Config bar */}
-      <div style={{ padding:'9px 18px', borderBottom:'1px solid #e8eaed', background:'#fafafa', display:'flex', alignItems:'center', gap:'10px', flexShrink:0, flexWrap:'wrap' }}>
+      <div style={{ padding:'9px 18px', borderBottom:'1px solid #e8eaed', background:'#fafafa', display:'flex', alignItems:'center', gap:'10px', flexShrink:0, flexWrap:'wrap', opacity:readOnly?0.88:1, pointerEvents:readOnly?'none':'auto', userSelect:readOnly?'none':'auto' }}>
         <div style={{ display:'flex', background:'#f3f4f6', borderRadius:'8px', padding:'2px' }}>
           {(['exam','quiz','homework'] as PaperKind[]).map(k=>(
-            <button key={k} onClick={()=>setKind(k)} style={{ padding:'5px 12px', borderRadius:'6px', border:'none', cursor:'pointer', fontSize:'12px', background:kind===k?'#fff':'transparent', color:kind===k?'#0f0f23':'#6b7280', fontWeight:kind===k?600:400, boxShadow:kind===k?'0 1px 3px rgba(0,0,0,0.08)':'none' }}>
+            <button key={k} type="button" disabled={readOnly} onClick={()=>setKind(k)} style={{ padding:'5px 12px', borderRadius:'6px', border:'none', cursor:readOnly?'default':'pointer', fontSize:'12px', background:kind===k?'#fff':'transparent', color:kind===k?'#0f0f23':'#6b7280', fontWeight:kind===k?600:400, boxShadow:kind===k?'0 1px 3px rgba(0,0,0,0.08)':'none' }}>
               {k==='exam'?'📋 Exam':k==='quiz'?'⚡ Quiz':'📚 Homework'}
             </button>
           ))}
         </div>
-        <MiniSelect label="Grade "   value={grade}   onChange={setGrade}   options={GRADES}/>
-        <MiniSelect label="Subject " value={subject} onChange={setSubject} options={SUBJECTS}/>
-        <input value={title} onChange={e=>setTitle(e.target.value)}
+        <MiniSelect label="Grade "   value={grade}   onChange={setGrade}   options={GRADES} disabled={readOnly}/>
+        <MiniSelect label="Subject " value={subject} onChange={setSubject} options={SUBJECTS} disabled={readOnly}/>
+        <input value={title} onChange={e=>setTitle(e.target.value)} disabled={readOnly}
           placeholder={`e.g. ${grade} ${subject} Midterm 2026`}
-          style={{ flex:1, minWidth:'180px', padding:'7px 12px', borderRadius:'8px', border:'1.5px solid #e8eaed', fontSize:'12px', color:'#0f0f23', outline:'none' }}
+          style={{ flex:1, minWidth:'180px', padding:'7px 12px', borderRadius:'8px', border:'1.5px solid #e8eaed', fontSize:'12px', color:'#0f0f23', outline:'none', background:readOnly?'#f9fafb':'#fff' }}
           onFocus={e=>{e.currentTarget.style.borderColor='#3b5bdb';}} onBlur={e=>{e.currentTarget.style.borderColor='#e8eaed';}}/>
         <div style={{ display:'flex', alignItems:'center', gap:'5px' }}>
           <Clock size={12} style={{ color:'#9ca3af' }}/>
-          <input type="number" value={dur} min={5} max={360} onChange={e=>setDur(+e.target.value)}
-            style={{ width:'50px', padding:'6px 8px', borderRadius:'8px', border:'1.5px solid #e8eaed', fontSize:'12px', textAlign:'center', outline:'none' }}/>
+          <input type="number" value={dur} min={5} max={360} onChange={e=>setDur(+e.target.value)} disabled={readOnly}
+            style={{ width:'50px', padding:'6px 8px', borderRadius:'8px', border:'1.5px solid #e8eaed', fontSize:'12px', textAlign:'center', outline:'none', background:readOnly?'#f9fafb':'#fff' }}/>
           <span style={{ fontSize:'11px', color:'#6b7280' }}>min</span>
         </div>
       </div>
@@ -1172,6 +1183,7 @@ function AssembleView({
       {/* Body */}
       <div style={{ flex:1, display:'flex', overflow:'hidden' }}>
         {/* LEFT PANEL */}
+        {!readOnly && (
         <div style={{ width:'272px', flexShrink:0, borderRight:'1px solid #e8eaed', display:'flex', flexDirection:'column', overflow:'hidden', background:'#fff' }}>
           {/* Mode switcher */}
           <div style={{ padding:'10px 11px 0', flexShrink:0 }}>
@@ -1187,8 +1199,8 @@ function AssembleView({
               ))}
             </div>
           </div>
-          {/* Panel content */}
-          {mode==='bank' ? (
+          {/* Panel content：双面板常驻 + display 切换，避免 Bank/Papers 互切时卸载导致重复请求与滚动丢失（数据由 React Query 缓存） */}
+          <div style={{ flex: 1, minHeight: 0, display: mode === 'bank' ? 'flex' : 'none', flexDirection: 'column', overflow: 'hidden' }}>
             <QuestionBankBrowser
               grade={grade}
               subject={subject}
@@ -1198,7 +1210,8 @@ function AssembleView({
               onAdd={addQ}
               onReplace={replaceQ}
             />
-          ) : (
+          </div>
+          <div style={{ flex: 1, minHeight: 0, display: mode === 'papers' ? 'flex' : 'none', flexDirection: 'column', overflow: 'hidden' }}>
             <ExamPaperPicker
               grade={grade}
               subject={subject}
@@ -1206,11 +1219,12 @@ function AssembleView({
               canvasHasContent={canvasHasContent}
               loadedPaperId={loadedPaperId}
             />
-          )}
+          </div>
         </div>
+        )}
 
         {/* RIGHT — Canvas */}
-        <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', background:'#f7f8fb' }}>
+        <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', background:'#f7f8fb', minWidth:0 }}>
           <div style={{ padding:'8px 18px', borderBottom:'1px solid #e8eaed', background:'#fff', display:'flex', alignItems:'center', gap:'10px', flexShrink:0 }}>
             <span style={{ fontSize:'12px', fontWeight:700, color:'#0f0f23' }}>Task Canvas</span>
             <span style={{ fontSize:'11px', color:'#9ca3af' }}>{totalQ}q · {totalPts}pts · {dur}min</span>
@@ -1219,7 +1233,7 @@ function AssembleView({
                 based on {loadedPaperTitle.split('—')[0].trim()}
               </span>
             )}
-            {replaceTarget && (
+            {replaceTarget && !readOnly && (
               <button onClick={()=>setReplaceTarget(null)}
                 style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:'5px', padding:'4px 11px', borderRadius:'6px', border:'1px solid #fde68a', background:'#fef9c3', color:'#92400e', fontSize:'11px', cursor:'pointer' }}>
                 <X size={10}/> Cancel Replace
@@ -1244,14 +1258,20 @@ function AssembleView({
                     <TypeBadge t={sec.type}/>
                     <div style={{ display:'flex', alignItems:'center', gap:'4px', fontSize:'11px', color:'#6b7280' }}>
                       <span>{sec.qs.length}q ·</span>
-                      <input type="number" value={sec.ptsEach} min={1} max={50} onChange={e=>updatePtsEach(sec.id,+e.target.value)}
-                        style={{ width:'34px', textAlign:'center', padding:'2px 4px', borderRadius:'5px', border:'1px solid #e8eaed', fontSize:'11px', fontWeight:600, color:'#3b5bdb' }}/>
+                      {readOnly ? (
+                        <span style={{ fontWeight:600, color:'#3b5bdb' }}>{sec.ptsEach}</span>
+                      ) : (
+                        <input type="number" value={sec.ptsEach} min={1} max={50} onChange={e=>updatePtsEach(sec.id,+e.target.value)}
+                          style={{ width:'34px', textAlign:'center', padding:'2px 4px', borderRadius:'5px', border:'1px solid #e8eaed', fontSize:'11px', fontWeight:600, color:'#3b5bdb' }}/>
+                      )}
                       <span>pt/q =</span>
                       <span style={{ color:'#0f0f23', fontWeight:700 }}>{secTotal}pt</span>
                     </div>
+                    {!readOnly && (
                     <button onClick={()=>removeSec(sec.id)} style={{ width:'20px', height:'20px', borderRadius:'5px', border:'none', cursor:'pointer', background:'#fee2e2', color:'#b91c1c', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                       <X size={10}/>
                     </button>
+                    )}
                   </div>
                   <div style={{ padding:'8px 12px', display:'flex', flexDirection:'column', gap:'5px' }}>
                     {sec.qs.length===0 ? (
@@ -1264,6 +1284,7 @@ function AssembleView({
                             q={q} globalIdx={globalIdx} secId={sec.id}
                             isEditing={editingId===q.uid}
                             isReplaceTarget={replaceTarget?.uid===q.uid}
+                            readOnly={readOnly}
                             onEdit={()=>{ setReplaceTarget(null); setEditingId(q.uid); }}
                             onCancelEdit={()=>setEditingId(null)}
                             onSaveEdit={(p)=>saveEdit(sec.id,q.uid,p)}
@@ -1278,6 +1299,7 @@ function AssembleView({
               );
             })}
             {/* Add section */}
+            {!readOnly && (
             <div>
               {addSecOpen ? (
                 <div style={{ display:'flex', alignItems:'center', gap:'8px', padding:'10px 14px', border:'1.5px solid #3b5bdb', borderRadius:'10px', background:'#f0f4ff', flexWrap:'wrap' }}>
@@ -1299,6 +1321,7 @@ function AssembleView({
                 </button>
               )}
             </div>
+            )}
           </div>
 
           {/* Footer */}
@@ -1308,6 +1331,7 @@ function AssembleView({
                 <div key={item.label} style={{ display:'flex', alignItems:'center', gap:'4px', fontSize:'12px', color:'#6b7280' }}><span style={{ color:'#9ca3af' }}>{item.icon}</span>{item.label}</div>
               ))}
             </div>
+            {!readOnly && (
             <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
               {saved && <span style={{ fontSize:'11px', color:'#15803d', display:'flex', alignItems:'center', gap:'4px' }}><CheckCircle2 size={12}/> Saved</span>}
               <button onClick={() => void handleSave()} disabled={totalQ===0||saving}
@@ -1315,6 +1339,7 @@ function AssembleView({
                 {saving ? <Loader2 size={12} style={{ animation:'spin 0.7s linear infinite' }}/> : <Save size={12}/>} Save Draft
               </button>
             </div>
+            )}
           </div>
         </div>
       </div>
@@ -1325,10 +1350,12 @@ function AssembleView({
 /* ═══════════════════════════════════════════════════════════════════════════
    PUBLISH VIEW
 ═══════════════════════════════════════════════════════════════════════════ */
-function PublishCard({ paper, onDelete, onSelectPublish, onEditTask, isSelected }: {
-  paper:Paper; onDelete:(id:string)=>void; onSelectPublish:()=>void; onEditTask?:(taskId:number)=>void; isSelected:boolean;
+function PublishCard({ paper, onDelete, onSelectPublish, onEditTask, onViewTask, onRollback, isSelected }: {
+  paper:Paper; onDelete:(id:string)=>void; onSelectPublish:()=>void; onEditTask?:(taskId:number)=>void;
+  onViewTask?:(taskId:number)=>void; onRollback?:(id:string)=>Promise<boolean>; isSelected:boolean;
 }) {
   const [confirmDel, setConfirmDel] = useState(false);
+  const [confirmRollback, setConfirmRollback] = useState(false);
   const sc=STATUS_C[paper.status]; const se=SUBJ_EMOJI[paper.subject]??'📄';
 
   function handleEdit() {
@@ -1337,6 +1364,13 @@ function PublishCard({ paper, onDelete, onSelectPublish, onEditTask, isSelected 
       return;
     }
     onEditTask?.(Number(paper.id));
+  }
+  function handleView() {
+    if (!/^\d+$/.test(paper.id)) {
+      window.alert('Invalid task id.');
+      return;
+    }
+    onViewTask?.(Number(paper.id));
   }
   return (
     <div style={{ background:'#fff', border:`1.5px solid ${isSelected?'#93c5fd':'#e8eaed'}`, borderRadius:'12px', overflow:'hidden', boxShadow:isSelected?'0 0 0 3px rgba(59,91,219,0.10)':'none', transition:'all 0.15s' }}>
@@ -1364,16 +1398,38 @@ function PublishCard({ paper, onDelete, onSelectPublish, onEditTask, isSelected 
               <button onClick={()=>setConfirmDel(false)} style={{ padding:'4px 9px', borderRadius:'6px', border:'1px solid #e8eaed', background:'#fff', color:'#374151', fontSize:'11px', cursor:'pointer' }}>Cancel</button>
               <button onClick={()=>onDelete(paper.id)} style={{ padding:'4px 9px', borderRadius:'6px', border:'none', background:'#fee2e2', color:'#b91c1c', fontSize:'11px', fontWeight:600, cursor:'pointer' }}>Delete</button>
             </>
+          ) : confirmRollback ? (
+            <>
+              <span style={{ fontSize:'11px', color:'#92400e', alignSelf:'center' }}>Revert to draft?</span>
+              <button type="button" onClick={()=>setConfirmRollback(false)} style={{ padding:'4px 9px', borderRadius:'6px', border:'1px solid #e8eaed', background:'#fff', color:'#374151', fontSize:'11px', cursor:'pointer' }}>Cancel</button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!onRollback) return;
+                  const ok = await onRollback(paper.id);
+                  if (ok) setConfirmRollback(false);
+                }}
+                style={{ padding:'4px 9px', borderRadius:'6px', border:'none', background:'#fef3c7', color:'#92400e', fontSize:'11px', fontWeight:600, cursor:'pointer' }}
+              >
+                Confirm
+              </button>
+            </>
           ) : (
             <>
-              <button onClick={()=>setConfirmDel(true)} style={{ display:'flex', alignItems:'center', padding:'6px 9px', borderRadius:'7px', border:'1px solid #fecaca', background:'#fff', color:'#ef4444', fontSize:'11px', cursor:'pointer' }}><Trash2 size={11}/></button>
-              <button type="button" onClick={handleEdit} style={{ display:'flex', alignItems:'center', gap:'3px', padding:'6px 10px', borderRadius:'7px', border:'1px solid #e8eaed', background:'#fff', color:'#374151', fontSize:'11px', cursor:'pointer' }}><Edit3 size={11}/> Edit</button>
-              {paper.status==='draft' ? (
-                <button onClick={onSelectPublish} style={{ display:'flex', alignItems:'center', gap:'4px', padding:'6px 13px', borderRadius:'7px', border:'none', background:isSelected?'#eff6ff':'#3b5bdb', color:isSelected?'#3b5bdb':'#fff', fontSize:'11px', fontWeight:600, cursor:'pointer' }}>
-                  <Send size={11}/> {isSelected?'Cancel':'Publish'}
-                </button>
-              ) : (
-                <button style={{ display:'flex', alignItems:'center', gap:'3px', padding:'6px 12px', borderRadius:'7px', border:'1px solid #e8eaed', background:'#fff', color:'#374151', fontSize:'11px', cursor:'pointer' }}><Eye size={11}/> View</button>
+              <button type="button" onClick={()=>setConfirmDel(true)} style={{ display:'flex', alignItems:'center', padding:'6px 9px', borderRadius:'7px', border:'1px solid #fecaca', background:'#fff', color:'#ef4444', fontSize:'11px', cursor:'pointer' }}><Trash2 size={11}/></button>
+              {paper.status==='draft' && (
+                <>
+                  <button type="button" onClick={handleEdit} style={{ display:'flex', alignItems:'center', gap:'3px', padding:'6px 10px', borderRadius:'7px', border:'1px solid #e8eaed', background:'#fff', color:'#374151', fontSize:'11px', cursor:'pointer' }}><Edit3 size={11}/> Edit</button>
+                  <button type="button" onClick={onSelectPublish} style={{ display:'flex', alignItems:'center', gap:'4px', padding:'6px 13px', borderRadius:'7px', border:'none', background:isSelected?'#eff6ff':'#3b5bdb', color:isSelected?'#3b5bdb':'#fff', fontSize:'11px', fontWeight:600, cursor:'pointer' }}>
+                    <Send size={11}/> {isSelected?'Cancel':'Publish'}
+                  </button>
+                </>
+              )}
+              {paper.status==='published' && (
+                <>
+                  <button type="button" onClick={handleView} style={{ display:'flex', alignItems:'center', gap:'3px', padding:'6px 12px', borderRadius:'7px', border:'1px solid #e8eaed', background:'#fff', color:'#374151', fontSize:'11px', cursor:'pointer' }}><Eye size={11}/> View</button>
+                  <button type="button" onClick={()=>setConfirmRollback(true)} style={{ display:'flex', alignItems:'center', gap:'3px', padding:'6px 10px', borderRadius:'7px', border:'1px solid #fde68a', background:'#fffbeb', color:'#92400e', fontSize:'11px', fontWeight:600, cursor:'pointer' }}><RotateCcw size={11}/> Revert</button>
+                </>
               )}
             </>
           )}
@@ -1503,7 +1559,7 @@ function PublishPanel({ paper, onClose, onPublish }: { paper:Paper; onClose:()=>
   );
 }
 
-function PublishView({ papers, onDelete, onPublish, onNewPaper, onEditTask }: { papers:Paper[]; onDelete:(id:string)=>void; onPublish:(id:string,cfg:PublishCfg)=>void; onNewPaper:()=>void; onEditTask:(taskId:number)=>void }) {
+function PublishView({ papers, onDelete, onPublish, onNewPaper, onEditTask, onViewTask, onRollback }: { papers:Paper[]; onDelete:(id:string)=>void; onPublish:(id:string,cfg:PublishCfg)=>void; onNewPaper:()=>void; onEditTask:(taskId:number)=>void; onViewTask:(taskId:number)=>void; onRollback:(id:string)=>Promise<boolean> }) {
   /** Publish tab lists Draft / Published only; Closed is omitted */
   const publishPapers = papers.filter((p) => p.status === 'draft' || p.status === 'published');
   const [filter,   setFilter]   = useState<'all' | 'draft' | 'published'>('all');
@@ -1539,7 +1595,7 @@ function PublishView({ papers, onDelete, onPublish, onNewPaper, onEditTask }: { 
             </div>
           ) : displayed.map(paper=>(
             <React.Fragment key={paper.id}>
-              <PublishCard paper={paper} isSelected={selPaper?.id===paper.id} onDelete={onDelete} onEditTask={onEditTask} onSelectPublish={()=>setSelPaper(p=>p?.id===paper.id?null:paper)}/>
+              <PublishCard paper={paper} isSelected={selPaper?.id===paper.id} onDelete={onDelete} onEditTask={onEditTask} onViewTask={onViewTask} onRollback={onRollback} onSelectPublish={()=>setSelPaper(p=>p?.id===paper.id?null:paper)}/>
             </React.Fragment>
           ))}
         </div>
@@ -1808,27 +1864,38 @@ function GradeView({ papers, subs, onUpdateSub }: { papers:Paper[]; subs:Student
    ROOT
 ═══════════════════════════════════════════════════════════════════════════ */
 export default function AssessmentGrading() {
+  const queryClient = useQueryClient();
   const [tab,    setTab]    = useState<StudioTab>('assemble');
-  const [papers, setPapers] = useState<Paper[]>([]);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
-  /** loading: before fetch · api: loaded server rows · api_empty: 200 but 0 items · error: network/HTTP */
-  const [papersListSource, setPapersListSource] = useState<'loading' | 'api' | 'api_empty' | 'error'>('loading');
+  /** 查看已发布任务：仅浏览 Assemble 内容，不可改题、不可保存 */
+  const [assembleReadOnly, setAssembleReadOnly] = useState(false);
+
+  const {
+    data: tasksRes,
+    isPending: tasksPending,
+    isError: tasksIsError,
+  } = useQuery({
+    queryKey: teacherKeys.tasksList(1, 100),
+    queryFn: () => fetchTaskListApi({ page: 1, page_size: 100 }),
+  });
+
+  const papers = useMemo(
+    () => (tasksRes?.items ?? []).map(mapTaskListItemToPaper),
+    [tasksRes],
+  );
+
+  /** loading: 尚无数据 · api: 有任务 · api_empty: 成功但 0 条 · error: 请求失败 */
+  const papersListSource: 'loading' | 'api' | 'api_empty' | 'error' = tasksIsError
+    ? 'error'
+    : tasksPending
+      ? 'loading'
+      : papers.length > 0
+        ? 'api'
+        : 'api_empty';
 
   const reloadTasks = React.useCallback(async () => {
-    try {
-      const res = await fetchTaskListApi({ page: 1, page_size: 100 });
-      const mapped = res.items.map(mapTaskListItemToPaper);
-      setPapers(mapped);
-      setPapersListSource(mapped.length > 0 ? 'api' : 'api_empty');
-    } catch {
-      setPapers([]);
-      setPapersListSource('error');
-    }
-  }, []);
-
-  useEffect(() => {
-    void reloadTasks();
-  }, [reloadTasks]);
+    await queryClient.invalidateQueries({ queryKey: ['teacher', 'tasks'] });
+  }, [queryClient]);
 
   const draftCount   = papers.filter(p=>p.status==='draft').length;
 
@@ -1849,12 +1916,28 @@ export default function AssessmentGrading() {
     try {
       await publishTaskApi(n);
       await reloadTasks();
-      setPapers((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, status: 'published' as const, publishCfg: cfg } : p)),
-      );
     } catch (e) {
       window.alert(e instanceof Error ? e.message : 'Publish failed');
       throw e;
+    }
+  }
+
+  async function rollbackTask(id: string): Promise<boolean> {
+    const n = Number(id);
+    if (!Number.isFinite(n)) return false;
+    try {
+      await unpublishTaskApi(n);
+      await reloadTasks();
+      toast.success('已恢复为草稿，可在列表中点击 Edit 继续编辑');
+      return true;
+    } catch (e) {
+      const raw = e instanceof Error ? e.message : 'Revert failed';
+      const msg =
+        raw === 'Not Found' || raw.includes('Not Found')
+          ? '无法回滚：接口返回 404。若刚更新过代码，请重启后端 API（uvicorn）后再试。'
+          : raw;
+      toast.error(msg);
+      return false;
     }
   }
 
@@ -1880,23 +1963,28 @@ export default function AssessmentGrading() {
           <StudioTabBar tab={tab} setTab={setTab} draftCount={draftCount}/>
         </div>
       </div>
-      <div style={{ flex:1, overflow:'hidden' }}>
-        {tab==='assemble' && (
+      <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column', minHeight:0 }}>
+        {/* Assemble / Publish 双面板常驻，仅用 display 切换，避免每次点 Publish 卸载再挂载导致重绘与重复请求感知 */}
+        <div style={{ flex:1, overflow:'hidden', display:tab==='assemble'?'flex':'none', flexDirection:'column', minHeight:0 }}>
           <AssembleView
             editingTaskId={editingTaskId}
+            readOnly={assembleReadOnly}
+            onExitReadOnly={() => { setAssembleReadOnly(false); setEditingTaskId(null); setTab('publish'); }}
             onSaved={() => { void reloadTasks(); }}
-            onTaskCreated={(taskId) => { setEditingTaskId(taskId); }}
+            onTaskCreated={(taskId) => { setEditingTaskId(taskId); setAssembleReadOnly(false); }}
           />
-        )}
-        {tab==='publish'  && (
+        </div>
+        <div style={{ flex:1, overflow:'hidden', display:tab==='publish'?'flex':'none', flexDirection:'column', minHeight:0 }}>
           <PublishView
             papers={papers}
             onDelete={deletePaper}
             onPublish={publishPaper}
-            onNewPaper={() => { setEditingTaskId(null); setTab('assemble'); }}
-            onEditTask={(taskId) => { setEditingTaskId(taskId); setTab('assemble'); }}
+            onNewPaper={() => { setEditingTaskId(null); setAssembleReadOnly(false); setTab('assemble'); }}
+            onEditTask={(taskId) => { setEditingTaskId(taskId); setAssembleReadOnly(false); setTab('assemble'); }}
+            onViewTask={(taskId) => { setEditingTaskId(taskId); setAssembleReadOnly(true); setTab('assemble'); }}
+            onRollback={rollbackTask}
           />
-        )}
+        </div>
       </div>
       <style>{`@keyframes spin { to { transform:rotate(360deg); } }`}</style>
     </div>

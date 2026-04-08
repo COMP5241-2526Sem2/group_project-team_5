@@ -266,9 +266,9 @@ export default function Geometry3D({ state: rawState, onStateChange, readonly }:
   }
 
   return (
-    <div style={{ background: '#030712', borderRadius: '10px', overflow: 'hidden' }}>
+    <div style={{ background: '#030712', borderRadius: '10px', overflow: 'hidden', display: 'inline-block', verticalAlign: 'top', width: W, boxSizing: 'border-box' }}>
       <canvas ref={canvasRef} width={W} height={H}
-        style={{ width: '100%', display: 'block', cursor: dragRef.current ? 'grabbing' : 'grab' }}
+        style={{ width: W, height: H, display: 'block', cursor: dragRef.current ? 'grabbing' : 'grab' }}
         onMouseDown={onMouseDown} onMouseMove={onMouseMove}
         onMouseUp={onMouseUp} onMouseLeave={onMouseUp} onWheel={onWheel} />
 

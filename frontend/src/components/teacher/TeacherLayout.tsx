@@ -1,7 +1,9 @@
 import React, { type ElementType, type ReactNode, useCallback, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { useChat } from '../labs/ChatContext';
 import { prefetchPaperList, prefetchQuestionBankSets } from '../../utils/assessmentDataCache';
+import { prefetchTeacherShell } from '../../query/prefetchTeacherShell';
 
 /** 跨 Labs 页面实例保留：用于检测 Lab Catalog ↔ Drafts 切换（TeacherLayout 会随路由重挂载） */
 let prevTeacherLabsSection: 'catalog' | 'drafts' | null = null;
@@ -42,6 +44,7 @@ const LABS_SUB_ITEMS: SubNavItem[] = [
 export default function TeacherLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const { clearLabChatBinding, isGenerating, cancelGeneration } = useChat();
   const [activeMenu, setActiveMenu] = useState('lessons');
   const [activeSub, setActiveSub] = useState('generate');
@@ -94,6 +97,11 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
     }
     prevTeacherLabsSection = section;
   }, [location.pathname, clearLabChatBinding]);
+
+  /** 进入教师端任意页后统一预取：课件列表、题库、试卷列表、AI Labs，减少首次进入各子页的等待 */
+  useEffect(() => {
+    prefetchTeacherShell(queryClient);
+  }, [queryClient]);
 
   const guardedNavigate = useCallback((path: string) => {
     if (!path || path === location.pathname) return;

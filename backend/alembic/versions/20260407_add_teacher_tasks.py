@@ -1,7 +1,7 @@
 """add teacher_tasks and teacher_task_items
 
 Revision ID: 20260407_teacher_tasks
-Revises: f6a7b8c9d0e1
+Revises:
 Create Date: 2026-04-07
 """
 
@@ -12,7 +12,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "20260407_teacher_tasks"
-down_revision = "f6a7b8c9d0e1"
+down_revision = None
 branch_labels = None
 depends_on = None
 

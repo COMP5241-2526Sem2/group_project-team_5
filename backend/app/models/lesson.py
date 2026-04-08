@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Integer, JSON, Text, UniqueConstraint, func
 from sqlalchemy import Enum as SQLEnum
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models import Base
+
+if TYPE_CHECKING:
+    pass
 
 
 class DeckStatus(str, enum.Enum):
@@ -48,6 +52,12 @@ class LessonDeck(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
+    slides: Mapped[list["Slide"]] = relationship(
+        back_populates="deck",
+        cascade="all, delete-orphan",
+        order_by="Slide.order_num",
+    )
+
 
 class Slide(Base):
     __tablename__ = "slides"
@@ -55,7 +65,15 @@ class Slide(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     deck_id: Mapped[int] = mapped_column(ForeignKey("lesson_decks.id", ondelete="CASCADE"), nullable=False, index=True)
     title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     order_num: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    deck: Mapped["LessonDeck"] = relationship(back_populates="slides")
+    blocks: Mapped[list["SlideBlock"]] = relationship(
+        back_populates="slide",
+        cascade="all, delete-orphan",
+        order_by="SlideBlock.order_num",
+    )
 
     __table_args__ = (
         UniqueConstraint("deck_id", "order_num", name="uq_slides_deck_order"),
@@ -74,6 +92,8 @@ class SlideBlock(Base):
     content: Mapped[str | None] = mapped_column(Text, nullable=True)
     extra_payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     order_num: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    slide: Mapped["Slide"] = relationship(back_populates="blocks")
 
     __table_args__ = (
         UniqueConstraint("slide_id", "order_num", name="uq_slide_blocks_slide_order"),

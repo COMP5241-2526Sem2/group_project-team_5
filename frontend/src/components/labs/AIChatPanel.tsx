@@ -228,17 +228,17 @@ function AIChatPanelInner({
 
       es.addEventListener('generating', () => {
         setMessages(prev =>
-          prev.map(m => m.id === asstId ? { ...m, content: '正在生成…', streaming: true } : m)
+          prev.map(m => m.id === asstId ? { ...m, content: 'Generating…', streaming: true } : m)
         );
       });
 
       es.addEventListener('status', (e: MessageEvent) => {
         try {
           const s = JSON.parse(e.data || '{}') as { stage?: string; message?: string; progress?: number };
-          const msg = (s.message || '处理中…').trim();
+          const msg = (s.message || 'Processing…').trim();
           const p = typeof s.progress === 'number' ? Math.max(0, Math.min(100, s.progress)) : undefined;
           const stage = (s.stage || '').trim();
-          const line = `${msg}${p !== undefined ? `（${p}%）` : ''}${stage ? `\n${stage}` : ''}`;
+          const line = `${msg}${p !== undefined ? ` (${p}%)` : ''}${stage ? `\n${stage}` : ''}`;
           setMessages(prev =>
             prev.map(m => m.id === asstId ? { ...m, content: line, streaming: true } : m)
           );
@@ -250,7 +250,7 @@ function AIChatPanelInner({
       es.addEventListener('thinking', (e: MessageEvent) => {
         try {
           const t = JSON.parse(e.data || '{}') as { message?: string; stage?: string };
-          const msg = (t.message || '推理中…').trim();
+          const msg = (t.message || 'Reasoning…').trim();
           const stage = (t.stage || '').trim();
           const line = `${msg}${stage ? `\n${stage}` : ''}`;
           setMessages(prev =>
@@ -262,7 +262,7 @@ function AIChatPanelInner({
       });
 
       es.addEventListener('text', (e: MessageEvent) => {
-        const finalText = e.data || '处理完成。';
+        const finalText = e.data || 'Done.';
         setMessages(prev =>
           prev.map(m => m.id === asstId ? { ...m, content: finalText, streaming: false } : m)
         );
@@ -342,7 +342,7 @@ function AIChatPanelInner({
           );
         });
         // 生成结束即合并到前端 Workspace / WidgetRegistry，便于 Drafts 中间区域立刻预览；
-        // 同步数据库仅在用户点击「保存草稿 / 发布」或 Drafts 页「保存到服务器」。
+        // 同步数据库仅在用户点击「保存草稿 / 发布」。
         if (def && effectiveMode === 'generate_lab') {
           onLabGenerated?.(def, { status: 'draft' });
         } else if (def && effectiveMode === 'drive_lab') {
@@ -357,7 +357,7 @@ function AIChatPanelInner({
         const detail = typeof e.data === 'string' && e.data.trim() ? e.data : 'Unknown error';
         setMessages(prev =>
           prev.map(m => m.id === asstId
-            ? { ...m, content: (m.content || '') + `\n[AI 服务错误] ${detail}`, streaming: false }
+            ? { ...m, content: (m.content || '') + `\n[AI error] ${detail}`, streaming: false }
             : m
           )
         );
@@ -372,7 +372,7 @@ function AIChatPanelInner({
           prev.map(m => m.id === asstId
             ? {
                 ...m,
-                content: (m.content || '') + '\n[连接中断] 请确认后端已启动（:8000），或稍后重试。',
+                content: (m.content || '') + '\n[Connection lost] Ensure the backend is running (:8000), or try again later.',
                 streaming: false,
               }
             : m
@@ -425,9 +425,9 @@ function AIChatPanelInner({
       const commitNotice =
         status === 'draft'
           ? contentUnchanged
-            ? '已保存'
-            : '保存成功，版本更新'
-          : '发布成功';
+            ? 'Saved'
+            : 'Saved; version updated'
+          : 'Published successfully';
       setMessages(prev =>
         prev.map(m =>
           m.id === msgId
@@ -620,7 +620,7 @@ function AIChatPanelInner({
                   {/* Candidate selector tabs */}
                   {hasMultiple && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '10px', color: '#a78bfa', fontWeight: 600 }}>方案:</span>
+                      <span style={{ fontSize: '10px', color: '#a78bfa', fontWeight: 600 }}>Option:</span>
                       {candidates.map((cand, idx) => (
                         <button
                           key={idx}
@@ -644,13 +644,13 @@ function AIChatPanelInner({
                     Lab definition ready: <strong style={{ color: '#fff' }}>{selectedDef.registryKey}</strong>
                     {hasMultiple && <span style={{ color: '#6b7280' }}> ({selectedIndex + 1}/{candidates.length})</span>}
                     <br />
-                    左侧 Drafts 预览已更新；你可以继续在对话中提出修改来<strong style={{ color: '#fcd34d' }}>迭代改进当前方案</strong>。需要持久化时，点击下方将当前方案同步到服务器：
+                    Drafts preview is updated. Keep chatting to <strong style={{ color: '#fcd34d' }}>iterate on this design</strong>. To persist, sync to the server below:
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
                     <button type="button"
                       onClick={() => commitGeneratedLab(msg.id, selectedDef, 'draft', selectedIndex)}
                       style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #fbbf24', background: 'rgba(251,191,36,0.12)', color: '#fcd34d', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                      保存草稿（同步服务器）
+                      Save draft (sync to server)
                     </button>
                     <button type="button"
                       onClick={() => commitGeneratedLab(msg.id, selectedDef, 'published', selectedIndex)}
@@ -722,10 +722,10 @@ function AIChatPanelInner({
             generateBaseRegistryKey ? (
               <>
                 <div style={{ fontSize: '11px', fontWeight: 800, color: '#f5f3ff' }}>
-                  迭代基于已选实验
+                  Iterating from selected lab
                 </div>
                 <div style={{ fontSize: '11px', color: 'rgba(233,213,255,0.86)' }}>
-                  <span style={{ fontWeight: 700, color: '#ffffff' }}>「{generateBaseTitle?.trim() || generateBaseRegistryKey}」</span>
+                  <span style={{ fontWeight: 700, color: '#ffffff' }}>&ldquo;{generateBaseTitle?.trim() || generateBaseRegistryKey}&rdquo;</span>
                   <span
                     style={{
                       marginLeft: '8px',
@@ -759,17 +759,14 @@ function AIChatPanelInner({
                     </code>
                   </span>
                 </div>
-                <div style={{ fontSize: '10px', color: 'rgba(233,213,255,0.72)' }}>
-                  生成后 Drafts 会立即预览；需要持久化时再点「保存草稿」或 Drafts 页「保存到服务器」。
-                </div>
               </>
             ) : (
               <>
                 <div style={{ fontSize: '11px', fontWeight: 800, color: '#f5f3ff' }}>
-                  从零生成实验
+                  Generate from scratch
                 </div>
                 <div style={{ fontSize: '10px', color: 'rgba(233,213,255,0.72)' }}>
-                  选中左侧实验后，将围绕该实验迭代生成。
+                  Select a lab on the left to iterate from it.
                 </div>
               </>
             )
@@ -779,7 +776,7 @@ function AIChatPanelInner({
                 Drive mode
               </div>
               <div style={{ fontSize: '10px', color: 'rgba(219,234,254,0.78)' }}>
-                AI 将控制当前实验的状态。
+                {"The AI drives this lab's runtime state."}
               </div>
             </>
           )}
