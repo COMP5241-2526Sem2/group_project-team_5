@@ -573,6 +573,58 @@ export default function AssessmentGenerate() {
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [creatingPaper, setCreatingPaper] = useState(false);
   const [generateNonce, setGenerateNonce] = useState(0);
+  const hasGeneratedQuestions = genDone && questions.length > 0;
+  const hasUnsavedGeneratedQuestions = hasGeneratedQuestions && savedIds.size < questions.length;
+
+  function resetGeneratedResult() {
+    setGenerating(false);
+    setGenDone(false);
+    setGenPhase('questions');
+    setGenProgress(0);
+    setIllustProgress(0);
+    setQuestions([]);
+    setSavedIds(new Set());
+    setExpandedQ(null);
+  }
+
+  function confirmDiscardGeneratedQuestions(): boolean {
+    if (!hasUnsavedGeneratedQuestions) return true;
+    const ok = window.confirm(
+      'You have generated questions that are not saved. Leave this page section now? Unsaved generated questions will be discarded.'
+    );
+    if (!ok) return false;
+    resetGeneratedResult();
+    return true;
+  }
+
+  function handleSourceTabChange(nextTab: SourceTab) {
+    if (nextTab === sourceTab) return;
+    if (!confirmDiscardGeneratedQuestions()) return;
+    if (hasGeneratedQuestions) {
+      // Always start from a clean slate when changing source flow.
+      resetGeneratedResult();
+    }
+    setSourceTab(nextTab);
+    setStep(1);
+  }
+
+  function handleLeaveReviewStep() {
+    if (!confirmDiscardGeneratedQuestions()) return;
+    if (hasGeneratedQuestions) {
+      resetGeneratedResult();
+    }
+    setStep(sourceTab === 'questions' ? 1 : 2);
+  }
+
+  useEffect(() => {
+    if (!hasUnsavedGeneratedQuestions) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [hasUnsavedGeneratedQuestions]);
 
   function inferEffectiveSubject(): string {
     if (sourceTab === 'textbook' && tbSubject) return tbSubject;
@@ -1072,7 +1124,7 @@ export default function AssessmentGenerate() {
                 const Icon = tab.icon;
                 const isActive = sourceTab === tab.id;
                 return (
-                  <button key={tab.id} onClick={() => setSourceTab(tab.id)}
+                  <button key={tab.id} onClick={() => handleSourceTabChange(tab.id)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '6px',
                       padding: '7px 10px', borderRadius: '6px', cursor: 'pointer',
@@ -2252,7 +2304,7 @@ export default function AssessmentGenerate() {
 
             {/* Footer nav */}
             <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '24px' }}>
-              <button onClick={() => setStep(sourceTab === 'questions' ? 1 : 2)}
+              <button onClick={handleLeaveReviewStep}
                 style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 22px', borderRadius: '9px', border: '1px solid #e8eaed', background: '#fff', color: '#374151', fontSize: '14px', cursor: 'pointer' }}>
                 <ChevronLeft size={15} /> Back
               </button>
