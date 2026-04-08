@@ -348,7 +348,7 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
         onConfirm={() => {
           const path = pendingNavPath;
           setPendingNavPath(null);
-          cancelGeneration('已中断生成（用户切换页面）');
+          cancelGeneration('Generation interrupted (user switched pages)');
           if (path) navigate(path);
         }}
       />
@@ -404,10 +404,10 @@ function InterruptGenerationModal({
         }}
       >
         <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f0f23', marginBottom: '10px' }}>
-          正在生成中，切换页面会中断生成
+          Generation in progress: switching pages will interrupt it
         </div>
         <div style={{ fontSize: '13px', color: '#6b7280', lineHeight: 1.65, marginBottom: '20px' }}>
-          当前有一条 AI 生成/流式响应仍在进行。继续跳转将<strong style={{ color: '#111827' }}>终止本次生成</strong>，并可能导致未保存的输出丢失。
+          An AI generation/streaming response is still running. Continuing will <strong style={{ color: '#111827' }}>terminate this generation</strong> and may cause unsaved output to be lost.
         </div>
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
           <button
@@ -423,7 +423,7 @@ function InterruptGenerationModal({
               color: '#374151',
             }}
           >
-            取消
+            Cancel
           </button>
           <button
             type="button"
@@ -439,7 +439,7 @@ function InterruptGenerationModal({
               cursor: 'pointer',
             }}
           >
-            继续并中断生成
+            Continue and Interrupt
           </button>
         </div>
       </div>

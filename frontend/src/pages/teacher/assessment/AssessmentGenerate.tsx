@@ -10,7 +10,7 @@ import {
   PenLine, Copy,
 } from 'lucide-react';
 import { CustomSelect, SelectField } from '../../../components/teacher/CustomSelect';
-import { previewGenerateQuestionsApi } from '../../../utils/aiQuestionGenApi';
+import { previewGenerateQuestionsApi, previewGenerateQuestionsMultimodalApi } from '../../../utils/aiQuestionGenApi';
 import { createPaperApi } from '../../../utils/paperApi';
 import { extractSourceTextApi } from '../../../utils/sourceExtractionApi';
 
@@ -209,47 +209,47 @@ interface TbEdition { id: string; name: string; subtitle: string; color: string;
 
 const TB_EDITION_DATA: Record<string, { name: string; subtitle: string; color: string; year: string }[]> = {
   'English': [
-    { name: 'Go for it!',           subtitle: '人教版英语 Go for it!',    color: '#3b5bdb', year: '2024版' },
-    { name: 'New Standard English', subtitle: '人教版新标准英语',          color: '#0891b2', year: '2022版' },
+    { name: 'Go for it!',           subtitle: 'PEP English: Go for it!',    color: '#3b5bdb', year: '2024 Edition' },
+    { name: 'New Standard English', subtitle: 'PEP New Standard English',    color: '#0891b2', year: '2022 Edition' },
   ],
   'Mathematics': [
-    { name: '数学 A版', subtitle: '人教版数学（A版）', color: '#7c3aed', year: '2024版' },
-    { name: '数学 B版', subtitle: '人教版数学（B版）', color: '#6d28d9', year: '2023版' },
+    { name: 'Mathematics A Edition', subtitle: 'PEP Mathematics (A Edition)', color: '#7c3aed', year: '2024 Edition' },
+    { name: 'Mathematics B Edition', subtitle: 'PEP Mathematics (B Edition)', color: '#6d28d9', year: '2023 Edition' },
   ],
   'Physics': [
-    { name: '物理（必修）',       subtitle: '人教版物理必修系列',    color: '#0e7490', year: '2024版' },
-    { name: '物理（选择性必修）', subtitle: '人教版选修系列',        color: '#164e63', year: '2023版' },
+    { name: 'Physics (Required)',       subtitle: 'PEP Physics Required Series',    color: '#0e7490', year: '2024 Edition' },
+    { name: 'Physics (Selective Required)', subtitle: 'PEP Elective Series',        color: '#164e63', year: '2023 Edition' },
   ],
   'Chemistry': [
-    { name: '化学（必修）',       subtitle: '人教版化学必修系列',   color: '#16a34a', year: '2024版' },
-    { name: '化学（选择性必修）', subtitle: '人教版选修系列',       color: '#15803d', year: '2023版' },
+    { name: 'Chemistry (Required)',       subtitle: 'PEP Chemistry Required Series',   color: '#16a34a', year: '2024 Edition' },
+    { name: 'Chemistry (Selective Required)', subtitle: 'PEP Elective Series',       color: '#15803d', year: '2023 Edition' },
   ],
   'Biology': [
-    { name: '生物学（必修）',       subtitle: '人教版生物必修系列', color: '#ca8a04', year: '2024版' },
-    { name: '生物学（选择性必修）', subtitle: '人教版选修系列',     color: '#a16207', year: '2023版' },
+    { name: 'Biology (Required)',       subtitle: 'PEP Biology Required Series', color: '#ca8a04', year: '2024 Edition' },
+    { name: 'Biology (Selective Required)', subtitle: 'PEP Elective Series',     color: '#a16207', year: '2023 Edition' },
   ],
   'History': [
-    { name: '中外历史纲要（上）', subtitle: '人教版历史必修', color: '#dc2626', year: '2024版' },
-    { name: '选择性必修系列',     subtitle: '人教版历史选修', color: '#b91c1c', year: '2023版' },
+    { name: 'Chinese & World History Outline (Vol.1)', subtitle: 'PEP History Required', color: '#dc2626', year: '2024 Edition' },
+    { name: 'Selective Required Series',     subtitle: 'PEP History Elective', color: '#b91c1c', year: '2023 Edition' },
   ],
   'Geography': [
-    { name: '地理（必修）',       subtitle: '人教版地理必修系列', color: '#059669', year: '2024版' },
-    { name: '地理（选择性必修）', subtitle: '人教版选修系列',     color: '#047857', year: '2023版' },
+    { name: 'Geography (Required)',       subtitle: 'PEP Geography Required Series', color: '#059669', year: '2024 Edition' },
+    { name: 'Geography (Selective Required)', subtitle: 'PEP Elective Series',     color: '#047857', year: '2023 Edition' },
   ],
 };
 
 const PUBLISHER_SHORT: Record<string, string> = {
-  "PEP (People's Education Press)": '人教版',
-  'Beijing Normal University Press': '北师大版',
-  'Jiangsu Education Press': '苏教版',
-  'Oxford University Press': 'Oxford版',
+  "PEP (People's Education Press)": 'PEP',
+  'Beijing Normal University Press': 'BNU Press',
+  'Jiangsu Education Press': 'JSEP',
+  'Oxford University Press': 'Oxford',
 };
 
 function getTbEditions(publisher: string, grade: string, subject: string, semester: string): TbEdition[] {
   const pubLabel = PUBLISHER_SHORT[publisher] || publisher.split(' ')[0];
-  const volLabel = semester === 'Vol.1' ? '上册' : '下册';
+  const volLabel = semester === 'Vol.1' ? 'Volume 1' : 'Volume 2';
   const base = TB_EDITION_DATA[subject] ?? [
-    { name: `${pubLabel}${subject}`, subtitle: `${pubLabel}${subject}`, color: '#3b5bdb', year: '2024版' },
+    { name: `${pubLabel} ${subject}`, subtitle: `${pubLabel} ${subject}`, color: '#3b5bdb', year: '2024 Edition' },
   ];
   return base.map((e, i) => ({
     ...e,
@@ -494,7 +494,7 @@ export default function AssessmentGenerate() {
   const [examGenMode, setExamGenMode] = useState<ExamGenMode>('error-questions');
   const [examMatchMode, setExamMatchMode] = useState<'type' | 'knowledge'>('type');
   const [examDifficulty, setExamDifficulty] = useState<'basic' | 'solid' | 'advanced'>('solid');
-  const [examFiles, setExamFiles] = useState<{ name: string; size: number; url: string }[]>([]);
+  const [examFiles, setExamFiles] = useState<{ name: string; size: number; url: string; file?: File; extractedText?: string }[]>([]);
   const [examDragging, setExamDragging] = useState(false);
   const examFileRef = useRef<HTMLInputElement>(null);
   const [bankSearch, setBankSearch] = useState('');
@@ -608,8 +608,10 @@ export default function AssessmentGenerate() {
       return [tbPublisher, tbGrade, tbSubject, tbSemester, tbEdition, chosenSections].filter(Boolean).join(' ');
     }
     if (sourceTab === 'exam') {
+      const extracted = examFiles.map((f) => (f.extractedText || '').trim()).filter(Boolean).join('\n\n');
+      if (extracted) return extracted;
       const fileNames = examFiles.map((f) => f.name).join(' ');
-      return [fileNames, examGenMode, examMatchMode, examDifficulty].filter(Boolean).join(' ');
+      return [fileNames, examGenMode, examMatchMode].filter(Boolean).join(' ');
     }
 
     if (qInputMode === 'paste') {
@@ -703,10 +705,13 @@ export default function AssessmentGenerate() {
         ? (tbSemester.includes('Vol.2') ? 'Vol.2' : tbSemester.includes('Vol.1') ? 'Vol.1' : null)
         : null;
 
+      const effectiveSubject = inferEffectiveSubject();
+      const resolvedGrade = sourceTab === 'textbook' && tbGrade ? tbGrade : 'Unspecified';
+
       const response = await createPaperApi({
-        title: `AI Generated ${inferEffectiveSubject()} Paper ${new Date().toISOString().slice(0, 10)}`,
-        grade: tbGrade || 'Grade 7',
-        subject: inferEffectiveSubject(),
+        title: `AI Generated ${effectiveSubject} Paper ${new Date().toISOString().slice(0, 10)}`,
+        grade: resolvedGrade,
+        subject: effectiveSubject,
         semester: resolvedSemester,
         exam_type: sourceTab === 'exam' ? 'simulation' : 'ai_generated',
         duration_min: 45,
@@ -751,6 +756,8 @@ export default function AssessmentGenerate() {
     if (!files) return;
     const newFiles = Array.from(files).slice(0, Math.max(0, 5 - examFiles.length)).map(f => ({
       name: f.name, size: f.size,
+      file: f,
+      extractedText: '',
       url: f.type.startsWith('image/') ? URL.createObjectURL(f) : '',
     }));
     setExamFiles(prev => [...prev, ...newFiles].slice(0, 5));
@@ -761,6 +768,28 @@ export default function AssessmentGenerate() {
   }
 
   function totalQ() { return qTypes.filter(t => t.active).reduce((s, t) => s + t.count, 0); }
+
+  function examDifficultyToApiDifficulty(
+    d: 'basic' | 'solid' | 'advanced'
+  ): 'easy' | 'medium' | 'hard' {
+    if (d === 'basic') return 'easy';
+    if (d === 'advanced') return 'hard';
+    return 'medium';
+  }
+
+  function isTextExtractSupported(file: File): boolean {
+    const name = (file.name || '').toLowerCase();
+    if (name.endsWith('.pdf') || name.endsWith('.txt') || name.endsWith('.md') || name.endsWith('.docx')) {
+      return true;
+    }
+    const mime = (file.type || '').toLowerCase();
+    return (
+      mime === 'application/pdf' ||
+      mime === 'text/plain' ||
+      mime === 'text/markdown' ||
+      mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    );
+  }
 
   function canProceedStep1() {
     if (sourceTab === 'upload') return !!uploadedFile;
@@ -794,19 +823,44 @@ export default function AssessmentGenerate() {
     }
     const effectiveSubject = inferEffectiveSubject();
     let sourceMaterial = buildSourceMaterialText();
+    if (sourceTab === 'exam' && examFiles.length > 0) {
+      try {
+        const next = [...examFiles];
+        let changed = false;
+        for (let i = 0; i < Math.min(next.length, 2); i++) {
+          const ef = next[i];
+          if (!ef.extractedText?.trim() && ef.file && isTextExtractSupported(ef.file)) {
+            const extracted = await extractSourceTextApi(ef.file);
+            next[i] = { ...ef, extractedText: extracted.source_text };
+            changed = true;
+          }
+        }
+        if (changed) {
+          setExamFiles(next);
+          const extractedAll = next.map((f) => (f.extractedText || '').trim()).filter(Boolean).join('\n\n');
+          if (extractedAll) sourceMaterial = extractedAll;
+        }
+      } catch {
+        // Keep filename fallback for preview when extraction fails.
+      }
+    }
     if (sourceTab === 'upload' && uploadedFile?.file) {
       try {
-        const extracted = await extractSourceTextApi(uploadedFile.file);
-        sourceMaterial = extracted.source_text;
-        setUploadedFile((prev) => prev ? { ...prev, extractedText: extracted.source_text } : prev);
+        if (isTextExtractSupported(uploadedFile.file)) {
+          const extracted = await extractSourceTextApi(uploadedFile.file);
+          sourceMaterial = extracted.source_text;
+          setUploadedFile((prev) => prev ? { ...prev, extractedText: extracted.source_text } : prev);
+        }
       } catch {
         // fallback to filename when extraction fails
       }
     }
+    const effectiveDifficulty =
+      sourceTab === 'exam' ? examDifficultyToApiDifficulty(examDifficulty) : difficulty;
     const materialKeywords = extractKeywords(sourceMaterial);
     const subjectDefaults = SUBJECT_TOPICS[effectiveSubject] ?? SUBJECT_TOPICS.Biology;
     const topicPool = uniqueKeepOrder([...materialKeywords, ...subjectDefaults]).slice(0, 20);
-    const seedKey = `${effectiveSubject}|${sourceMaterial}|${difficulty}|${sourceTab}|${nextNonce}`;
+    const seedKey = `${effectiveSubject}|${sourceMaterial}|${effectiveDifficulty}|${sourceTab}|${nextNonce}`;
     const typeTargets = qTypes
       .filter((qt) => qt.active)
       .reduce<Record<string, number>>((acc, qt) => {
@@ -820,14 +874,47 @@ export default function AssessmentGenerate() {
 
     let qs = buildGeneratedQuestions(effectiveSubject, topicPool, seedKey);
     try {
-      const preview = await previewGenerateQuestionsApi({
-        source_text: sourceMaterial || `${effectiveSubject} ${tbGrade || 'Grade 7'} ${difficulty}`,
-        subject: effectiveSubject,
-        grade: tbGrade || 'Grade 7',
-        difficulty,
+      const previewSourceText = (() => {
+        if (sourceTab === 'text') {
+          return (sourceMaterial || textInput).trim();
+        }
+        if (sourceTab === 'textbook') {
+          const m = sourceMaterial.trim();
+          return m || `${effectiveSubject} ${tbGrade || 'Grade 7'} ${effectiveDifficulty}`.trim();
+        }
+        const m = sourceMaterial.trim();
+        if (m) return m;
+        if (sourceTab === 'upload' && uploadedFile?.name) return uploadedFile.name.trim();
+        if (sourceTab === 'exam' && examFiles.length > 0) {
+          return examFiles.map((f) => f.name).join(' ').trim();
+        }
+        return '[no extractable text]';
+      })();
+
+      const previewPayload: Parameters<typeof previewGenerateQuestionsApi>[0] = {
+        source_text: previewSourceText,
+        difficulty: effectiveDifficulty,
         question_count: totalQ(),
         type_targets: typeTargets,
-      });
+      };
+      if (sourceTab === 'textbook') {
+        previewPayload.subject = effectiveSubject;
+        previewPayload.grade = tbGrade || 'Grade 7';
+      }
+      if (sourceTab === 'exam') {
+        previewPayload.task_type = examGenMode === 'simulation' ? 'simulation' : 'error_based';
+        previewPayload.match_mode = examMatchMode;
+      }
+      const examBinaryFiles =
+        sourceTab === 'exam'
+          ? examFiles
+              .map((f) => f.file)
+              .filter((f): f is File => Boolean(f))
+          : [];
+      const preview =
+        sourceTab === 'exam' && examBinaryFiles.length > 0
+          ? await previewGenerateQuestionsMultimodalApi(previewPayload, examBinaryFiles)
+          : await previewGenerateQuestionsApi(previewPayload);
       if (preview.questions.length > 0) {
         qs = preview.questions.map((q, idx) => ({
           id: `gq-${idx + 1}`,
@@ -1096,7 +1183,7 @@ export default function AssessmentGenerate() {
                 <div style={{ marginTop: '6px', fontSize: '11px', color: '#9ca3af', textAlign: 'right', display: 'flex', justifyContent: 'flex-end', flexWrap: 'wrap', gap: '6px' }}>
                   <span>{textInput.length} characters</span>
                   {textInput.trim().length < TEXT_SOURCE_MIN_CHARS && (
-                    <span style={{ color: '#b45309' }}>· 至少还需 {TEXT_SOURCE_MIN_CHARS - textInput.trim().length} 字可进入下一步</span>
+                    <span style={{ color: '#b45309' }}>· At least {TEXT_SOURCE_MIN_CHARS - textInput.trim().length} more characters are required to continue</span>
                   )}
                 </div>
               </div>
@@ -1111,7 +1198,7 @@ export default function AssessmentGenerate() {
                   <SelectField label="Publisher" options={PUBLISHERS}                       placeholder="Select publisher"  value={tbPublisher} onChange={v => { setTbPublisher(v); tbResetAll(); }} />
                   <SelectField label="Grade"     options={GRADES}                           placeholder="Select grade"      value={tbGrade}     onChange={v => { setTbGrade(v);     tbResetAll(); }} />
                   <SelectField label="Subject"   options={SUBJECTS}                         placeholder="Select subject"    value={tbSubject}   onChange={v => { setTbSubject(v);   tbResetAll(); }} />
-                  <SelectField label="Semester"  options={['Vol.1 · 上册', 'Vol.2 · 下册']} placeholder="Select semester"   value={tbSemester}  onChange={v => { setTbSemester(v);  tbResetEdition(); }} />
+                  <SelectField label="Semester"  options={['Vol.1 · Volume 1', 'Vol.2 · Volume 2']} placeholder="Select semester"   value={tbSemester}  onChange={v => { setTbSemester(v);  tbResetEdition(); }} />
                 </div>
 
                 {/* ── Step B: 教材版本选择 ── */}
@@ -1120,8 +1207,8 @@ export default function AssessmentGenerate() {
                   const editions = getTbEditions(tbPublisher || "PEP (People's Education Press)", tbGrade || 'Grade 7', tbSubject, semKey);
                   return (
                     <div style={{ background: '#fff', border: '1px solid #e8eaed', borderRadius: '12px', padding: '18px 20px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>教材版本</div>
-                      <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '14px' }}>选择你所使用的具体版本教材</div>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>Textbook Edition</div>
+                      <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '14px' }}>Select the specific textbook edition you use</div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {editions.map(ed => {
                           const active = tbEdition === ed.id;
@@ -1192,11 +1279,11 @@ export default function AssessmentGenerate() {
                   <div style={{ border: '1px solid #e8eaed', borderRadius: '12px', overflow: 'hidden', background: '#fff' }}>
                     {/* Header */}
                     <div style={{ padding: '16px 20px', borderBottom: '1px solid #f0f2f5' }}>
-                      <div style={{ fontSize: '15px', fontWeight: 700, color: '#0f0f23', marginBottom: '2px' }}>选择练习内容</div>
+                      <div style={{ fontSize: '15px', fontWeight: 700, color: '#0f0f23', marginBottom: '2px' }}>Select Practice Content</div>
                       <div style={{ fontSize: '12px', color: '#9ca3af' }}>
                         {selectedSections.size > 0
-                          ? `已选 ${selectedSections.size} 个知识点 · 点击章节或标签可单独勾选`
-                          : '点击章节复选框全选该章，或点击标签选择单个知识点'}
+                          ? `${selectedSections.size} knowledge point(s) selected · click chapters or tags to select individually`
+                          : 'Click a chapter checkbox to select all in that chapter, or click tags to select individual knowledge points'}
                       </div>
                     </div>
 
@@ -1278,15 +1365,15 @@ export default function AssessmentGenerate() {
                         justifyContent: 'space-between',
                       }}>
                         <span style={{ fontSize: '13px', fontWeight: 600, color: '#3b5bdb' }}>
-                          已选 {selectedSections.size} 个知识点
+                          {selectedSections.size} knowledge point(s) selected
                           {Array.from(new Set([...selectedSections].map((k: string) => k.split('::')[0]))).length > 0 &&
-                            ` · 跨 ${Array.from(new Set([...selectedSections].map((k: string) => k.split('::')[0]))).length} 个章节`}
+                            ` · across ${Array.from(new Set([...selectedSections].map((k: string) => k.split('::')[0]))).length} chapter(s)`}
                         </span>
                         <button
                           onClick={() => setSelectedSections(new Set())}
                           style={{ fontSize: '12px', color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                         >
-                          清除全部
+                          Clear all
                         </button>
                       </div>
                     )}
@@ -1299,7 +1386,7 @@ export default function AssessmentGenerate() {
                     <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
                       <BookOpen size={22} style={{ color: '#d1d5db' }} />
                     </div>
-                    请依次选择出版社、年级、科目和学期，再选择教材版本
+                    Please select publisher, grade, subject, and semester first, then choose a textbook edition
                   </div>
                 )}
 
@@ -1324,10 +1411,8 @@ export default function AssessmentGenerate() {
                       {
                         id: 'error-questions' as ExamGenMode,
                         Icon: PenLine,
-                        label: '出试卷错题',
-                        labelEn: 'Error-Based Questions',
-                        desc: '根据批改后的试卷，针对错题生成专项复习题',
-                        descEn: 'Generate targeted review questions from a graded exam with marked mistakes',
+                        label: 'Error-Based Questions',
+                        desc: 'Generate targeted review questions from mistakes in graded exam papers',
                         color: '#dc2626',
                         activeBorder: '#fca5a5',
                         activeBg: '#fff5f5',
@@ -1336,10 +1421,8 @@ export default function AssessmentGenerate() {
                       {
                         id: 'simulation' as ExamGenMode,
                         Icon: Copy,
-                        label: '出试卷仿题',
-                        labelEn: 'Question Simulation',
-                        desc: '根据空白试卷结构，仿照题型生成相似题目',
-                        descEn: 'Generate similar questions mirroring the structure of a blank exam paper',
+                        label: 'Question Simulation',
+                        desc: 'Generate similar questions based on the structure of a blank exam paper',
                         color: '#0891b2',
                         activeBorder: '#67e8f9',
                         activeBg: '#ecfeff',
@@ -1373,9 +1456,6 @@ export default function AssessmentGenerate() {
                               <div style={{ fontSize: '14px', fontWeight: 700, color: active ? m.color : '#374151', lineHeight: 1.25 }}>
                                 {m.label}
                               </div>
-                              <div style={{ fontSize: '11px', color: active ? m.color : '#9ca3af', fontWeight: 500 }}>
-                                {m.labelEn}
-                              </div>
                             </div>
                             {active && (
                               <div style={{
@@ -1388,11 +1468,8 @@ export default function AssessmentGenerate() {
                             )}
                           </div>
                           <div style={{ paddingLeft: '46px' }}>
-                            <p style={{ margin: '0 0 2px', fontSize: '12px', color: active ? m.color : '#6b7280', lineHeight: 1.5, opacity: active ? 0.85 : 1 }}>
+                            <p style={{ margin: 0, fontSize: '12px', color: active ? m.color : '#6b7280', lineHeight: 1.5, opacity: active ? 0.85 : 1 }}>
                               {m.desc}
-                            </p>
-                            <p style={{ margin: 0, fontSize: '11px', color: '#9ca3af', lineHeight: 1.4 }}>
-                              {m.descEn}
                             </p>
                           </div>
                         </button>
@@ -1662,14 +1739,14 @@ export default function AssessmentGenerate() {
         {step === 2 && (
           <div>
             <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f0f23', margin: '0 0 4px' }}>
-              {sourceTab === 'exam' ? '定制题目要求' : 'Configure Questions'}
+              {sourceTab === 'exam' ? 'Customize Question Requirements' : 'Configure Questions'}
             </h2>
             <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '24px' }}>
               {sourceTab === 'exam'
-                ? '设置题目匹配方式与难度级别，AI 将依此生成针对性题目。'
+                ? 'Configure matching strategy and difficulty level; AI will generate targeted questions accordingly.'
                 : sourceTab === 'textbook'
-                  ? '教材与年级已在第 1 步选择。此处设置题型、难度与配图等。'
-                  : '设置题型、难度与配图等'}
+                  ? 'Textbook and grade are selected in Step 1. Configure types, difficulty, and illustrations here.'
+                  : 'Configure question types, difficulty, and illustrations.'}
             </p>
 
             {/* ── Exam Paper simplified config ── */}
@@ -1677,18 +1754,18 @@ export default function AssessmentGenerate() {
               <div>
                 {/* 题目匹配方式 */}
                 <div style={{ background: '#fff', border: '1px solid #e8eaed', borderRadius: '12px', padding: '20px 22px', marginBottom: '16px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '14px' }}>题目匹配方式</div>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '14px' }}>Question Matching Mode</div>
                   <div style={{ display: 'flex', gap: '12px' }}>
                     {([
                       {
                         id: 'type' as const,
-                        label: '题型一致',
-                        desc: `生成的题目与试卷错题一致（每个错题生成 5 道针对性复习题）`,
+                        label: 'Match Question Type',
+                        desc: `Generate questions with the same type as wrong questions (5 targeted review questions per wrong question)`,
                       },
                       {
                         id: 'knowledge' as const,
-                        label: '知识点一致',
-                        desc: `考查相同知识点，但题型可以不同（每个错题生成 5 道针对性复习题）`,
+                        label: 'Match Knowledge Point',
+                        desc: `Target the same knowledge points with flexible question types (5 targeted review questions per wrong question)`,
                       },
                     ]).map(m => {
                       const active = examMatchMode === m.id;
@@ -1719,12 +1796,12 @@ export default function AssessmentGenerate() {
 
                 {/* 难度级别 */}
                 <div style={{ background: '#fff', border: '1px solid #e8eaed', borderRadius: '12px', padding: '20px 22px', marginBottom: '28px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '14px' }}>难度级别</div>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '14px' }}>Difficulty Level</div>
                   <div style={{ display: 'flex', gap: '12px' }}>
                     {([
-                      { id: 'basic' as const,    label: '基础', sub: '巩固基本概念' },
-                      { id: 'solid' as const,    label: '巩固', sub: '加强练习理解' },
-                      { id: 'advanced' as const, label: '拔高', sub: '挑战思维能力' },
+                      { id: 'basic' as const,    label: 'Basic', sub: 'Reinforce core concepts' },
+                      { id: 'solid' as const,    label: 'Solid', sub: 'Strengthen understanding through practice' },
+                      { id: 'advanced' as const, label: 'Advanced', sub: 'Challenge higher-order thinking' },
                     ]).map(d => {
                       const active = examDifficulty === d.id;
                       return (
@@ -1984,9 +2061,18 @@ export default function AssessmentGenerate() {
                     ...(sourceTab === 'textbook'
                       ? [{ label: 'Grade & Subject', val: `${tbGrade || '—'} · ${tbSubject || '—'}` }]
                       : []),
-                    { label: 'Difficulty', val: difficulty },
+                    { label: 'Difficulty', val: sourceTab === 'exam' ? examDifficultyToApiDifficulty(examDifficulty) : difficulty },
+                    ...(sourceTab === 'exam'
+                      ? [
+                          { label: 'Task Type', val: examGenMode === 'simulation' ? 'Question Simulation' : 'Error-Based Questions' },
+                          { label: 'Match Mode', val: examMatchMode === 'type' ? 'Match Question Type' : 'Match Knowledge Point' },
+                          { label: 'Question Structure', val: 'Controlled by exam mode + backend constraints' },
+                        ]
+                      : []),
                     { label: 'Illustrations', val: illustEnabled ? `${ILLUST_STYLES.find(s => s.id === illustStyle)?.label} · ${illustTypes.size} type(s)` : 'Disabled' },
-                    ...qTypes.filter(t => t.active).map(t => ({ label: t.label, val: `${t.count} questions` })),
+                    ...(sourceTab === 'exam'
+                      ? []
+                      : qTypes.filter(t => t.active).map(t => ({ label: t.label, val: `${t.count} questions` }))),
                   ].map((row, i) => (
                     <div key={i} style={{ minWidth: 0 }}>
                       <div style={{ fontSize: '10px', color: '#9ca3af', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{row.label}</div>

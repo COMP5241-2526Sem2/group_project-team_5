@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from openai import AsyncOpenAI
 
@@ -51,6 +53,7 @@ class AIQuestionGenService:
             for attempt in range(1, max_attempts + 1):
                 try:
                     generated = await AIQuestionGenService._llm_generate(payload, type_targets)
+                    generated = AIQuestionGenService._enforce_type_targets(generated, payload, type_targets)
                     if generated:
                         return AIQuestionGenPreviewResponse(
                             questions=generated[: payload.question_count],
@@ -75,6 +78,7 @@ class AIQuestionGenService:
                     await asyncio.sleep(min(0.5 * attempt, 1.5))
 
             fallback = AIQuestionGenService._heuristic_generate(payload, type_targets)
+            fallback = AIQuestionGenService._enforce_type_targets(fallback, payload, type_targets)
             warning = "LLM unavailable or returned empty output; heuristic fallback was used."
             if last_error is not None:
                 warning = f"LLM call failed ({type(last_error).__name__}); heuristic fallback was used."
@@ -88,6 +92,7 @@ class AIQuestionGenService:
         provider_mismatch = provider not in {"openai", "ohmygpt", "heuristic"}
 
         fallback = AIQuestionGenService._heuristic_generate(payload, type_targets)
+        fallback = AIQuestionGenService._enforce_type_targets(fallback, payload, type_targets)
         warning: str | None = None
         if key_missing:
             warning = "LLM provider is enabled but API key is missing; heuristic fallback was used."
@@ -97,6 +102,51 @@ class AIQuestionGenService:
             questions=fallback[: payload.question_count],
             generation_mode="heuristic",
             warning=warning,
+        )
+
+    @staticmethod
+    async def preview_generate_multimodal(
+        payload: AIQuestionGenPreviewRequest,
+        files: list[tuple[str, str, bytes]],
+    ) -> AIQuestionGenPreviewResponse:
+        # No files -> behave like normal preview path.
+        if not files:
+            return await AIQuestionGenService.preview_generate(payload)
+
+        type_targets = payload.type_targets or AIQuestionGenService._default_type_targets(payload.question_count)
+        provider = settings.quiz_generation_provider.strip().lower()
+        if AIQuestionGenService._llm_enabled():
+            max_attempts = max(1, settings.quiz_generation_llm_max_retries)
+            last_error: Exception | None = None
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    generated = await AIQuestionGenService._llm_generate_multimodal(payload, type_targets, files)
+                    generated = AIQuestionGenService._enforce_type_targets(generated, payload, type_targets)
+                    if generated:
+                        return AIQuestionGenPreviewResponse(
+                            questions=generated[: payload.question_count],
+                            generation_mode="llm",
+                        )
+                except Exception as exc:
+                    last_error = exc
+                    logger.warning(
+                        "AI multimodal preview failed (attempt=%s/%s, provider=%s, error=%s)",
+                        attempt,
+                        max_attempts,
+                        provider,
+                        repr(exc),
+                    )
+                if attempt < max_attempts:
+                    await asyncio.sleep(min(0.5 * attempt, 1.5))
+            warning = "LLM multimodal preview returned empty output after retries."
+            if last_error is not None:
+                warning = f"LLM multimodal call failed ({type(last_error).__name__})."
+            return AIQuestionGenPreviewResponse(questions=[], generation_mode="llm", warning=warning)
+
+        return AIQuestionGenPreviewResponse(
+            questions=[],
+            generation_mode="heuristic",
+            warning="LLM provider unavailable for multimodal preview.",
         )
 
     @staticmethod
@@ -127,6 +177,9 @@ class AIQuestionGenService:
 
     @staticmethod
     async def _llm_generate(payload: AIQuestionGenPreviewRequest, type_targets: dict[str, int]) -> list[AIQuestionGenQuestion]:
+        if payload.task_type == "simulation":
+            return await AIQuestionGenService._llm_generate_simulation_two_stage(payload, type_targets)
+
         client = AIQuestionGenService._get_client()
         messages = AIQuestionGenService._build_messages(payload, type_targets)
         response = await client.chat.completions.create(
@@ -153,51 +206,262 @@ class AIQuestionGenService:
         raw_questions = parsed.get("questions", []) if isinstance(parsed, dict) else []
         if not isinstance(raw_questions, list):
             return await AIQuestionGenService._llm_generate_text_mode(payload, type_targets)
-
-        result: list[AIQuestionGenQuestion] = []
-        for item in raw_questions:
-            if not isinstance(item, dict):
-                continue
-            qtype = str(item.get("type", "")).strip()
-            prompt = AIQuestionGenService._sanitize_prompt(str(item.get("prompt", "")).strip())
-            if not qtype or not prompt:
-                continue
-
-            normalized_type = AIQuestionGenService._normalize_type_label(qtype)
-            difficulty = str(item.get("difficulty", payload.difficulty)).strip().lower()
-            if difficulty not in {"easy", "medium", "hard"}:
-                difficulty = payload.difficulty
-
-            options: list[AIQuestionGenOption] = []
-            raw_options = item.get("options", [])
-            if isinstance(raw_options, list):
-                for idx, opt in enumerate(raw_options[:4]):
-                    if not isinstance(opt, dict):
-                        continue
-                    key = str(opt.get("key", "")).strip().upper() or "ABCD"[idx]
-                    text = str(opt.get("text", "")).strip()
-                    if not text:
-                        continue
-                    options.append(AIQuestionGenOption(key=key, text=text, correct=bool(opt.get("correct", False))))
-
-            answer = item.get("answer")
-            answer_text = str(answer).strip() if answer is not None else None
-            explanation = str(item.get("explanation", "")).strip() or "Generated from source concepts."
-
-            result.append(
-                AIQuestionGenQuestion(
-                    type=normalized_type,
-                    prompt=prompt,
-                    options=options,
-                    answer=answer_text,
-                    difficulty=difficulty,
-                    explanation=explanation,
-                )
-            )
+        result = AIQuestionGenService._map_raw_questions(raw_questions, payload)
 
         if result:
             return result
         return await AIQuestionGenService._llm_generate_text_mode(payload, type_targets)
+
+    @staticmethod
+    def _to_multimodal_user_content(
+        text_intro: str,
+        files: list[tuple[str, str, bytes]],
+    ) -> list[dict[str, Any]]:
+        content: list[dict[str, Any]] = [{"type": "text", "text": text_intro}]
+        # Keep payload controlled for token/cost.
+        for (_name, ctype, data) in files[:4]:
+            if not ctype.startswith("image/"):
+                continue
+            b64 = base64.b64encode(data).decode("ascii")
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{ctype};base64,{b64}"},
+                }
+            )
+        return content
+
+    @staticmethod
+    async def _llm_generate_multimodal(
+        payload: AIQuestionGenPreviewRequest,
+        type_targets: dict[str, int],
+        files: list[tuple[str, str, bytes]],
+    ) -> list[AIQuestionGenQuestion]:
+        client = AIQuestionGenService._get_client()
+
+        stage1_messages: list[dict[str, Any]] = [
+            {
+                "role": "system",
+                "content": (
+                    "You are an exam structure analyzer. "
+                    "Infer question-type distribution and style constraints from provided exam images/text. "
+                    "Return JSON only."
+                ),
+            },
+            {
+                "role": "user",
+                "content": AIQuestionGenService._to_multimodal_user_content(
+                    "Analyze these exam files and output JSON with keys: "
+                    "inferred_type_distribution, style_constraints, key_topics, rationale. "
+                    "Do not generate final questions in this step.",
+                    files,
+                ),
+            },
+        ]
+        stage1 = await client.chat.completions.create(
+            model=settings.quiz_generation_model,
+            temperature=0.1,
+            **AIQuestionGenService._token_limit_kwargs(
+                model=settings.quiz_generation_model,
+                max_tokens=max(512, settings.quiz_generation_max_tokens // 2),
+            ),
+            response_format={"type": "json_object"},
+            messages=stage1_messages,
+        )
+        stage1_raw = stage1.choices[0].message.content if stage1.choices else None
+        stage1_parsed = AIQuestionGenService._parse_json_object(stage1_raw or "") or {}
+        blueprint = json.dumps(stage1_parsed, ensure_ascii=False)
+
+        stage2_prompt = (
+            AIQuestionGenService._format_preview_user_prompt(payload, type_targets)
+            + "\n\nsource_analysis_blueprint:\n"
+            + blueprint
+            + "\n\nUse source_analysis_blueprint as the first-priority guide for structure/style."
+        )
+        stage2_messages: list[dict[str, Any]] = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a strict Question Generation Engine. "
+                    "You MUST follow the user's requested question type distribution exactly. "
+                    "For MCQ, you MUST provide 'options' as a list of 4 items with 'key', 'text', and 'correct' fields. "
+                    "A Multiple Choice Question (MCQ) without options is invalid and forbidden. "
+                    "Return JSON only."
+                ),
+            },
+            {
+                "role": "user",
+                "content": AIQuestionGenService._to_multimodal_user_content(stage2_prompt, files),
+            },
+        ]
+        stage2 = await client.chat.completions.create(
+            model=settings.quiz_generation_model,
+            temperature=settings.quiz_generation_temperature,
+            **AIQuestionGenService._token_limit_kwargs(
+                model=settings.quiz_generation_model,
+                max_tokens=settings.quiz_generation_max_tokens,
+            ),
+            response_format={"type": "json_object"},
+            messages=stage2_messages,
+        )
+        raw = stage2.choices[0].message.content if stage2.choices else None
+        if not raw:
+            return []
+        parsed = AIQuestionGenService._parse_json_object(raw)
+        raw_questions = parsed.get("questions", []) if isinstance(parsed, dict) else []
+        if not isinstance(raw_questions, list):
+            return []
+        return AIQuestionGenService._map_raw_questions(raw_questions, payload)
+
+    @staticmethod
+    async def _llm_generate_simulation_two_stage(
+        payload: AIQuestionGenPreviewRequest,
+        type_targets: dict[str, int],
+    ) -> list[AIQuestionGenQuestion]:
+        client = AIQuestionGenService._get_client()
+
+        # Stage 1: extract source exam structure blueprint first.
+        stage1_messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are an exam structure analyzer. "
+                    "Infer question-type distribution and style constraints from the source text. "
+                    "Return JSON only."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    "Analyze the source exam content and output JSON with keys:\n"
+                    "- inferred_type_distribution: object, e.g. {\"MCQ\": 5, \"Fill-blank\": 2}\n"
+                    "- style_constraints: array of short strings\n"
+                    "- key_topics: array of short topic strings\n"
+                    "- rationale: one short sentence\n"
+                    "Do not generate final questions in this step.\n"
+                    "source_text:\n"
+                    f"{payload.source_text[:7000]}"
+                ),
+            },
+        ]
+        stage1 = await client.chat.completions.create(
+            model=settings.quiz_generation_model,
+            temperature=0.1,
+            **AIQuestionGenService._token_limit_kwargs(
+                model=settings.quiz_generation_model,
+                max_tokens=max(512, settings.quiz_generation_max_tokens // 2),
+            ),
+            response_format={"type": "json_object"},
+            messages=stage1_messages,
+        )
+        stage1_raw = stage1.choices[0].message.content if stage1.choices else None
+        stage1_parsed = AIQuestionGenService._parse_json_object(stage1_raw or "") or {}
+        blueprint = json.dumps(stage1_parsed, ensure_ascii=False)
+
+        # Stage 2: generate questions using blueprint + all runtime constraints.
+        stage2_messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a strict Question Generation Engine. "
+                    "You MUST follow the user's requested question type distribution exactly. "
+                    "For MCQ, you MUST provide 'options' as a list of 4 items with 'key', 'text', and 'correct' fields. "
+                    "A Multiple Choice Question (MCQ) without options is invalid and forbidden. "
+                    "Return JSON only."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    AIQuestionGenService._format_preview_user_prompt(payload, type_targets)
+                    + "\n\nsource_analysis_blueprint:\n"
+                    + blueprint
+                    + "\n\nUse source_analysis_blueprint as the first-priority guide for structure/style."
+                ),
+            },
+        ]
+        stage2 = await client.chat.completions.create(
+            model=settings.quiz_generation_model,
+            temperature=settings.quiz_generation_temperature,
+            **AIQuestionGenService._token_limit_kwargs(
+                model=settings.quiz_generation_model,
+                max_tokens=settings.quiz_generation_max_tokens,
+            ),
+            response_format={"type": "json_object"},
+            messages=stage2_messages,
+        )
+
+        raw = stage2.choices[0].message.content if stage2.choices else None
+        if not raw:
+            return []
+
+        parsed = AIQuestionGenService._parse_json_object(raw)
+        raw_questions = parsed.get("questions", []) if isinstance(parsed, dict) else []
+        if not isinstance(raw_questions, list):
+            return []
+        return AIQuestionGenService._map_raw_questions(raw_questions, payload)
+
+    @staticmethod
+    def _format_preview_user_prompt(payload: AIQuestionGenPreviewRequest, type_targets: dict[str, int]) -> str:
+        subj = (payload.subject or "").strip()
+        grade = (payload.grade or "").strip()
+        meta_lines: list[str] = []
+        if subj:
+            meta_lines.append(f"subject={subj}")
+        if grade:
+            meta_lines.append(f"grade={grade}")
+        if payload.task_type:
+            meta_lines.append(f"task_type={payload.task_type}")
+        if payload.match_mode:
+            meta_lines.append(f"match_mode={payload.match_mode}")
+        if not subj and not grade:
+            meta_lines.append(
+                "subject and grade: infer only from source_text; do not assume a default subject or grade."
+            )
+        if payload.task_type == "simulation":
+            meta_lines.append(
+                "simulation mode: infer and follow the source exam's question-type structure before generating questions."
+            )
+        elif payload.task_type == "error_based":
+            meta_lines.append(
+                "error_based mode: generate targeted remediation questions based on likely mistakes in source material."
+            )
+        meta_block = "\n".join(meta_lines)
+        return (
+            f"{meta_block}\n"
+            f"difficulty={payload.difficulty}\n"
+            f"question_count={payload.question_count}\n"
+            f"type_targets={json.dumps(type_targets, ensure_ascii=True)}\n"
+            "Interpretation:\n"
+            "- source_text is the TOPIC/INTENT instruction for question authoring.\n"
+            "- It is not a question stem and must never be copied verbatim into prompt.\n"
+            "Constraints:\n"
+            "1) Do not include phrases like 'according to source/provided material/uploaded document'.\n"
+            "2) Keep questions answerable standalone.\n"
+            "3) For MCQ, options are mandatory JSON structure requirements: provide exactly 4 non-empty options "
+            "A-D with fields {key, text, correct}, and exactly one option where correct=true.\n"
+            "4) For True/False provide answer as True or False.\n"
+            "5) Reflect concrete concepts from source text.\n"
+            "6) Strictly forbid instructional/meta wording in prompt, including but not limited to "
+            "'generate N questions', 'please generate', 'create questions', '生成X道题', '请生成'.\n"
+            "7) Each item must contain exactly ONE question in prompt; do not concatenate multiple questions.\n"
+            "8) prompt must be student-facing only. Do not include authoring instructions, counts, or process notes.\n"
+            "source_text:\n"
+            f"{payload.source_text[:7000]}"
+        )
+
+    @staticmethod
+    def _is_meta_instruction_prompt(prompt: str) -> bool:
+        p = (prompt or "").strip().lower()
+        if not p:
+            return True
+        if p.startswith(("generate ", "please generate", "create ", "write ")):
+            return True
+        if p.startswith(("生成", "请生成", "请出", "出 ")):
+            return True
+        if "道题" in p and ("生成" in p or "请生成" in p):
+            return True
+        return False
 
     @staticmethod
     def _build_messages(payload: AIQuestionGenPreviewRequest, type_targets: dict[str, int]) -> list[dict[str, str]]:
@@ -207,27 +471,16 @@ class AIQuestionGenService:
                 "content": (
                     "You generate high-quality school assessment questions. "
                     "Use the source text as reference but do NOT mention source/document/material in the question wording. "
+                    "You MUST follow the user's requested question type distribution exactly. "
+                    "For MCQ, you MUST provide 'options' as a list of 4 items with 'key', 'text', and 'correct' fields. "
+                    "A Multiple Choice Question (MCQ) without options is invalid and forbidden. "
                     "Return JSON only with key questions. "
                     "Each question: type, prompt, options(optional), answer(optional), difficulty, explanation."
                 ),
             },
             {
                 "role": "user",
-                "content": (
-                    f"subject={payload.subject}\n"
-                    f"grade={payload.grade}\n"
-                    f"difficulty={payload.difficulty}\n"
-                    f"question_count={payload.question_count}\n"
-                    f"type_targets={json.dumps(type_targets, ensure_ascii=True)}\n"
-                    "Constraints:\n"
-                    "1) Do not include phrases like 'according to source/provided material/uploaded document'.\n"
-                    "2) Keep questions answerable standalone.\n"
-                    "3) For MCQ provide exactly 4 options A-D and exactly one correct option.\n"
-                    "4) For True/False provide answer as True or False.\n"
-                    "5) Reflect concrete concepts from source text.\n"
-                    "source_text:\n"
-                    f"{payload.source_text[:7000]}"
-                ),
+                "content": AIQuestionGenService._format_preview_user_prompt(payload, type_targets),
             },
         ]
 
@@ -256,48 +509,91 @@ class AIQuestionGenService:
                 normalized_raw = raw
             reparsed = AIQuestionGenService._parse_json_object(normalized_raw)
             if reparsed and isinstance(reparsed.get("questions"), list):
-                # Let the main mapper process by simulating the existing loop.
                 raw_questions = reparsed.get("questions", [])
-                mapped: list[AIQuestionGenQuestion] = []
-                for item in raw_questions:
-                    if not isinstance(item, dict):
-                        continue
-                    qtype = str(item.get("type", "")).strip()
-                    prompt = AIQuestionGenService._sanitize_prompt(str(item.get("prompt", "")).strip())
-                    if not qtype or not prompt:
-                        continue
-                    normalized_type = AIQuestionGenService._normalize_type_label(qtype)
-                    diff = str(item.get("difficulty", payload.difficulty)).strip().lower()
-                    if diff not in {"easy", "medium", "hard"}:
-                        diff = payload.difficulty
-                    options: list[AIQuestionGenOption] = []
-                    raw_options = item.get("options", [])
-                    if isinstance(raw_options, list):
-                        for idx, opt in enumerate(raw_options[:4]):
-                            if not isinstance(opt, dict):
-                                continue
-                            key = str(opt.get("key", "")).strip().upper() or "ABCD"[idx]
-                            text = str(opt.get("text", "")).strip()
-                            if not text:
-                                continue
-                            options.append(AIQuestionGenOption(key=key, text=text, correct=bool(opt.get("correct", False))))
-                    answer = item.get("answer")
-                    answer_text = str(answer).strip() if answer is not None else None
-                    explanation = str(item.get("explanation", "")).strip() or "Generated from source concepts."
-                    mapped.append(
-                        AIQuestionGenQuestion(
-                            type=normalized_type,
-                            prompt=prompt,
-                            options=options,
-                            answer=answer_text,
-                            difficulty=diff,
-                            explanation=explanation,
-                        )
-                    )
+                mapped = AIQuestionGenService._map_raw_questions(raw_questions, payload)
                 if mapped:
                     return mapped
 
         return AIQuestionGenService._parse_markdown_questions(raw, payload.difficulty)
+
+    @staticmethod
+    def _map_raw_questions(
+        raw_questions: list[dict],
+        payload: AIQuestionGenPreviewRequest,
+    ) -> list[AIQuestionGenQuestion]:
+        mapped: list[AIQuestionGenQuestion] = []
+        for item in raw_questions:
+            if not isinstance(item, dict):
+                continue
+            qtype = str(item.get("type", "")).strip()
+            prompt = AIQuestionGenService._sanitize_prompt(str(item.get("prompt", "")).strip())
+            if not qtype or not prompt:
+                continue
+            if AIQuestionGenService._is_meta_instruction_prompt(prompt):
+                continue
+            normalized_type = AIQuestionGenService._normalize_type_label(qtype)
+            diff = str(item.get("difficulty", payload.difficulty)).strip().lower()
+            if diff not in {"easy", "medium", "hard"}:
+                diff = payload.difficulty
+            options: list[AIQuestionGenOption] = []
+            raw_options = item.get("options", [])
+            if isinstance(raw_options, list):
+                for idx, opt in enumerate(raw_options[:4]):
+                    if not isinstance(opt, dict):
+                        continue
+                    key = str(opt.get("key", "")).strip().upper() or "ABCD"[idx]
+                    text = str(opt.get("text", "")).strip()
+                    if not text:
+                        continue
+                    options.append(AIQuestionGenOption(key=key, text=text, correct=bool(opt.get("correct", False))))
+            answer = item.get("answer")
+            answer_text = str(answer).strip() if answer is not None else None
+            explanation = str(item.get("explanation", "")).strip() or "Generated from source concepts."
+            mapped.append(
+                AIQuestionGenQuestion(
+                    type=normalized_type,
+                    prompt=prompt,
+                    options=options,
+                    answer=answer_text,
+                    difficulty=diff,
+                    explanation=explanation,
+                )
+            )
+        return mapped
+
+    @staticmethod
+    def _normalize_type_targets(type_targets: dict[str, int]) -> dict[str, int]:
+        normalized: dict[str, int] = {}
+        for raw_type, count in type_targets.items():
+            if int(count) <= 0:
+                continue
+            key = AIQuestionGenService._normalize_type_key(raw_type)
+            normalized[key] = normalized.get(key, 0) + int(count)
+        return normalized
+
+    @staticmethod
+    def _enforce_type_targets(
+        generated: list[AIQuestionGenQuestion],
+        payload: AIQuestionGenPreviewRequest,
+        type_targets: dict[str, int],
+    ) -> list[AIQuestionGenQuestion]:
+        target = AIQuestionGenService._normalize_type_targets(type_targets)
+        if not target:
+            return generated
+
+        # Keep only requested types and cap count per type.
+        selected: list[AIQuestionGenQuestion] = []
+        used: dict[str, int] = {k: 0 for k in target}
+        for q in generated:
+            qtype = AIQuestionGenService._normalize_type_key(str(q.type))
+            if qtype not in target:
+                continue
+            if used[qtype] >= target[qtype]:
+                continue
+            selected.append(q)
+            used[qtype] += 1
+
+        return selected
 
     @staticmethod
     def _parse_json_object(raw: str) -> dict | None:
@@ -517,8 +813,9 @@ class AIQuestionGenService:
     @staticmethod
     def _heuristic_generate(payload: AIQuestionGenPreviewRequest, type_targets: dict[str, int]) -> list[AIQuestionGenQuestion]:
         keywords = AIQuestionGenService._extract_keywords(payload.source_text)
+        subject_label = (payload.subject or "").strip() or "the topic"
         if not keywords:
-            keywords = [payload.subject, "core concept", "application"]
+            keywords = [subject_label, "core concept", "application"] if subject_label != "the topic" else ["core concept", "application"]
 
         queue: list[_DraftQuestion] = []
         index = 0
@@ -535,7 +832,7 @@ class AIQuestionGenService:
                     queue.append(
                         _DraftQuestion(
                             qtype="MCQ",
-                            prompt=f"In {payload.subject}, which statement best explains {topic}?",
+                            prompt=f"Regarding {subject_label}, which statement best explains {topic}?",
                             options=[
                                 AIQuestionGenOption(key="A", text=f"A common misconception about {topic}", correct=False),
                                 AIQuestionGenOption(key="B", text=f"A correct explanation of {topic}", correct=True),
@@ -550,7 +847,7 @@ class AIQuestionGenService:
                     queue.append(
                         _DraftQuestion(
                             qtype="True/False",
-                            prompt=f"True or False: {topic} in {payload.subject} should be analyzed with assumptions and boundary conditions.",
+                            prompt=f"True or False: {topic} in {subject_label} should be analyzed with assumptions and boundary conditions.",
                             options=[],
                             answer="True",
                             explanation="This checks whether students avoid overgeneralized claims.",
@@ -570,7 +867,7 @@ class AIQuestionGenService:
                     queue.append(
                         _DraftQuestion(
                             qtype="Essay",
-                            prompt=f"Write an essay explaining {topic} in {payload.subject}, including method, example, and limitations.",
+                            prompt=f"Write an essay explaining {topic} in {subject_label}, including method, example, and limitations.",
                             options=[],
                             answer=None,
                             explanation="The essay expects concept definition, method, and evaluative discussion.",
@@ -580,7 +877,7 @@ class AIQuestionGenService:
                     queue.append(
                         _DraftQuestion(
                             qtype="Short Answer",
-                            prompt=f"Use 2-3 sentences to explain {topic} and provide one example in {payload.subject}.",
+                            prompt=f"Use 2-3 sentences to explain {topic} and provide one example in {subject_label}.",
                             options=[],
                             answer=None,
                             explanation="A strong answer includes both concept and example.",
