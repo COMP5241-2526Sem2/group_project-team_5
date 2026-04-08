@@ -777,6 +777,20 @@ export default function AssessmentGenerate() {
     return 'medium';
   }
 
+  function isTextExtractSupported(file: File): boolean {
+    const name = (file.name || '').toLowerCase();
+    if (name.endsWith('.pdf') || name.endsWith('.txt') || name.endsWith('.md') || name.endsWith('.docx')) {
+      return true;
+    }
+    const mime = (file.type || '').toLowerCase();
+    return (
+      mime === 'application/pdf' ||
+      mime === 'text/plain' ||
+      mime === 'text/markdown' ||
+      mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    );
+  }
+
   function canProceedStep1() {
     if (sourceTab === 'upload') return !!uploadedFile;
     // 与下方占位「至少 N 字」一致；中英文都按字符数计
@@ -815,7 +829,7 @@ export default function AssessmentGenerate() {
         let changed = false;
         for (let i = 0; i < Math.min(next.length, 2); i++) {
           const ef = next[i];
-          if (!ef.extractedText?.trim() && ef.file) {
+          if (!ef.extractedText?.trim() && ef.file && isTextExtractSupported(ef.file)) {
             const extracted = await extractSourceTextApi(ef.file);
             next[i] = { ...ef, extractedText: extracted.source_text };
             changed = true;
@@ -832,9 +846,11 @@ export default function AssessmentGenerate() {
     }
     if (sourceTab === 'upload' && uploadedFile?.file) {
       try {
-        const extracted = await extractSourceTextApi(uploadedFile.file);
-        sourceMaterial = extracted.source_text;
-        setUploadedFile((prev) => prev ? { ...prev, extractedText: extracted.source_text } : prev);
+        if (isTextExtractSupported(uploadedFile.file)) {
+          const extracted = await extractSourceTextApi(uploadedFile.file);
+          sourceMaterial = extracted.source_text;
+          setUploadedFile((prev) => prev ? { ...prev, extractedText: extracted.source_text } : prev);
+        }
       } catch {
         // fallback to filename when extraction fails
       }
