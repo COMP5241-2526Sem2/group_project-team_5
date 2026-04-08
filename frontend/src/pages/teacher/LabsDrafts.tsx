@@ -11,7 +11,7 @@ import { parseLabDefinitionJson, sanitizeLabDefinitionFileText } from '../../com
 import { labsApi, fromBackend } from '@/api/labs';
 import {
   FlaskConical, Upload, Sparkles, FileJson,
-  Trash2, Send, Search, X, Eye, Tag, Cpu, Layers, ChevronRight, Save,
+  Trash2, Send, Search, X, Eye, Tag, Cpu, Layers, ChevronRight,
 } from 'lucide-react';
 
 const SOURCE_META: Record<string, { emoji: string; label: string; color: string; bg: string }> = {
@@ -215,7 +215,6 @@ export default function LabsDrafts() {
   const [showChat, setShowChat] = useState(true);
   const [selectedKey, setSelectedKey] = useState<string>('');
   const [pendingDraftSelectKey, setPendingDraftSelectKey] = useState<string | null>(null);
-  const [savingToServer, setSavingToServer] = useState(false);
 
   const filtered = useMemo(() => workspaceLabs.filter(e => {
     const q = search.toLowerCase();
@@ -256,7 +255,7 @@ export default function LabsDrafts() {
   useEffect(() => {
     if (chatMode !== 'drive_lab') return;
     if (selectedEntry) {
-      setWidgetType(selectedEntry.def.registryKey);
+      setWidgetType(selectedEntry.def.registryKey, selectedEntry.def.title);
     } else {
       setWidgetType(undefined);
     }
@@ -314,24 +313,6 @@ export default function LabsDrafts() {
     startTransition(() => setSelectedKey(def.registryKey));
     if (options?.status === 'published') {
       await publishLab(def.registryKey);
-    }
-  }
-
-  /** 将当前选中实验同步到数据库（与对话内「Save as draft」等价） */
-  async function handleSaveSelectedToServer() {
-    if (!selectedEntry) return;
-    setSavingToServer(true);
-    try {
-      const { raw } = await labsApi.saveLabDefinition(
-        { ...selectedEntry.def, status: 'draft' },
-        'save_draft',
-      );
-      const { content_unchanged: _c, ...row } = raw;
-      mergeLab(fromBackend(row as Parameters<typeof fromBackend>[0]), selectedEntry.source);
-    } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSavingToServer(false);
     }
   }
 
@@ -689,22 +670,6 @@ export default function LabsDrafts() {
                     </button>
                     <button
                       type="button"
-                      disabled={savingToServer || selectedEntry.def.status === 'published'}
-                      onClick={() => void handleSaveSelectedToServer()}
-                      title="将当前草稿同步到服务器（生成后本地已可预览，点此持久化）"
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 14px',
-                        border: '1px solid #cbd5e1', borderRadius: '7px',
-                        background: selectedEntry.def.status === 'published' ? '#f3f4f6' : '#fff',
-                        color: selectedEntry.def.status === 'published' ? '#9ca3af' : '#334155',
-                        fontSize: '12px', fontWeight: 600,
-                        cursor: selectedEntry.def.status === 'published' || savingToServer ? 'not-allowed' : 'pointer',
-                      }}
-                    >
-                      <Save size={12} /> {savingToServer ? '保存中…' : '保存到服务器'}
-                    </button>
-                    <button
-                      type="button"
                       disabled={selectedEntry.def.status === 'published'}
                       onClick={() => void handlePublish(selectedEntry.def.registryKey)}
                       style={{
@@ -801,7 +766,7 @@ export default function LabsDrafts() {
         intent={pendingDraftSelectKey === PENDING_DESELECT ? 'deselect' : 'switch_lab'}
         targetTitle={
           pendingDraftSelectKey === PENDING_DESELECT
-            ? (selectedEntry?.def.title ?? '当前实验')
+            ? (selectedEntry?.def.title ?? 'Current lab')
             : (pendingDraftSelectKey
               ? (filtered.find(e => e.def.registryKey === pendingDraftSelectKey)?.def.title
                 ?? pendingDraftSelectKey)

@@ -24,7 +24,10 @@ interface LabListParams {
   subject?: string;
   type?: string;
   dimension?: string;
+  /** 单状态（与 statuses 互斥，后端优先使用 statuses） */
   status?: string;
+  /** 多状态，如 published + draft */
+  statuses?: string[];
   search?: string;
   page?: number;
   page_size?: number;
@@ -50,6 +53,11 @@ interface BackendLabDefinition {
   visual_profile?: string;
   visual_hint?: Record<string, unknown>;
   render_code?: string;
+}
+
+/** 写入课件 slide 的 lab_snapshot（与后端 Lab 表字段对齐），库中实验删除后仍凭此渲染 */
+export function labDefinitionToEmbeddedSnapshot(def: LabComponentDefinition): Record<string, unknown> {
+  return toBackend(def) as unknown as Record<string, unknown>;
 }
 
 function toBackend(def: LabComponentDefinition): BackendLabDefinition {
@@ -87,6 +95,26 @@ function sseOrigin(): string {
   return '';
 }
 
+/** 内置模板（无 DB 行）：写入课件的嵌入快照 */
+export function builtinLabEmbeddedSnapshot(
+  widgetType: string,
+  title: string,
+  subjectLab: string,
+  initialState: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    registry_key: widgetType,
+    title,
+    subject_lab: subjectLab,
+    renderer_profile: 'generic_2d',
+    dimension: '2d',
+    initial_state: initialState,
+    lab_type: 'builtin_template',
+    status: 'published',
+    render_code: null,
+  };
+}
+
 export function fromBackend(def: BackendLabDefinition): LabComponentDefinition {
   const rc = (def as { render_code?: string | null }).render_code;
   const vp = (def as { visual_profile?: string | null }).visual_profile;
@@ -106,9 +134,27 @@ export function fromBackend(def: BackendLabDefinition): LabComponentDefinition {
   };
 }
 
+function labsListQueryString(params?: LabListParams): string {
+  if (!params) return '';
+  const e = new URLSearchParams();
+  if (params.page !== undefined) e.set('page', String(params.page));
+  if (params.page_size !== undefined) e.set('page_size', String(params.page_size));
+  if (params.subject !== undefined) e.set('subject', params.subject);
+  if (params.type !== undefined) e.set('type', params.type);
+  if (params.dimension !== undefined) e.set('dimension', params.dimension);
+  if (params.search !== undefined) e.set('search', params.search);
+  if (params.statuses?.length) {
+    for (const s of params.statuses) e.append('statuses', s);
+  } else if (params.status !== undefined) {
+    e.set('status', params.status);
+  }
+  const s = e.toString();
+  return s ? `?${s}` : '';
+}
+
 export const labsApi = {
   list: (params?: LabListParams) =>
-    fetch(`/api/v1/labs/?${new URLSearchParams(params as Record<string, string>)}`).then(r => r.json()),
+    fetch(`/api/v1/labs/${labsListQueryString(params)}`).then(r => r.json()),
 
   get: (registryKey: string): Promise<Record<string, unknown>> =>
     fetch(`/api/v1/labs/${registryKey}`).then(r => {

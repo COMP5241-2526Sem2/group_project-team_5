@@ -190,10 +190,26 @@ export default function CircuitLab({ state: rawState, onStateChange, dispatch, r
   }
 
   return (
-    <div style={{ background: '#0b1120', borderRadius: '10px', overflow: 'hidden' }}>
-      {/* Circuit SVG */}
-      <div style={{ overflowX: 'auto' }}>
-        <svg width={W} height={H} style={{ display: 'block', minWidth: W }}>
+    <div
+      style={{
+        background: '#0b1120',
+        borderRadius: '10px',
+        overflow: 'hidden',
+        width: W,
+        display: 'inline-block',
+        verticalAlign: 'top',
+        boxSizing: 'border-box',
+      }}
+    >
+      {/* Circuit SVG：viewBox 内等比例绘制（meet），外框由 LabScaleToFit 整体等比缩放 */}
+      <div style={{ width: W, height: H, overflow: 'hidden', position: 'relative' }}>
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          preserveAspectRatio="xMidYMid meet"
+          width="100%"
+          height="100%"
+          style={{ display: 'block' }}
+        >
           <defs>
             <filter id="glow">
               <feGaussianBlur stdDeviation="3" result="blur" />
@@ -235,7 +251,7 @@ export default function CircuitLab({ state: rawState, onStateChange, dispatch, r
 
       {/* Controls */}
       {!readonly && (
-        <div style={{ background: '#0f172a', padding: '12px 16px', display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
+        <div style={{ flexShrink: 0, background: '#0f172a', padding: '12px 16px', display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#d1d5db' }}>
             <span style={{ color: '#60a5fa', fontFamily: 'monospace', minWidth: '50px' }}>EMF (V)</span>
             <input type="range" min="1" max="24" step="0.5" value={s.voltage}

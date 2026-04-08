@@ -1,7 +1,20 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Filter, Search, ChevronDown, Check, Plus, Eye, X, FileText } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Filter, Search, Check, Plus, Eye, X, FileText } from 'lucide-react';
+import { CustomSelect } from '../../../components/teacher/CustomSelect';
 import { listQuestionBankSetsApi, type QuestionBankSetDto } from '../../../utils/questionBankApi';
-import { prefetchQuestionBankSets, readCachedQuestionBankSets } from '../../../utils/assessmentDataCache';
+import { teacherKeys } from '../../../query/teacherKeys';
+
+function FilterSelect({
+  label, options, value, onChange,
+}: { label: string; options: string[]; value: string; onChange: (v: string) => void }) {
+  return (
+    <div style={{ marginBottom: '18px' }}>
+      <div style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>{label}</div>
+      <CustomSelect options={options} value={value} onChange={onChange} width="100%" />
+    </div>
+  );
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Difficulty = 'easy' | 'medium' | 'hard';
@@ -94,45 +107,32 @@ export default function AssessmentLibrary() {
   const [filterDiff,    setFilterDiff]    = useState('All Difficulties');
   const [filterType,    setFilterType]    = useState('All Types');
   const [activeSet,     setActiveSet]     = useState<QuestionSet | null>(null);
-  const [sets,          setSets]          = useState<QuestionSet[]>([]);
-  const [loading,       setLoading]       = useState(true);
-  const [loadError,     setLoadError]     = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const params = {
-        subject: isDefault(filterSubject) ? undefined : filterSubject,
-        grade: isDefault(filterGrade) ? undefined : filterGrade,
-        semester: isDefault(filterSem) ? undefined : filterSem,
-        difficulty: isDefault(filterDiff) ? undefined : filterDiff,
-        question_type: isDefault(filterType) ? undefined : filterType,
-      };
+  const listParams = useMemo(
+    () => ({
+      subject: isDefault(filterSubject) ? undefined : filterSubject,
+      grade: isDefault(filterGrade) ? undefined : filterGrade,
+      semester: isDefault(filterSem) ? undefined : filterSem,
+      difficulty: isDefault(filterDiff) ? undefined : filterDiff,
+      question_type: isDefault(filterType) ? undefined : filterType,
+    }),
+    [filterSubject, filterGrade, filterSem, filterDiff, filterType],
+  );
 
-      // If we already prefetched (e.g. hover/click), render immediately.
-      const cached = readCachedQuestionBankSets(params);
-      if (cached && !cancelled) {
-        setSets(cached.sets.map(mapQuestionBankDtoToSet));
-        setLoading(false);
-      } else {
-        setLoading(true);
-      }
-      setLoadError(null);
-      try {
-        // Always refresh in background to ensure "DB 最新"。
-        const res = await prefetchQuestionBankSets(params, { force: true });
-        if (!cancelled) setSets(res.sets.map(mapQuestionBankDtoToSet));
-      } catch (e) {
-        if (!cancelled) {
-          setSets([]);
-          setLoadError(e instanceof Error ? e.message : 'Failed to load question bank');
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [filterSubject, filterGrade, filterSem, filterDiff, filterType]);
+  const {
+    data: qbRes,
+    isPending: loading,
+    isError,
+    error: qbError,
+  } = useQuery({
+    queryKey: teacherKeys.questionBankSets(listParams),
+    queryFn: () => listQuestionBankSetsApi(listParams),
+  });
+  const loadError = isError ? (qbError instanceof Error ? qbError.message : 'Failed to load question bank') : null;
+  const sets = useMemo(
+    () => (qbRes?.sets ?? []).map(mapQuestionBankDtoToSet),
+    [qbRes],
+  );
 
   const filtered = sets.filter(s => {
     const q = search.toLowerCase();
@@ -157,50 +157,54 @@ export default function AssessmentLibrary() {
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 48px)', overflow: 'hidden', position: 'relative', background: '#fafafa' }}>
 
-      {/* ── Filter sidebar ───────────────────────────────────── */}
+      {/* ── Filter sidebar（与 Exam Papers 左栏一致）──────────────── */}
       <aside style={{
         width: '200px', flexShrink: 0, borderRight: '1px solid #e5e7eb',
         background: '#fff', overflowY: 'auto', padding: '16px 14px',
-        display: 'flex', flexDirection: 'column', gap: '14px',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
           <Filter size={14} style={{ color: '#6b7280' }} />
           <span style={{ fontSize: '13px', fontWeight: 600, color: '#111827' }}>Filter</span>
         </div>
 
-        <p style={{ margin: 0, fontSize: '11px', color: '#9ca3af', lineHeight: 1.5 }}>
+        <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '14px' }}>
           {totalQuestions} questions · {uniqueTypes} types
-        </p>
+        </div>
 
-        <div>
-          <div style={{ fontSize: '11px', fontWeight: 500, color: '#6b7280', marginBottom: '6px' }}>Search</div>
+        <div style={{ marginBottom: '20px' }}>
+          <div style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>Search</div>
           <div style={{ position: 'relative' }}>
-            <Search size={12} style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', pointerEvents: 'none' }} />
+            <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', pointerEvents: 'none' }} />
             <input
-              value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Keyword…"
-              style={{ width: '100%', boxSizing: 'border-box', padding: '7px 9px 7px 26px', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', color: '#374151', outline: 'none', background: '#fff' }}
-              onFocus={e => { e.currentTarget.style.borderColor = '#d1d5db'; }}
-              onBlur={e =>  { e.currentTarget.style.borderColor = '#e5e7eb'; }}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Enter keyword…"
+              style={{
+                width: '100%', boxSizing: 'border-box', padding: '8px 10px 8px 32px',
+                border: '1px solid #e8eaed', borderRadius: '8px', fontSize: '13px',
+                color: '#374151', outline: 'none', background: '#fff',
+              }}
+              onFocus={e => { e.currentTarget.style.borderColor = '#3b5bdb'; }}
+              onBlur={e => { e.currentTarget.style.borderColor = '#e8eaed'; }}
             />
           </div>
         </div>
 
-        <CustomSelect label="Subject"       value={filterSubject} onChange={setFilterSubject} options={SUBJECT_OPTIONS}  />
-        <CustomSelect label="Grade"         value={filterGrade}   onChange={setFilterGrade}   options={GRADE_OPTIONS}    />
-        <CustomSelect label="Semester"      value={filterSem}     onChange={setFilterSem}     options={SEMESTER_OPTIONS} />
-        <CustomSelect label="Difficulty"    value={filterDiff}    onChange={setFilterDiff}    options={DIFF_OPTIONS}     />
-        <CustomSelect label="Question Type" value={filterType}    onChange={setFilterType}    options={TYPE_OPTIONS}     />
+        <FilterSelect label="Subject"       options={SUBJECT_OPTIONS}  value={filterSubject} onChange={setFilterSubject} />
+        <FilterSelect label="Grade"         options={GRADE_OPTIONS}    value={filterGrade}   onChange={setFilterGrade} />
+        <FilterSelect label="Semester"      options={SEMESTER_OPTIONS} value={filterSem}     onChange={setFilterSem} />
+        <FilterSelect label="Difficulty"    options={DIFF_OPTIONS}     value={filterDiff}    onChange={setFilterDiff} />
+        <FilterSelect label="Question Type" options={TYPE_OPTIONS}     value={filterType}    onChange={setFilterType} />
 
         {hasActiveFilters && (
           <button
             type="button"
             onClick={() => { setSearch(''); setFilterSubject('All Subjects'); setFilterGrade('All Grades'); setFilterSem('All Semesters'); setFilterDiff('All Difficulties'); setFilterType('All Types'); }}
-            style={{ padding: '7px 10px', borderRadius: '6px', border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280', fontSize: '11px', cursor: 'pointer' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f9fafb'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff'; }}
+            style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px dashed #d1d5db', background: 'transparent', fontSize: '13px', color: '#6b7280', cursor: 'pointer', marginTop: '4px' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = '#9ca3af'; (e.currentTarget as HTMLElement).style.color = '#374151'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#d1d5db'; (e.currentTarget as HTMLElement).style.color = '#6b7280'; }}
           >
-            Reset
+            Reset Filters
           </button>
         )}
       </aside>
@@ -485,76 +489,6 @@ function DetailModal({ set, onClose }: { set: QuestionSet; onClose: () => void }
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-// ── Custom Dropdown ───────────────────────────────────────────────────────────
-function CustomSelect({ label, value, onChange, options }: {
-  label: string; value: string; onChange: (v: string) => void; options: string[];
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const isPlaceholder = options[0] === value;
-
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <div style={{ fontSize: '11px', fontWeight: 500, color: '#6b7280', marginBottom: '5px' }}>{label}</div>
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        style={{
-          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '6px 9px', borderRadius: '6px', cursor: 'pointer', textAlign: 'left',
-          border: `1px solid ${open ? '#d1d5db' : '#e5e7eb'}`,
-          background: '#fff', outline: 'none', transition: 'border-color 0.12s',
-        }}
-      >
-        <span style={{ fontSize: '12px', color: isPlaceholder ? '#9ca3af' : '#111827', fontWeight: isPlaceholder ? 400 : 500 }}>
-          {value}
-        </span>
-        <ChevronDown size={12} style={{ color: '#9ca3af', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }} />
-      </button>
-
-      {open && (
-        <div style={{
-          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 100,
-          background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
-          overflow: 'hidden', padding: '3px',
-        }}>
-          {options.map((opt, i) => {
-            const isSel = opt === value;
-            return (
-              <button
-                type="button"
-                key={opt}
-                onClick={() => { onChange(opt); setOpen(false); }}
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '6px 8px', borderRadius: '4px', border: 'none', cursor: 'pointer',
-                  background: isSel ? '#f3f4f6' : 'transparent',
-                  color: i === 0 ? '#9ca3af' : '#374151',
-                  fontSize: '12px', fontWeight: isSel ? 500 : 400, textAlign: 'left', transition: 'background 0.1s',
-                }}
-                onMouseEnter={e => { if (!isSel) (e.currentTarget as HTMLElement).style.background = '#f9fafb'; }}
-                onMouseLeave={e => { if (!isSel) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-              >
-                <span>{opt}</span>
-                {isSel && <Check size={11} style={{ color: '#6b7280', flexShrink: 0 }} />}
-              </button>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }

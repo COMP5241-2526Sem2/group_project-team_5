@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1 import labs
+from app.api.v1 import labs, lessons
 from app.api.v1.papers import router as papers_router
 from app.api.v1.teacher_tasks import router as teacher_tasks_router
 from app.api.v1.question_bank import router as question_bank_router
@@ -22,3 +22,4 @@ async def health() -> dict:
 
 
 router.include_router(labs.router)
+router.include_router(lessons.router)

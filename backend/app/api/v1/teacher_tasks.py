@@ -102,3 +102,13 @@ async def publish_task(
 ) -> TaskStatusMutationResponse:
     actor_id = _require_user_id(x_user_id)
     return await TaskService.publish_task(db=db, actor_id=actor_id, task_id=task_id)
+
+
+@router.post("/tasks/{task_id}/unpublish", response_model=TaskStatusMutationResponse)
+async def unpublish_task(
+    task_id: int,
+    db: AsyncSession = Depends(get_db),
+    x_user_id: int | None = Header(default=None, alias="X-User-Id"),
+) -> TaskStatusMutationResponse:
+    actor_id = _require_user_id(x_user_id)
+    return await TaskService.unpublish_task(db=db, actor_id=actor_id, task_id=task_id)

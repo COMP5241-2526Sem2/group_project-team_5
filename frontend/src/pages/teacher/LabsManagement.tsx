@@ -191,7 +191,7 @@ export default function LabsManagement() {
 
   function applyCatalogSelection(lab: LabItem) {
     startTransition(() => setSelectedId(lab.id));
-    setWidgetType(lab.widgetType);
+    setWidgetType(lab.widgetType, lab.label);
     setMode('drive_lab');
   }
 
@@ -604,7 +604,7 @@ export default function LabsManagement() {
         intent={pendingCatalogDeselect ? 'deselect' : 'switch_lab'}
         targetTitle={
           pendingCatalogDeselect
-            ? (selected?.label ?? '当前实验')
+            ? (selected?.label ?? 'Current lab')
             : (pendingCatalogSelect?.label ?? '')
         }
         onCancel={() => {

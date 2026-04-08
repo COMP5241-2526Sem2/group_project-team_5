@@ -1,8 +1,10 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { LabComponentDefinition } from './types';
-import { MOCK_DYNAMIC_DEFS, WidgetRegistry } from './LabRegistry';
+import { WidgetRegistry } from './LabRegistry';
 import { labsApi } from '@/api/labs';
 import { fromBackend } from '@/api/labs';
+import { teacherKeys } from '@/query/teacherKeys';
 
 /** Lab source: how it entered the system */
 export type LabSource = 'builtin' | 'uploaded' | 'ai';
@@ -41,20 +43,7 @@ const LabsContext = createContext<LabsContextValue | null>(null);
 const DELETED_KEYS_KEY = 'lab:deleted_keys';
 
 function buildInitialAllLabs(): Map<string, LabEntry> {
-  const map = new Map<string, LabEntry>();
-  try {
-    const deleted: string[] = JSON.parse(sessionStorage.getItem(DELETED_KEYS_KEY) ?? '[]');
-    MOCK_DYNAMIC_DEFS.forEach(def => {
-      if (!deleted.includes(def.registryKey)) {
-        map.set(def.registryKey, { def, source: 'ai' });
-      }
-    });
-  } catch {
-    MOCK_DYNAMIC_DEFS.forEach(def => {
-      map.set(def.registryKey, { def, source: 'ai' });
-    });
-  }
-  return map;
+  return new Map();
 }
 
 export function LabsProvider({ children }: { children: ReactNode }) {
@@ -72,20 +61,21 @@ export function LabsProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  // ── Backend load on mount ──────────────────────────────────────────────────
+  const { data: labsListRes } = useQuery({
+    queryKey: teacherKeys.labsAiList(100),
+    queryFn: () => labsApi.list({ type: 'ai_generated', page_size: 100 }) as Promise<{ items: unknown[] }>,
+  });
+
   useEffect(() => {
-    labsApi.list({ type: 'ai_generated', page_size: 100 }).then(
-      (res: { items: unknown[] }) => {
-        res.items.forEach((item: unknown) => {
-          try {
-            const def = fromBackend(item as Parameters<typeof fromBackend>[0]);
-            mergeLab(def, 'ai');
-          } catch { /* ignore malformed items */ }
-        });
-      },
-      () => { /* backend offline — fine, use MOCK_DYNAMIC_DEFS only */ }
-    );
-  }, [mergeLab]);
+    const items = labsListRes?.items;
+    if (!items?.length) return;
+    for (const item of items) {
+      try {
+        const def = fromBackend(item as Parameters<typeof fromBackend>[0]);
+        mergeLab(def, 'ai');
+      } catch { /* ignore malformed items */ }
+    }
+  }, [labsListRes, mergeLab]);
 
   const saveDraft = useCallback((def: LabComponentDefinition, source: LabSource) => {
     mergeLab({ ...def, status: 'draft' }, source);

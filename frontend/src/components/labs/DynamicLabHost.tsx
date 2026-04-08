@@ -61,7 +61,16 @@ function RenderCodeLabBranch({
   return (
     <div
       key={runtimeKey}
-      style={{ borderRadius: '10px', overflow: 'hidden', height: height ? `${height}px` : undefined }}
+      style={{
+        borderRadius: '10px',
+        overflow: 'hidden',
+        display: 'inline-block',
+        verticalAlign: 'top',
+        width: 'max-content',
+        maxWidth: '100%',
+        height: height != null ? `${height}px` : 'auto',
+        minHeight: 0,
+      }}
     >
       <AILabRuntime
         renderCode={renderCode}

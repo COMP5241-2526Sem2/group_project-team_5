@@ -54,9 +54,9 @@ export interface ChatContextValue {
   /** Full message setter for AIChatPanel to push streaming updates into shared state */
   setMessages: (updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
   /** Reset all chat state — called when the user picks a different lab */
-  resetChat: (widgetType?: string) => void;
-  /** Set the lab widget type (triggers reset if different from current) */
-  setWidgetType: (widgetType: string | undefined) => void;
+  resetChat: (widgetType?: string, displayTitle?: string) => void;
+  /** Set the lab widget type (triggers reset if different from current)；`displayTitle` 用于首条中文欢迎语 */
+  setWidgetType: (widgetType: string | undefined, displayTitle?: string) => void;
   /**
    * Generate 模式：当前选中的实验 registry_key（用于后端「基于该实验迭代」）。
    * 与 widgetType 不同，不会在 Drive 模式下被清除；用户切换回 Generate 时依然持有基准实验。
@@ -82,25 +82,32 @@ export interface ChatContextValue {
 
 const ChatContext = createContext<ChatContextValue | null>(null);
 
-function buildInitialMessages(widgetType?: string): ChatMessage[] {
+function buildAnchoredLabWelcome(title: string, registryKey: string, mode: ChatMode): string {
+  const body =
+    mode === 'drive_lab'
+      ? '当前 **Drive** 会通过自然语言理解你的意图，并向该实验下发运行时指令以更新中间预览区；本模式不修改 `render_code` 或草稿内容。'
+      : '当前 **Generate** 会围绕该实验迭代：可说明希望调整的可视化、交互参数、说明文字或 `render_code`；在不大改实验主题时，请保持同一 `registry_key` 以便覆盖草稿。';
+  return (
+    `**已选中实验：**「${title}」  \`registry_key\`: \`${registryKey}\`\n\n` +
+    `${body}\n\n` +
+    '• **Drive** — 用自然语言直接调节中间预览区状态\n' +
+    '• **Generate** — 基于上述实验生成改进版；完成后在对话中选择 **Save as draft** 或 **Publish**'
+  );
+}
+
+function buildInitialMessages(widgetType?: string, displayTitle?: string, mode?: ChatMode): ChatMessage[] {
   return [{
     id: mkMsgId(),
     role: 'assistant',
     content: widgetType
-      ? `Lab connected: **${widgetType}**. Ask me to adjust parameters, explain concepts, or generate a new Lab component.`
+      ? buildAnchoredLabWelcome(
+          (displayTitle?.trim()) || widgetType,
+          widgetType,
+          mode ?? 'drive_lab',
+        )
       : `Hello! I can help you:\n• **Drive existing labs** — control parameters via natural language\n• **Generate new Labs** — create custom interactive components`,
     timestamp: Date.now(),
   }];
-}
-
-function buildGenerateAnchoredWelcome(title: string, registryKey: string): string {
-  return (
-    `**已选中实验：**「${title}」  \`registry_key\`: \`${registryKey}\`\n\n` +
-    '当前 **Generate** 会围绕该实验迭代：可说明希望调整的可视化、交互参数、说明文字或 `render_code`；' +
-    '在不大改实验主题时，请保持同一 `registry_key` 以便覆盖草稿。\n\n' +
-    '• **Drive** — 用自然语言直接调节中间预览区状态\n' +
-    '• **Generate** — 基于上述实验生成改进版；完成后在对话中选择 **Save as draft** 或 **Publish**'
-  );
 }
 
 /** 仅一条助手欢迎语（或空）时可替换，避免合并多条助手回复 */
@@ -125,10 +132,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const pendingMsgIdRef = useRef<string | undefined>(undefined);
   const activeEventSourceRef = useRef<EventSource | null>(null);
 
-  const resetChat = useCallback((wt?: string) => {
+  const resetChat = useCallback((wt?: string, displayTitle?: string) => {
     sessionIdRef.current = null;
     pendingMsgIdRef.current = undefined;
-    setMessages(buildInitialMessages(wt));
+    const nextMode: ChatMode = wt ? 'drive_lab' : 'generate_lab';
+    setMessages(buildInitialMessages(wt, displayTitle, nextMode));
     setLoading(false);
     setIsGenerating(false);
     if (activeEventSourceRef.current) {
@@ -137,10 +145,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const setWidgetType = useCallback((wt: string | undefined) => {
+  const setWidgetType = useCallback((wt: string | undefined, displayTitle?: string) => {
     if (wt !== widgetType) {
       setWidgetTypeState(wt);
-      resetChat(wt);
+      resetChat(wt, displayTitle);
       setModeState(wt ? 'drive_lab' : 'generate_lab');
     }
   }, [widgetType, resetChat]);
@@ -220,20 +228,21 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  /** Generate + 已选实验：用「围绕该实验」的欢迎语替换仅含助手首条时的占位文案 */
+  /** Drive / Generate：已选实验时按当前模式同步首条说明段落（含 Drafts 仅 Generate 未走 setWidgetType 的路径） */
   useEffect(() => {
-    if (mode !== 'generate_lab' || loading) return;
-    if (!generateBaseRegistryKey) return;
+    if (loading) return;
+    const registryKey = generateBaseRegistryKey ?? widgetType;
+    if (!registryKey) return;
     setMessages(prev => {
       if (!isReplaceableGenerateWelcome(prev)) return prev;
-      const title = (generateBaseTitle && generateBaseTitle.trim()) || generateBaseRegistryKey;
-      const content = buildGenerateAnchoredWelcome(title, generateBaseRegistryKey);
+      const title = (generateBaseTitle && generateBaseTitle.trim()) || registryKey;
+      const content = buildAnchoredLabWelcome(title, registryKey, mode);
       if (prev.length === 0) {
         return [{ id: mkMsgId(), role: 'assistant', content, timestamp: Date.now() }];
       }
       return [{ ...prev[0], content, timestamp: Date.now() }];
     });
-  }, [mode, generateBaseRegistryKey, generateBaseTitle, loading]);
+  }, [mode, generateBaseRegistryKey, generateBaseTitle, widgetType, loading]);
 
   const consumeCommands = useCallback(() => {
     setPendingCommands([]);

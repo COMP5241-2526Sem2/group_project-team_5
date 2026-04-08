@@ -257,10 +257,10 @@ export default function CellViewer({ state:rawState, onStateChange, readonly }: 
   const uniqueOrgs=ORGANELLES.filter((o,i,arr)=>arr.findIndex(b=>b.name===o.name)===i);
 
   return (
-    <div style={{ background:'#050912', borderRadius:'10px', overflow:'hidden' }}>
+    <div style={{ background:'#050912', borderRadius:'10px', overflow:'hidden', display: 'inline-block', verticalAlign: 'top', width: W, boxSizing: 'border-box' }}>
       <div style={{ position:'relative' }}>
         <canvas ref={canvasRef} width={W} height={H}
-          style={{ width:'100%', display:'block', cursor: dragRef.current?'grabbing':'grab' }}
+          style={{ width: W, height: H, display:'block', cursor: dragRef.current?'grabbing':'grab' }}
           onMouseDown={onMouseDown} onMouseMove={handleMouseMove}
           onMouseUp={onMouseUp} onMouseLeave={()=>{ dragRef.current=null; setTooltip(null); }}
           onClick={handleClick} />

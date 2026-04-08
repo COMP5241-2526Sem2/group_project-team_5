@@ -36,18 +36,18 @@ export function ConfirmGenerateResetModal({
         }}
       >
         <div style={{ fontSize: '16px', fontWeight: 700, color: '#0f0f23', marginBottom: '10px' }}>
-          {isDeselect ? '取消选择实验？' : '切换实验？'}
+          {isDeselect ? 'Deselect this lab?' : 'Switch lab?'}
         </div>
         <div style={{ fontSize: '13px', color: '#6b7280', lineHeight: 1.65, marginBottom: '22px' }}>
           {isDeselect ? (
             <>
-              当前在 <strong style={{ color: '#374151' }}>Generate</strong> 中已有对话内容；取消选择{' '}
-              <strong style={{ color: '#1e40af' }}>{targetTitle}</strong> 将清除本次对话与生成会话，并解除与 Drive / Generate 对该实验的绑定。
+              You have an active <strong style={{ color: '#374151' }}>Generate</strong> conversation. Deselecting{' '}
+              <strong style={{ color: '#1e40af' }}>{targetTitle}</strong> will clear this chat and the generate session, and unbind Drive / Generate from this lab.
             </>
           ) : (
             <>
-              当前在 <strong style={{ color: '#374151' }}>Generate</strong> 中已有对话内容；切换到{' '}
-              <strong style={{ color: '#1e40af' }}>{targetTitle}</strong> 将清除本次对话与生成会话。
+              You have an active <strong style={{ color: '#374151' }}>Generate</strong> conversation. Switching to{' '}
+              <strong style={{ color: '#1e40af' }}>{targetTitle}</strong> will clear this chat and the generate session.
             </>
           )}
         </div>
@@ -60,7 +60,7 @@ export function ConfirmGenerateResetModal({
               background: '#fff', fontSize: '13px', cursor: 'pointer', color: '#374151',
             }}
           >
-            取消
+            Cancel
           </button>
           <button
             type="button"
@@ -70,7 +70,7 @@ export function ConfirmGenerateResetModal({
               background: '#3b5bdb', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
             }}
           >
-            {isDeselect ? '仍要取消选择' : '继续切换'}
+            {isDeselect ? 'Deselect anyway' : 'Switch anyway'}
           </button>
         </div>
       </div>

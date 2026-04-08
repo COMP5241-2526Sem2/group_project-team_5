@@ -4,9 +4,10 @@
  * are ONLY loaded lazily when the component is actually rendered.
  */
 import { lazy, Suspense, useState, useCallback, useTransition, useEffect, useMemo } from 'react';
-import type { LabWidgetProps, LabState } from './types';
-import { WidgetRegistry, MOCK_DYNAMIC_DEFS } from './LabRegistry';
+import type { LabComponentDefinition, LabWidgetProps, LabState } from './types';
+import { WidgetRegistry } from './LabRegistry';
 import { normalizeDriveCommandsForLabHost } from './normalizeDriveCommands';
+import LabScaleToFit from './LabScaleToFit';
 
 // ── Lazy-load each lab — NO static imports from these files ──────────────────
 const FunctionGraph  = lazy(() => import('./mathLab/FunctionGraph'));
@@ -97,6 +98,8 @@ function LabSkeleton({ height = 380 }: { height?: number }) {
 // ── LabHost ───────────────────────────────────────────────────────────────────
 interface LabHostProps {
   widgetType: string;
+  /** 库中已无该 registry_key 时，用课件内嵌快照渲染（与 labs 表解耦） */
+  embeddedDefinition?: LabComponentDefinition | null;
   initialState?: LabState;
   readonly?: boolean;
   height?: number;
@@ -107,7 +110,7 @@ interface LabHostProps {
 }
 
 export default function LabHost({
-  widgetType, initialState, readonly, height,
+  widgetType, embeddedDefinition, initialState, readonly, height,
   pendingCommands, onConsumeCommands,
 }: LabHostProps) {
   // Defer widgetType transitions so lazy-load suspense never fires synchronously
@@ -120,17 +123,15 @@ export default function LabHost({
         setActiveType(widgetType);
         // Also reset lab state so the new widget never receives the old widget's state shape
         const newMeta = STATIC_WIDGETS.find(w => w.widgetType === widgetType);
-        const newDynamic =
-          MOCK_DYNAMIC_DEFS.find(d => d.registryKey === widgetType) ??
-          WidgetRegistry.getDynamic(widgetType);
+        const newDynamic = WidgetRegistry.getDynamic(widgetType);
         setState(initialState ?? newMeta?.defaultState ?? newDynamic?.initialState ?? {});
       });
     }
   }, [widgetType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const staticMeta = STATIC_WIDGETS.find(w => w.widgetType === activeType);
-  const dynamicDef = MOCK_DYNAMIC_DEFS.find(d => d.registryKey === activeType)
-    ?? WidgetRegistry.getDynamic(activeType);
+  const registryDef = WidgetRegistry.getDynamic(activeType);
+  const dynamicDef = registryDef ?? embeddedDefinition ?? null;
 
   const baseState = initialState ?? staticMeta?.defaultState ?? dynamicDef?.initialState ?? {};
   const [state, setState] = useState<LabState>(baseState);
@@ -205,9 +206,19 @@ export default function LabHost({
   }
 
   return (
-    <Suspense fallback={<LabSkeleton height={height} />}>
-      <div style={{ opacity: isPending ? 0.6 : 1, transition: 'opacity 0.2s' }}>
-        {renderLab()}
+    <Suspense fallback={<LabSkeleton height={height ?? 380} />}>
+      <div
+        style={{
+          opacity: isPending ? 0.6 : 1,
+          transition: 'opacity 0.2s',
+          width: '100%',
+          height: height != null ? `${height}px` : '100%',
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <LabScaleToFit pin="top-left">{renderLab()}</LabScaleToFit>
       </div>
     </Suspense>
   );

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Filter, Search, Eye, Download, FileText, Clock,
   Star, Calendar, BookOpen, ChevronDown, X, Target, BarChart2,
@@ -8,6 +9,7 @@ import {
 import { CustomSelect } from '../../../components/teacher/CustomSelect';
 import {
   downloadPaperExportApi,
+  fetchPaperListApi,
   fetchPaperDetailApi,
   publishPaperApi,
   unpublishPaperApi,
@@ -17,7 +19,7 @@ import {
   type PaperExportFormat,
   type PaperListItemDto,
 } from '../../../utils/paperApi';
-import { prefetchPaperList, readCachedPaperList } from '../../../utils/assessmentDataCache';
+import { teacherKeys } from '../../../query/teacherKeys';
 
 /* ─── Types ────────────────────────────────────────────────────── */
 interface Paper {
@@ -493,14 +495,12 @@ function toRoman(n: number) {
 /* ─── Main Component ─────────────────────────────────────────────── */
 export default function AssessmentPapers() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [search, setSearch]       = useState('');
   const [subject, setSubject]     = useState('All Subjects');
   const [grade, setGrade]         = useState('All Grades');
   const [semester, setSemester]   = useState('All Semesters');
   const [type, setType]           = useState('All Types');
-  const [papers, setPapers]       = useState<Paper[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [previewPaper, setPreviewPaper] = useState<Paper | null>(null);
   const [exportModalPaper, setExportModalPaper] = useState<Paper | null>(null);
   const [publishingId, setPublishingId] = useState<string | null>(null);
@@ -508,41 +508,23 @@ export default function AssessmentPapers() {
   const [confirmDeletePaper, setConfirmDeletePaper] = useState<Paper | null>(null);
   const [busyManage, setBusyManage] = useState(false);
 
+  const {
+    data: listRes,
+    isPending: loading,
+    isError,
+    error: listQueryError,
+  } = useQuery({
+    queryKey: teacherKeys.paperList({ page: 1, page_size: 100 }),
+    queryFn: () => fetchPaperListApi({ page: 1, page_size: 100 }),
+  });
+  const papers = useMemo(() => listRes?.items.map(mapListItemToPaper) ?? [], [listRes]);
+  const loadError = isError
+    ? (listQueryError instanceof Error ? listQueryError.message : 'Failed to load papers')
+    : null;
+
   async function refreshList() {
-    const result = await prefetchPaperList({ page: 1, page_size: 100 }, { force: true });
-    setPapers(result.items.map(mapListItemToPaper));
+    await queryClient.invalidateQueries({ queryKey: ['teacher', 'papers'] });
   }
-
-  useEffect(() => {
-    let active = true;
-
-    (async () => {
-      const cached = readCachedPaperList({ page: 1, page_size: 100 });
-      if (cached && active) {
-        setPapers(cached.items.map(mapListItemToPaper));
-        setLoading(false);
-      } else {
-        setLoading(true);
-      }
-      setLoadError(null);
-      try {
-        // Always refresh to reflect latest DB state.
-        const result = await prefetchPaperList({ page: 1, page_size: 100 }, { force: true });
-        if (!active) return;
-        setPapers(result.items.map(mapListItemToPaper));
-      } catch (err) {
-        if (!active) return;
-        const message = err instanceof Error ? err.message : 'Failed to load papers';
-        setLoadError(message);
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, []);
 
   const allSubjects = useMemo(
     () => ['All Subjects', ...Array.from(new Set(papers.map(p => p.subject)))],
