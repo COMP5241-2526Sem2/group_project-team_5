@@ -52,3 +52,15 @@ async def extract_source_text(
         data=data,
     )
     return AIQuestionGenExtractTextResponse(source_text=text, chars=len(text))
+
+
+@router.post("/illustrations", response_model=AIQuestionGenIllustrationResponse)
+async def generate_question_illustrations(
+    payload: AIQuestionGenIllustrationRequest,
+    _db: AsyncSession = Depends(get_db),
+    x_user_id: int | None = Header(default=None, alias="X-User-Id"),
+) -> AIQuestionGenIllustrationResponse:
+    if x_user_id is None:
+        raise HTTPException(status_code=400, detail="X-User-Id header is required")
+    images = await QuizIllustrationService.generate(payload)
+    return AIQuestionGenIllustrationResponse(images=images)

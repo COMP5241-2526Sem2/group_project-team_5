@@ -6,6 +6,12 @@ from pydantic import BaseModel, Field, model_validator
 
 
 Difficulty = Literal["easy", "medium", "hard"]
+QuestionGenSourceMode = Literal["upload", "text", "textbook", "exam", "questions"]
+ExamGenerationMode = Literal["error-questions", "simulation"]
+ExamMatchMode = Literal["type", "knowledge"]
+ExamDifficulty = Literal["basic", "solid", "advanced"]
+QuestionInputMode = Literal["paste", "bank"]
+DerivationStyle = Literal["variation", "extension", "contrast"]
 GenerateMode = Literal["textbook", "paper_mimic"]
 QuestionType = Literal[
     "MCQ_SINGLE",
@@ -16,6 +22,7 @@ QuestionType = Literal[
     "ESSAY",
 ]
 SourceType = Literal["paper", "exercise", "textbook", "ai_generated", "manual"]
+IllustrationStyle = Literal["auto", "diagram", "chart", "photo", "scientific"]
 
 
 class QuizGenerateRequest(BaseModel):
@@ -95,6 +102,14 @@ class AIQuestionGenPreviewRequest(BaseModel):
     difficulty: Difficulty
     question_count: int = Field(ge=1)
     type_targets: dict[str, int] | None = None
+    source_mode: QuestionGenSourceMode | None = None
+    exam_generation_mode: ExamGenerationMode | None = None
+    exam_match_mode: ExamMatchMode | None = None
+    exam_difficulty: ExamDifficulty | None = None
+    source_file_names: list[str] | None = None
+    question_input_mode: QuestionInputMode | None = None
+    derive_mode: DerivationStyle | None = None
+    seed_questions: list[str] | None = None
 
 
 class AIQuestionGenPreviewResponse(BaseModel):
@@ -104,3 +119,26 @@ class AIQuestionGenPreviewResponse(BaseModel):
 class AIQuestionGenExtractTextResponse(BaseModel):
     source_text: str
     chars: int
+
+
+class AIQuestionGenIllustrationRequestItem(BaseModel):
+    question_id: str = Field(min_length=1)
+    prompt: str = Field(min_length=1)
+    question_type: str = Field(min_length=1)
+
+
+class AIQuestionGenIllustrationRequest(BaseModel):
+    style: IllustrationStyle = "auto"
+    style_prompt: str | None = None
+    questions: list[AIQuestionGenIllustrationRequestItem] = Field(min_length=1)
+
+
+class AIQuestionGenIllustrationResult(BaseModel):
+    question_id: str
+    image_url: str
+    used_fallback: bool = False
+    error: str | None = None
+
+
+class AIQuestionGenIllustrationResponse(BaseModel):
+    images: list[AIQuestionGenIllustrationResult]
