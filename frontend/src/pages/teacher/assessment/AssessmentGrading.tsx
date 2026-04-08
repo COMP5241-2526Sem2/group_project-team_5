@@ -48,12 +48,13 @@ interface LibQ {
   id: string; type: QType; diff: Diff;
   subject: string; grade: string; chapter: string;
   prompt: string; options?: string[]; answer?: string;
+  imageUrl?: string;
   source?: string;
 }
 interface SectionQ {
   uid: string; libId: string; prompt: string;
   type: QType; diff: Diff; pts: number;
-  options?: string[]; answer?: string;
+  options?: string[]; answer?: string; imageUrl?: string;
 }
 interface Section {
   id: string;
@@ -157,6 +158,7 @@ function flattenQuestionBankSetsToLibQ(sets: QuestionBankSetDto[]): LibQ[] {
         grade: s.grade,
         chapter: s.chapter,
         prompt: q.prompt,
+        imageUrl: q.image_url ?? undefined,
         options: q.options && q.options.length > 0 ? q.options : undefined,
         answer: q.answer ?? undefined,
         source: s.source,
@@ -271,6 +273,7 @@ function taskDetailToCanvas(detail: TaskDetailDto): {
       diff: normDiffFromApi(typeof snap.difficulty === 'string' ? snap.difficulty : null),
       pts: Math.max(1, Math.round(it.score)),
       prompt: typeof snap.prompt === 'string' ? snap.prompt : '',
+      imageUrl: typeof snap.image_url === 'string' ? snap.image_url : undefined,
       options: Array.isArray(snap.options) ? (snap.options as string[]) : undefined,
       answer: typeof snap.answer === 'string' ? snap.answer : undefined,
     });
@@ -301,6 +304,7 @@ function buildTaskPayload(
         difficulty: q.diff,
         uiType: q.type,
       };
+      if (q.imageUrl) snap.image_url = q.imageUrl;
       if (q.options && q.options.length > 0) snap.options = q.options;
       if (q.answer) snap.answer = q.answer;
 
@@ -1348,17 +1352,17 @@ function AssembleView({
     const pts = defaultPts(lq.type);
     if (existing) {
       setSections(prev=>prev.map(s=>s.id===existing.id
-        ? {...s, qs:[...s.qs, { uid:nid(), libId:lq.id, type:lq.type, diff:lq.diff, pts:s.ptsEach, prompt:lq.prompt, options:lq.options, answer:lq.answer }]}
+        ? {...s, qs:[...s.qs, { uid:nid(), libId:lq.id, type:lq.type, diff:lq.diff, pts:s.ptsEach, prompt:lq.prompt, imageUrl:lq.imageUrl, options:lq.options, answer:lq.answer }]}
         : s));
     } else {
       const idx = sections.length;
-      setSections(prev=>[...prev, { id:nid(), label:`Section ${ROMAN[idx]??idx+1}: ${lq.type}`, type:lq.type, ptsEach:pts, qs:[{ uid:nid(), libId:lq.id, type:lq.type, diff:lq.diff, pts, prompt:lq.prompt, options:lq.options, answer:lq.answer }] }]);
+      setSections(prev=>[...prev, { id:nid(), label:`Section ${ROMAN[idx]??idx+1}: ${lq.type}`, type:lq.type, ptsEach:pts, qs:[{ uid:nid(), libId:lq.id, type:lq.type, diff:lq.diff, pts, prompt:lq.prompt, imageUrl:lq.imageUrl, options:lq.options, answer:lq.answer }] }]);
     }
   }
   function replaceQ(lq: LibQ) {
     if (!replaceTarget) return;
     setSections(prev=>prev.map(s=>s.id===replaceTarget.secId
-      ? {...s, qs:s.qs.map(q=>q.uid===replaceTarget.uid ? {...q, libId:lq.id, prompt:lq.prompt, options:lq.options, answer:lq.answer, diff:lq.diff} : q)}
+      ? {...s, qs:s.qs.map(q=>q.uid===replaceTarget.uid ? {...q, libId:lq.id, prompt:lq.prompt, imageUrl:lq.imageUrl, options:lq.options, answer:lq.answer, diff:lq.diff} : q)}
       : s));
     setReplaceTarget(null);
   }

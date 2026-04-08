@@ -38,6 +38,7 @@
     "html2canvas": "^1.4.1",
     "input-otp": "^1.4.2",
     "jspdf": "^4.2.1",
+    "katex": "^0.16.45",
     "lucide-react": "^0.487.0",
     "motion": "*",
     "next-themes": "^0.4.6",
