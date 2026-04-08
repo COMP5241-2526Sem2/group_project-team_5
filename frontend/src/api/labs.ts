@@ -89,6 +89,11 @@ function toBackend(def: LabComponentDefinition): BackendLabDefinition {
 
 /** 开发环境下 EventSource 经 Vite 代理常不稳定，SSE 直连后端（需 CORS） */
 function sseOrigin(): string {
+  const raw = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+  if (raw) {
+    const noSlash = raw.replace(/\/+$/, '');
+    return noSlash.endsWith('/api/v1') ? noSlash.slice(0, -7) : noSlash;
+  }
   if (import.meta.env.DEV) {
     const o = import.meta.env.VITE_SSE_ORIGIN as string | undefined;
     return (o && o.replace(/\/$/, '')) || 'http://127.0.0.1:8000';
