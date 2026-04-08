@@ -10,7 +10,7 @@ import {
   PenLine, Copy,
 } from 'lucide-react';
 import { CustomSelect, SelectField } from '../../../components/teacher/CustomSelect';
-import { previewGenerateQuestionsApi } from '../../../utils/aiQuestionGenApi';
+import { previewGenerateQuestionsApi, previewGenerateQuestionsMultimodalApi } from '../../../utils/aiQuestionGenApi';
 import { createPaperApi } from '../../../utils/paperApi';
 import { extractSourceTextApi } from '../../../utils/sourceExtractionApi';
 
@@ -494,7 +494,7 @@ export default function AssessmentGenerate() {
   const [examGenMode, setExamGenMode] = useState<ExamGenMode>('error-questions');
   const [examMatchMode, setExamMatchMode] = useState<'type' | 'knowledge'>('type');
   const [examDifficulty, setExamDifficulty] = useState<'basic' | 'solid' | 'advanced'>('solid');
-  const [examFiles, setExamFiles] = useState<{ name: string; size: number; url: string }[]>([]);
+  const [examFiles, setExamFiles] = useState<{ name: string; size: number; url: string; file?: File; extractedText?: string }[]>([]);
   const [examDragging, setExamDragging] = useState(false);
   const examFileRef = useRef<HTMLInputElement>(null);
   const [bankSearch, setBankSearch] = useState('');
@@ -608,6 +608,8 @@ export default function AssessmentGenerate() {
       return [tbPublisher, tbGrade, tbSubject, tbSemester, tbEdition, chosenSections].filter(Boolean).join(' ');
     }
     if (sourceTab === 'exam') {
+      const extracted = examFiles.map((f) => (f.extractedText || '').trim()).filter(Boolean).join('\n\n');
+      if (extracted) return extracted;
       const fileNames = examFiles.map((f) => f.name).join(' ');
       return [fileNames, examGenMode, examMatchMode].filter(Boolean).join(' ');
     }
@@ -754,6 +756,8 @@ export default function AssessmentGenerate() {
     if (!files) return;
     const newFiles = Array.from(files).slice(0, Math.max(0, 5 - examFiles.length)).map(f => ({
       name: f.name, size: f.size,
+      file: f,
+      extractedText: '',
       url: f.type.startsWith('image/') ? URL.createObjectURL(f) : '',
     }));
     setExamFiles(prev => [...prev, ...newFiles].slice(0, 5));
@@ -805,6 +809,27 @@ export default function AssessmentGenerate() {
     }
     const effectiveSubject = inferEffectiveSubject();
     let sourceMaterial = buildSourceMaterialText();
+    if (sourceTab === 'exam' && examFiles.length > 0) {
+      try {
+        const next = [...examFiles];
+        let changed = false;
+        for (let i = 0; i < Math.min(next.length, 2); i++) {
+          const ef = next[i];
+          if (!ef.extractedText?.trim() && ef.file) {
+            const extracted = await extractSourceTextApi(ef.file);
+            next[i] = { ...ef, extractedText: extracted.source_text };
+            changed = true;
+          }
+        }
+        if (changed) {
+          setExamFiles(next);
+          const extractedAll = next.map((f) => (f.extractedText || '').trim()).filter(Boolean).join('\n\n');
+          if (extractedAll) sourceMaterial = extractedAll;
+        }
+      } catch {
+        // Keep filename fallback for preview when extraction fails.
+      }
+    }
     if (sourceTab === 'upload' && uploadedFile?.file) {
       try {
         const extracted = await extractSourceTextApi(uploadedFile.file);
@@ -864,7 +889,16 @@ export default function AssessmentGenerate() {
         previewPayload.task_type = examGenMode === 'simulation' ? 'simulation' : 'error_based';
         previewPayload.match_mode = examMatchMode;
       }
-      const preview = await previewGenerateQuestionsApi(previewPayload);
+      const examBinaryFiles =
+        sourceTab === 'exam'
+          ? examFiles
+              .map((f) => f.file)
+              .filter((f): f is File => Boolean(f))
+          : [];
+      const preview =
+        sourceTab === 'exam' && examBinaryFiles.length > 0
+          ? await previewGenerateQuestionsMultimodalApi(previewPayload, examBinaryFiles)
+          : await previewGenerateQuestionsApi(previewPayload);
       if (preview.questions.length > 0) {
         qs = preview.questions.map((q, idx) => ({
           id: `gq-${idx + 1}`,

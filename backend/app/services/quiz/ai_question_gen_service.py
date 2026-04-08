@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from openai import AsyncOpenAI
 
@@ -103,6 +105,51 @@ class AIQuestionGenService:
         )
 
     @staticmethod
+    async def preview_generate_multimodal(
+        payload: AIQuestionGenPreviewRequest,
+        files: list[tuple[str, str, bytes]],
+    ) -> AIQuestionGenPreviewResponse:
+        # No files -> behave like normal preview path.
+        if not files:
+            return await AIQuestionGenService.preview_generate(payload)
+
+        type_targets = payload.type_targets or AIQuestionGenService._default_type_targets(payload.question_count)
+        provider = settings.quiz_generation_provider.strip().lower()
+        if AIQuestionGenService._llm_enabled():
+            max_attempts = max(1, settings.quiz_generation_llm_max_retries)
+            last_error: Exception | None = None
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    generated = await AIQuestionGenService._llm_generate_multimodal(payload, type_targets, files)
+                    generated = AIQuestionGenService._enforce_type_targets(generated, payload, type_targets)
+                    if generated:
+                        return AIQuestionGenPreviewResponse(
+                            questions=generated[: payload.question_count],
+                            generation_mode="llm",
+                        )
+                except Exception as exc:
+                    last_error = exc
+                    logger.warning(
+                        "AI multimodal preview failed (attempt=%s/%s, provider=%s, error=%s)",
+                        attempt,
+                        max_attempts,
+                        provider,
+                        repr(exc),
+                    )
+                if attempt < max_attempts:
+                    await asyncio.sleep(min(0.5 * attempt, 1.5))
+            warning = "LLM multimodal preview returned empty output after retries."
+            if last_error is not None:
+                warning = f"LLM multimodal call failed ({type(last_error).__name__})."
+            return AIQuestionGenPreviewResponse(questions=[], generation_mode="llm", warning=warning)
+
+        return AIQuestionGenPreviewResponse(
+            questions=[],
+            generation_mode="heuristic",
+            warning="LLM provider unavailable for multimodal preview.",
+        )
+
+    @staticmethod
     def _llm_enabled() -> bool:
         provider = settings.quiz_generation_provider.strip().lower()
         return provider in {"openai", "ohmygpt"} and bool(settings.ohmygpt_api_key.strip())
@@ -164,6 +211,107 @@ class AIQuestionGenService:
         if result:
             return result
         return await AIQuestionGenService._llm_generate_text_mode(payload, type_targets)
+
+    @staticmethod
+    def _to_multimodal_user_content(
+        text_intro: str,
+        files: list[tuple[str, str, bytes]],
+    ) -> list[dict[str, Any]]:
+        content: list[dict[str, Any]] = [{"type": "text", "text": text_intro}]
+        # Keep payload controlled for token/cost.
+        for (_name, ctype, data) in files[:4]:
+            if not ctype.startswith("image/"):
+                continue
+            b64 = base64.b64encode(data).decode("ascii")
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{ctype};base64,{b64}"},
+                }
+            )
+        return content
+
+    @staticmethod
+    async def _llm_generate_multimodal(
+        payload: AIQuestionGenPreviewRequest,
+        type_targets: dict[str, int],
+        files: list[tuple[str, str, bytes]],
+    ) -> list[AIQuestionGenQuestion]:
+        client = AIQuestionGenService._get_client()
+
+        stage1_messages: list[dict[str, Any]] = [
+            {
+                "role": "system",
+                "content": (
+                    "You are an exam structure analyzer. "
+                    "Infer question-type distribution and style constraints from provided exam images/text. "
+                    "Return JSON only."
+                ),
+            },
+            {
+                "role": "user",
+                "content": AIQuestionGenService._to_multimodal_user_content(
+                    "Analyze these exam files and output JSON with keys: "
+                    "inferred_type_distribution, style_constraints, key_topics, rationale. "
+                    "Do not generate final questions in this step.",
+                    files,
+                ),
+            },
+        ]
+        stage1 = await client.chat.completions.create(
+            model=settings.quiz_generation_model,
+            temperature=0.1,
+            **AIQuestionGenService._token_limit_kwargs(
+                model=settings.quiz_generation_model,
+                max_tokens=max(512, settings.quiz_generation_max_tokens // 2),
+            ),
+            response_format={"type": "json_object"},
+            messages=stage1_messages,
+        )
+        stage1_raw = stage1.choices[0].message.content if stage1.choices else None
+        stage1_parsed = AIQuestionGenService._parse_json_object(stage1_raw or "") or {}
+        blueprint = json.dumps(stage1_parsed, ensure_ascii=False)
+
+        stage2_prompt = (
+            AIQuestionGenService._format_preview_user_prompt(payload, type_targets)
+            + "\n\nsource_analysis_blueprint:\n"
+            + blueprint
+            + "\n\nUse source_analysis_blueprint as the first-priority guide for structure/style."
+        )
+        stage2_messages: list[dict[str, Any]] = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a strict Question Generation Engine. "
+                    "You MUST follow the user's requested question type distribution exactly. "
+                    "For MCQ, you MUST provide 'options' as a list of 4 items with 'key', 'text', and 'correct' fields. "
+                    "A Multiple Choice Question (MCQ) without options is invalid and forbidden. "
+                    "Return JSON only."
+                ),
+            },
+            {
+                "role": "user",
+                "content": AIQuestionGenService._to_multimodal_user_content(stage2_prompt, files),
+            },
+        ]
+        stage2 = await client.chat.completions.create(
+            model=settings.quiz_generation_model,
+            temperature=settings.quiz_generation_temperature,
+            **AIQuestionGenService._token_limit_kwargs(
+                model=settings.quiz_generation_model,
+                max_tokens=settings.quiz_generation_max_tokens,
+            ),
+            response_format={"type": "json_object"},
+            messages=stage2_messages,
+        )
+        raw = stage2.choices[0].message.content if stage2.choices else None
+        if not raw:
+            return []
+        parsed = AIQuestionGenService._parse_json_object(raw)
+        raw_questions = parsed.get("questions", []) if isinstance(parsed, dict) else []
+        if not isinstance(raw_questions, list):
+            return []
+        return AIQuestionGenService._map_raw_questions(raw_questions, payload)
 
     @staticmethod
     async def _llm_generate_simulation_two_stage(
