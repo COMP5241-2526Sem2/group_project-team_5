@@ -153,49 +153,7 @@ class AIQuestionGenService:
         raw_questions = parsed.get("questions", []) if isinstance(parsed, dict) else []
         if not isinstance(raw_questions, list):
             return await AIQuestionGenService._llm_generate_text_mode(payload, type_targets)
-
-        result: list[AIQuestionGenQuestion] = []
-        for item in raw_questions:
-            if not isinstance(item, dict):
-                continue
-            qtype = str(item.get("type", "")).strip()
-            prompt = AIQuestionGenService._sanitize_prompt(str(item.get("prompt", "")).strip())
-            if not qtype or not prompt:
-                continue
-            if AIQuestionGenService._is_meta_instruction_prompt(prompt):
-                continue
-
-            normalized_type = AIQuestionGenService._normalize_type_label(qtype)
-            difficulty = str(item.get("difficulty", payload.difficulty)).strip().lower()
-            if difficulty not in {"easy", "medium", "hard"}:
-                difficulty = payload.difficulty
-
-            options: list[AIQuestionGenOption] = []
-            raw_options = item.get("options", [])
-            if isinstance(raw_options, list):
-                for idx, opt in enumerate(raw_options[:4]):
-                    if not isinstance(opt, dict):
-                        continue
-                    key = str(opt.get("key", "")).strip().upper() or "ABCD"[idx]
-                    text = str(opt.get("text", "")).strip()
-                    if not text:
-                        continue
-                    options.append(AIQuestionGenOption(key=key, text=text, correct=bool(opt.get("correct", False))))
-
-            answer = item.get("answer")
-            answer_text = str(answer).strip() if answer is not None else None
-            explanation = str(item.get("explanation", "")).strip() or "Generated from source concepts."
-
-            result.append(
-                AIQuestionGenQuestion(
-                    type=normalized_type,
-                    prompt=prompt,
-                    options=options,
-                    answer=answer_text,
-                    difficulty=difficulty,
-                    explanation=explanation,
-                )
-            )
+        result = AIQuestionGenService._map_raw_questions(raw_questions, payload)
 
         if result:
             return result
@@ -220,14 +178,19 @@ class AIQuestionGenService:
             f"difficulty={payload.difficulty}\n"
             f"question_count={payload.question_count}\n"
             f"type_targets={json.dumps(type_targets, ensure_ascii=True)}\n"
+            "Interpretation:\n"
+            "- source_text is the TOPIC/INTENT instruction for question authoring.\n"
+            "- It is not a question stem and must never be copied verbatim into prompt.\n"
             "Constraints:\n"
             "1) Do not include phrases like 'according to source/provided material/uploaded document'.\n"
             "2) Keep questions answerable standalone.\n"
             "3) For MCQ provide exactly 4 options A-D and exactly one correct option.\n"
             "4) For True/False provide answer as True or False.\n"
             "5) Reflect concrete concepts from source text.\n"
-            "6) Do NOT output meta/instruction prompts such as 'please generate ... questions'.\n"
-            "7) Each item must be a directly answerable question, not a request to generate questions.\n"
+            "6) Strictly forbid instructional/meta wording in prompt, including but not limited to "
+            "'generate N questions', 'please generate', 'create questions', '生成X道题', '请生成'.\n"
+            "7) Each item must contain exactly ONE question in prompt; do not concatenate multiple questions.\n"
+            "8) prompt must be student-facing only. Do not include authoring instructions, counts, or process notes.\n"
             "source_text:\n"
             f"{payload.source_text[:7000]}"
         )
@@ -288,50 +251,57 @@ class AIQuestionGenService:
                 normalized_raw = raw
             reparsed = AIQuestionGenService._parse_json_object(normalized_raw)
             if reparsed and isinstance(reparsed.get("questions"), list):
-                # Let the main mapper process by simulating the existing loop.
                 raw_questions = reparsed.get("questions", [])
-                mapped: list[AIQuestionGenQuestion] = []
-                for item in raw_questions:
-                    if not isinstance(item, dict):
-                        continue
-                    qtype = str(item.get("type", "")).strip()
-                    prompt = AIQuestionGenService._sanitize_prompt(str(item.get("prompt", "")).strip())
-                    if not qtype or not prompt:
-                        continue
-                    if AIQuestionGenService._is_meta_instruction_prompt(prompt):
-                        continue
-                    normalized_type = AIQuestionGenService._normalize_type_label(qtype)
-                    diff = str(item.get("difficulty", payload.difficulty)).strip().lower()
-                    if diff not in {"easy", "medium", "hard"}:
-                        diff = payload.difficulty
-                    options: list[AIQuestionGenOption] = []
-                    raw_options = item.get("options", [])
-                    if isinstance(raw_options, list):
-                        for idx, opt in enumerate(raw_options[:4]):
-                            if not isinstance(opt, dict):
-                                continue
-                            key = str(opt.get("key", "")).strip().upper() or "ABCD"[idx]
-                            text = str(opt.get("text", "")).strip()
-                            if not text:
-                                continue
-                            options.append(AIQuestionGenOption(key=key, text=text, correct=bool(opt.get("correct", False))))
-                    answer = item.get("answer")
-                    answer_text = str(answer).strip() if answer is not None else None
-                    explanation = str(item.get("explanation", "")).strip() or "Generated from source concepts."
-                    mapped.append(
-                        AIQuestionGenQuestion(
-                            type=normalized_type,
-                            prompt=prompt,
-                            options=options,
-                            answer=answer_text,
-                            difficulty=diff,
-                            explanation=explanation,
-                        )
-                    )
+                mapped = AIQuestionGenService._map_raw_questions(raw_questions, payload)
                 if mapped:
                     return mapped
 
         return AIQuestionGenService._parse_markdown_questions(raw, payload.difficulty)
+
+    @staticmethod
+    def _map_raw_questions(
+        raw_questions: list[dict],
+        payload: AIQuestionGenPreviewRequest,
+    ) -> list[AIQuestionGenQuestion]:
+        mapped: list[AIQuestionGenQuestion] = []
+        for item in raw_questions:
+            if not isinstance(item, dict):
+                continue
+            qtype = str(item.get("type", "")).strip()
+            prompt = AIQuestionGenService._sanitize_prompt(str(item.get("prompt", "")).strip())
+            if not qtype or not prompt:
+                continue
+            if AIQuestionGenService._is_meta_instruction_prompt(prompt):
+                continue
+            normalized_type = AIQuestionGenService._normalize_type_label(qtype)
+            diff = str(item.get("difficulty", payload.difficulty)).strip().lower()
+            if diff not in {"easy", "medium", "hard"}:
+                diff = payload.difficulty
+            options: list[AIQuestionGenOption] = []
+            raw_options = item.get("options", [])
+            if isinstance(raw_options, list):
+                for idx, opt in enumerate(raw_options[:4]):
+                    if not isinstance(opt, dict):
+                        continue
+                    key = str(opt.get("key", "")).strip().upper() or "ABCD"[idx]
+                    text = str(opt.get("text", "")).strip()
+                    if not text:
+                        continue
+                    options.append(AIQuestionGenOption(key=key, text=text, correct=bool(opt.get("correct", False))))
+            answer = item.get("answer")
+            answer_text = str(answer).strip() if answer is not None else None
+            explanation = str(item.get("explanation", "")).strip() or "Generated from source concepts."
+            mapped.append(
+                AIQuestionGenQuestion(
+                    type=normalized_type,
+                    prompt=prompt,
+                    options=options,
+                    answer=answer_text,
+                    difficulty=diff,
+                    explanation=explanation,
+                )
+            )
+        return mapped
 
     @staticmethod
     def _parse_json_object(raw: str) -> dict | None:
