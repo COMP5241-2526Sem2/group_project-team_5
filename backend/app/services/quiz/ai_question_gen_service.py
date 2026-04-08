@@ -162,6 +162,8 @@ class AIQuestionGenService:
             prompt = AIQuestionGenService._sanitize_prompt(str(item.get("prompt", "")).strip())
             if not qtype or not prompt:
                 continue
+            if AIQuestionGenService._is_meta_instruction_prompt(prompt):
+                continue
 
             normalized_type = AIQuestionGenService._normalize_type_label(qtype)
             difficulty = str(item.get("difficulty", payload.difficulty)).strip().lower()
@@ -224,9 +226,24 @@ class AIQuestionGenService:
             "3) For MCQ provide exactly 4 options A-D and exactly one correct option.\n"
             "4) For True/False provide answer as True or False.\n"
             "5) Reflect concrete concepts from source text.\n"
+            "6) Do NOT output meta/instruction prompts such as 'please generate ... questions'.\n"
+            "7) Each item must be a directly answerable question, not a request to generate questions.\n"
             "source_text:\n"
             f"{payload.source_text[:7000]}"
         )
+
+    @staticmethod
+    def _is_meta_instruction_prompt(prompt: str) -> bool:
+        p = (prompt or "").strip().lower()
+        if not p:
+            return True
+        if p.startswith(("generate ", "please generate", "create ", "write ")):
+            return True
+        if p.startswith(("生成", "请生成", "请出", "出 ")):
+            return True
+        if "道题" in p and ("生成" in p or "请生成" in p):
+            return True
+        return False
 
     @staticmethod
     def _build_messages(payload: AIQuestionGenPreviewRequest, type_targets: dict[str, int]) -> list[dict[str, str]]:
@@ -280,6 +297,8 @@ class AIQuestionGenService:
                     qtype = str(item.get("type", "")).strip()
                     prompt = AIQuestionGenService._sanitize_prompt(str(item.get("prompt", "")).strip())
                     if not qtype or not prompt:
+                        continue
+                    if AIQuestionGenService._is_meta_instruction_prompt(prompt):
                         continue
                     normalized_type = AIQuestionGenService._normalize_type_label(qtype)
                     diff = str(item.get("difficulty", payload.difficulty)).strip().lower()
