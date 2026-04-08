@@ -20,10 +20,6 @@ from app.schemas.quiz.quiz_generation import (
 logger = logging.getLogger(__name__)
 
 
-class LLMGenerationError(RuntimeError):
-    """Raised when LLM generation should fail fast without heuristic fallback."""
-
-
 @dataclass(slots=True)
 class _DraftQuestion:
     qtype: str
@@ -35,7 +31,6 @@ class _DraftQuestion:
 
 class AIQuestionGenService:
     _client: AsyncOpenAI | None = None
-    _max_source_chars = 5000
     _stopwords = {
         "the", "and", "for", "with", "that", "this", "from", "your", "into", "about", "paper", "chapter",
         "notes", "exercise", "exam", "test", "question", "questions", "grade", "unit", "file", "upload", "document",
@@ -48,177 +43,64 @@ class AIQuestionGenService:
     @staticmethod
     async def preview_generate(payload: AIQuestionGenPreviewRequest) -> AIQuestionGenPreviewResponse:
         type_targets = payload.type_targets or AIQuestionGenService._default_type_targets(payload.question_count)
-        effective_payload = payload
-        effective_type_targets = type_targets
-
-        # Simulation mode: first analyze source structure, then generate by analyzed structure.
-        if payload.task_type == "simulation":
-            analyzed_targets, analyzed_outline = await AIQuestionGenService._analyze_exam_source(
-                payload=payload,
-                requested_type_targets=type_targets,
-            )
-            if analyzed_targets:
-                effective_type_targets = analyzed_targets
-            if analyzed_outline:
-                enhanced_source = (
-                    f"[EXAM SOURCE ANALYSIS]\n{analyzed_outline}\n\n"
-                    f"[ORIGINAL SOURCE]\n{payload.source_text}"
-                )
-                effective_payload = payload.model_copy(update={"source_text": enhanced_source})
 
         provider = settings.quiz_generation_provider.strip().lower()
-        if not AIQuestionGenService._llm_enabled():
-            if provider in {"openai", "ohmygpt"} and not settings.ohmygpt_api_key.strip():
-                raise LLMGenerationError("LLM preview generation failed: API key is missing.")
-            raise LLMGenerationError(f"LLM preview generation failed: unsupported provider '{provider}'.")
-
-        max_attempts = max(1, settings.quiz_generation_llm_max_retries)
-        last_error: Exception | None = None
-        for attempt in range(1, max_attempts + 1):
-            try:
-                generated = await AIQuestionGenService._llm_generate(effective_payload, effective_type_targets)
-                generated = AIQuestionGenService._enforce_type_targets(
-                    generated,
-                    effective_payload,
-                    effective_type_targets,
-                )
-                if generated:
-                    return AIQuestionGenPreviewResponse(
-                        questions=generated[: effective_payload.question_count],
-                        generation_mode="llm",
+        if AIQuestionGenService._llm_enabled():
+            max_attempts = max(1, settings.quiz_generation_llm_max_retries)
+            last_error: Exception | None = None
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    generated = await AIQuestionGenService._llm_generate(payload, type_targets)
+                    generated = AIQuestionGenService._enforce_type_targets(generated, payload, type_targets)
+                    if generated:
+                        return AIQuestionGenPreviewResponse(
+                            questions=generated[: payload.question_count],
+                            generation_mode="llm",
+                        )
+                    logger.warning(
+                        "AI question preview got empty LLM output (attempt=%s/%s, provider=%s)",
+                        attempt,
+                        max_attempts,
+                        provider,
                     )
-                logger.warning(
-                    "AI question preview got empty LLM output after parse/enforce (attempt=%s/%s, provider=%s, source_chars=%s, requested_count=%s)",
-                    attempt,
-                    max_attempts,
-                    provider,
-                    len((effective_payload.source_text or "").strip()),
-                    effective_payload.question_count,
-                )
-            except Exception as exc:
-                last_error = exc
-                logger.warning(
-                    "AI question preview LLM call failed (attempt=%s/%s, provider=%s, error=%s)",
-                    attempt,
-                    max_attempts,
-                    provider,
-                    repr(exc),
-                )
-            if attempt < max_attempts:
-                await asyncio.sleep(min(1.2 * attempt, 3.0))
+                except Exception as exc:
+                    last_error = exc
+                    logger.warning(
+                        "AI question preview LLM call failed (attempt=%s/%s, provider=%s, error=%s)",
+                        attempt,
+                        max_attempts,
+                        provider,
+                        repr(exc),
+                    )
+                if attempt < max_attempts:
+                    await asyncio.sleep(min(0.5 * attempt, 1.5))
 
-        msg = "LLM preview generation returned empty output after retries; no heuristic fallback is allowed."
-        if last_error is not None:
-            msg = f"LLM preview generation failed after retries ({type(last_error).__name__}); no heuristic fallback is allowed."
-        raise LLMGenerationError(msg)
-
-    @staticmethod
-    async def _analyze_exam_source(
-        payload: AIQuestionGenPreviewRequest,
-        requested_type_targets: dict[str, int],
-    ) -> tuple[dict[str, int], str]:
-        """Two-stage simulation: infer source exam structure before generation."""
-        prepared_source = AIQuestionGenService._prepare_source_text(payload.source_text)
-        if not prepared_source.strip():
-            return requested_type_targets, ""
-
-        client = AIQuestionGenService._get_client()
-        response = await client.chat.completions.create(
-            model=settings.quiz_generation_model,
-            temperature=0.1,
-            **AIQuestionGenService._token_limit_kwargs(
-                model=settings.quiz_generation_model,
-                max_tokens=max(400, min(1200, settings.quiz_generation_max_tokens)),
-            ),
-            response_format={"type": "json_object"},
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are an exam structure analyzer. "
-                        "Extract question-type distribution and concise source question outlines from exam content. "
-                        "Return JSON only."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        f"question_count={payload.question_count}\n"
-                        "Output JSON schema:\n"
-                        '{ "type_targets": {"MCQ":int,"True/False":int,"Fill-blank":int,"Short Answer":int,"Essay":int}, '
-                        '"source_outline": [string, ...] }\n'
-                        "Rules:\n"
-                        "1) Infer structure from source_text.\n"
-                        "2) Keep only positive counts.\n"
-                        "3) type_targets should be close to inferred structure and sum to question_count.\n"
-                        "4) source_outline should contain concise question intent lines.\n"
-                        "source_text:\n"
-                        f"{prepared_source}"
-                    ),
-                },
-            ],
-        )
-        raw = response.choices[0].message.content if response.choices else None
-        if not raw:
-            return requested_type_targets, ""
-        parsed = AIQuestionGenService._parse_json_object(raw)
-        if not parsed:
-            return requested_type_targets, ""
-
-        raw_targets = parsed.get("type_targets", {})
-        outline = parsed.get("source_outline", [])
-        normalized_targets = (
-            AIQuestionGenService._normalize_type_targets(raw_targets)
-            if isinstance(raw_targets, dict)
-            else {}
-        )
-        if normalized_targets:
-            normalized_targets = AIQuestionGenService._rebalance_type_targets(
-                normalized_targets,
-                payload.question_count,
+            fallback = AIQuestionGenService._heuristic_generate(payload, type_targets)
+            fallback = AIQuestionGenService._enforce_type_targets(fallback, payload, type_targets)
+            warning = "LLM unavailable or returned empty output; heuristic fallback was used."
+            if last_error is not None:
+                warning = f"LLM call failed ({type(last_error).__name__}); heuristic fallback was used."
+            return AIQuestionGenPreviewResponse(
+                questions=fallback[: payload.question_count],
+                generation_mode="heuristic",
+                warning=warning,
             )
-        else:
-            normalized_targets = requested_type_targets
 
-        outline_text = ""
-        if isinstance(outline, list):
-            lines = [str(x).strip() for x in outline if str(x).strip()]
-            if lines:
-                outline_text = "\n".join(f"- {x}" for x in lines[:30])
+        key_missing = provider in {"openai", "ohmygpt"} and not settings.ohmygpt_api_key.strip()
+        provider_mismatch = provider not in {"openai", "ohmygpt", "heuristic"}
 
-        return normalized_targets, outline_text
-
-    @staticmethod
-    def _rebalance_type_targets(type_targets: dict[str, int], total: int) -> dict[str, int]:
-        normalized = {k: max(0, int(v)) for k, v in type_targets.items() if int(v) > 0}
-        if not normalized:
-            return AIQuestionGenService._default_type_targets(total)
-        s = sum(normalized.values())
-        if s == total:
-            return normalized
-        if s <= 0:
-            return AIQuestionGenService._default_type_targets(total)
-
-        # Proportional rescale then distribute remainder deterministically.
-        scaled: dict[str, int] = {}
-        fracs: list[tuple[str, float]] = []
-        for k, v in normalized.items():
-            f = (v * total) / s
-            base = int(f)
-            scaled[k] = base
-            fracs.append((k, f - base))
-        remainder = total - sum(scaled.values())
-        fracs.sort(key=lambda x: x[1], reverse=True)
-        i = 0
-        while remainder > 0 and fracs:
-            k = fracs[i % len(fracs)][0]
-            scaled[k] += 1
-            remainder -= 1
-            i += 1
-        # Ensure at least one item for top dominant type if all rounded to zero.
-        if sum(scaled.values()) == 0 and fracs:
-            scaled[fracs[0][0]] = total
-        return {k: v for k, v in scaled.items() if v > 0}
+        fallback = AIQuestionGenService._heuristic_generate(payload, type_targets)
+        fallback = AIQuestionGenService._enforce_type_targets(fallback, payload, type_targets)
+        warning: str | None = None
+        if key_missing:
+            warning = "LLM provider is enabled but API key is missing; heuristic fallback was used."
+        elif provider_mismatch:
+            warning = f"Unknown provider '{provider}'; heuristic fallback was used."
+        return AIQuestionGenPreviewResponse(
+            questions=fallback[: payload.question_count],
+            generation_mode="heuristic",
+            warning=warning,
+        )
 
     @staticmethod
     def _llm_enabled() -> bool:
@@ -248,6 +130,9 @@ class AIQuestionGenService:
 
     @staticmethod
     async def _llm_generate(payload: AIQuestionGenPreviewRequest, type_targets: dict[str, int]) -> list[AIQuestionGenQuestion]:
+        if payload.task_type == "simulation":
+            return await AIQuestionGenService._llm_generate_simulation_two_stage(payload, type_targets)
+
         client = AIQuestionGenService._get_client()
         messages = AIQuestionGenService._build_messages(payload, type_targets)
         response = await client.chat.completions.create(
@@ -263,42 +148,110 @@ class AIQuestionGenService:
 
         raw = response.choices[0].message.content if response.choices else None
         if not raw:
-            logger.warning(
-                "LLM preview response has empty message.content; switching to text-mode parse (provider=%s, model=%s)",
-                settings.quiz_generation_provider,
-                settings.quiz_generation_model,
-            )
             return await AIQuestionGenService._llm_generate_text_mode(payload, type_targets)
 
-        parsed = AIQuestionGenService._parse_json_value(raw)
+        parsed = AIQuestionGenService._parse_json_object(raw)
         if parsed is None:
-            logger.warning(
-                "LLM preview JSON parse failed; trying markdown parse (chars=%s, snippet=%s)",
-                len(raw),
-                AIQuestionGenService._log_snippet(raw),
-            )
             markdown_parsed = AIQuestionGenService._parse_markdown_questions(raw, payload.difficulty)
             if markdown_parsed:
                 return markdown_parsed
             return await AIQuestionGenService._llm_generate_text_mode(payload, type_targets)
-        raw_questions = AIQuestionGenService._extract_raw_questions(parsed)
-        if not raw_questions:
-            logger.warning(
-                "LLM preview JSON parsed but no question list found (parsed_type=%s, top_keys=%s)",
-                type(parsed).__name__,
-                ",".join(parsed.keys())[:120] if isinstance(parsed, dict) else "n/a",
-            )
+        raw_questions = parsed.get("questions", []) if isinstance(parsed, dict) else []
+        if not isinstance(raw_questions, list):
             return await AIQuestionGenService._llm_generate_text_mode(payload, type_targets)
         result = AIQuestionGenService._map_raw_questions(raw_questions, payload)
 
         if result:
             return result
-        logger.warning(
-            "LLM preview mapped zero valid questions (raw_count=%s, requested=%s)",
-            len(raw_questions),
-            payload.question_count,
-        )
         return await AIQuestionGenService._llm_generate_text_mode(payload, type_targets)
+
+    @staticmethod
+    async def _llm_generate_simulation_two_stage(
+        payload: AIQuestionGenPreviewRequest,
+        type_targets: dict[str, int],
+    ) -> list[AIQuestionGenQuestion]:
+        client = AIQuestionGenService._get_client()
+
+        # Stage 1: extract source exam structure blueprint first.
+        stage1_messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are an exam structure analyzer. "
+                    "Infer question-type distribution and style constraints from the source text. "
+                    "Return JSON only."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    "Analyze the source exam content and output JSON with keys:\n"
+                    "- inferred_type_distribution: object, e.g. {\"MCQ\": 5, \"Fill-blank\": 2}\n"
+                    "- style_constraints: array of short strings\n"
+                    "- key_topics: array of short topic strings\n"
+                    "- rationale: one short sentence\n"
+                    "Do not generate final questions in this step.\n"
+                    "source_text:\n"
+                    f"{payload.source_text[:7000]}"
+                ),
+            },
+        ]
+        stage1 = await client.chat.completions.create(
+            model=settings.quiz_generation_model,
+            temperature=0.1,
+            **AIQuestionGenService._token_limit_kwargs(
+                model=settings.quiz_generation_model,
+                max_tokens=max(512, settings.quiz_generation_max_tokens // 2),
+            ),
+            response_format={"type": "json_object"},
+            messages=stage1_messages,
+        )
+        stage1_raw = stage1.choices[0].message.content if stage1.choices else None
+        stage1_parsed = AIQuestionGenService._parse_json_object(stage1_raw or "") or {}
+        blueprint = json.dumps(stage1_parsed, ensure_ascii=False)
+
+        # Stage 2: generate questions using blueprint + all runtime constraints.
+        stage2_messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a strict Question Generation Engine. "
+                    "You MUST follow the user's requested question type distribution exactly. "
+                    "For MCQ, you MUST provide 'options' as a list of 4 items with 'key', 'text', and 'correct' fields. "
+                    "A Multiple Choice Question (MCQ) without options is invalid and forbidden. "
+                    "Return JSON only."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    AIQuestionGenService._format_preview_user_prompt(payload, type_targets)
+                    + "\n\nsource_analysis_blueprint:\n"
+                    + blueprint
+                    + "\n\nUse source_analysis_blueprint as the first-priority guide for structure/style."
+                ),
+            },
+        ]
+        stage2 = await client.chat.completions.create(
+            model=settings.quiz_generation_model,
+            temperature=settings.quiz_generation_temperature,
+            **AIQuestionGenService._token_limit_kwargs(
+                model=settings.quiz_generation_model,
+                max_tokens=settings.quiz_generation_max_tokens,
+            ),
+            response_format={"type": "json_object"},
+            messages=stage2_messages,
+        )
+
+        raw = stage2.choices[0].message.content if stage2.choices else None
+        if not raw:
+            return []
+
+        parsed = AIQuestionGenService._parse_json_object(raw)
+        raw_questions = parsed.get("questions", []) if isinstance(parsed, dict) else []
+        if not isinstance(raw_questions, list):
+            return []
+        return AIQuestionGenService._map_raw_questions(raw_questions, payload)
 
     @staticmethod
     def _format_preview_user_prompt(payload: AIQuestionGenPreviewRequest, type_targets: dict[str, int]) -> str:
@@ -326,7 +279,6 @@ class AIQuestionGenService:
                 "error_based mode: generate targeted remediation questions based on likely mistakes in source material."
             )
         meta_block = "\n".join(meta_lines)
-        prepared_source = AIQuestionGenService._prepare_source_text(payload.source_text)
         return (
             f"{meta_block}\n"
             f"difficulty={payload.difficulty}\n"
@@ -347,39 +299,8 @@ class AIQuestionGenService:
             "7) Each item must contain exactly ONE question in prompt; do not concatenate multiple questions.\n"
             "8) prompt must be student-facing only. Do not include authoring instructions, counts, or process notes.\n"
             "source_text:\n"
-            f"{prepared_source}"
+            f"{payload.source_text[:7000]}"
         )
-
-    @staticmethod
-    def _prepare_source_text(source_text: str) -> str:
-        text = (source_text or "").replace("\r\n", "\n").replace("\r", "\n")
-        cleaned: list[str] = []
-        noise_patterns = [
-            r"^\s*page\s*\d+(\s*\/\s*\d+)?\s*$",
-            r"^\s*\d+\s*\/\s*\d+\s*$",
-            r"^\s*考生须知[:：]?\s*$",
-            r"^\s*注意事项[:：]?\s*$",
-            r"^\s*exam instructions[:：]?\s*$",
-            r"^\s*read the following instructions.*$",
-            r"^\s*姓名[:：].*$",
-            r"^\s*班级[:：].*$",
-            r"^\s*学号[:：].*$",
-            r"^\s*student\s*id[:：].*$",
-            r"^\s*name[:：].*$",
-            r"^\s*class[:：].*$",
-        ]
-        compiled = [re.compile(p, flags=re.IGNORECASE) for p in noise_patterns]
-        for line in text.split("\n"):
-            ln = line.strip()
-            if not ln:
-                continue
-            if any(p.match(ln) for p in compiled):
-                continue
-            cleaned.append(ln)
-        normalized = "\n".join(cleaned).strip()
-        if len(normalized) > AIQuestionGenService._max_source_chars:
-            normalized = normalized[: AIQuestionGenService._max_source_chars]
-        return normalized
 
     @staticmethod
     def _is_meta_instruction_prompt(prompt: str) -> bool:
@@ -429,24 +350,23 @@ class AIQuestionGenService:
         )
         raw = response.choices[0].message.content if response.choices else None
         if not raw:
-            logger.warning("LLM preview text-mode response also empty.")
             return []
 
-        parsed = AIQuestionGenService._parse_json_value(raw)
-        raw_questions = AIQuestionGenService._extract_raw_questions(parsed)
-        if raw_questions:
-            mapped = AIQuestionGenService._map_raw_questions(raw_questions, payload)
-            if mapped:
-                return mapped
+        parsed = AIQuestionGenService._parse_json_object(raw)
+        if parsed is not None and isinstance(parsed.get("questions"), list):
+            # Reuse the strict path by feeding back as string for normalized mapping.
+            try:
+                normalized_raw = json.dumps(parsed, ensure_ascii=False)
+            except Exception:
+                normalized_raw = raw
+            reparsed = AIQuestionGenService._parse_json_object(normalized_raw)
+            if reparsed and isinstance(reparsed.get("questions"), list):
+                raw_questions = reparsed.get("questions", [])
+                mapped = AIQuestionGenService._map_raw_questions(raw_questions, payload)
+                if mapped:
+                    return mapped
 
         return AIQuestionGenService._parse_markdown_questions(raw, payload.difficulty)
-
-    @staticmethod
-    def _log_snippet(text: str, limit: int = 200) -> str:
-        compact = re.sub(r"\s+", " ", (text or "")).strip()
-        if len(compact) <= limit:
-            return compact
-        return compact[:limit] + "...[truncated]"
 
     @staticmethod
     def _map_raw_questions(
@@ -529,11 +449,6 @@ class AIQuestionGenService:
 
     @staticmethod
     def _parse_json_object(raw: str) -> dict | None:
-        parsed = AIQuestionGenService._parse_json_value(raw)
-        return parsed if isinstance(parsed, dict) else None
-
-    @staticmethod
-    def _parse_json_value(raw: str) -> dict | list | None:
         text = raw.strip()
         if not text:
             return None
@@ -545,55 +460,19 @@ class AIQuestionGenService:
 
         try:
             parsed = json.loads(text)
-            if isinstance(parsed, (dict, list)):
-                return parsed
-            return None
+            return parsed if isinstance(parsed, dict) else None
         except Exception:
             pass
 
-        # Fallback: extract first JSON object or array span from mixed text.
-        match = re.search(r"(\{[\s\S]*\}|\[[\s\S]*\])", text)
+        # Fallback: extract the first JSON object span from mixed text.
+        match = re.search(r"\{[\s\S]*\}", text)
         if not match:
             return None
         try:
             parsed = json.loads(match.group(0))
-            if isinstance(parsed, (dict, list)):
-                return parsed
-            return None
+            return parsed if isinstance(parsed, dict) else None
         except Exception:
             return None
-
-    @staticmethod
-    def _extract_raw_questions(parsed: dict | list | None) -> list[dict]:
-        if isinstance(parsed, list):
-            return [x for x in parsed if isinstance(x, dict)]
-        if not isinstance(parsed, dict):
-            return []
-
-        direct = parsed.get("questions")
-        if isinstance(direct, list):
-            return [x for x in direct if isinstance(x, dict)]
-
-        queue: list[dict] = [parsed]
-        seen_ids: set[int] = set()
-        candidate_keys = ("items", "data", "result", "output")
-        while queue:
-            node = queue.pop(0)
-            node_id = id(node)
-            if node_id in seen_ids:
-                continue
-            seen_ids.add(node_id)
-            for key in candidate_keys:
-                value = node.get(key)
-                if isinstance(value, list):
-                    dict_items = [x for x in value if isinstance(x, dict)]
-                    if dict_items:
-                        return dict_items
-                elif isinstance(value, dict):
-                    if isinstance(value.get("questions"), list):
-                        return [x for x in value["questions"] if isinstance(x, dict)]
-                    queue.append(value)
-        return []
 
     @staticmethod
     def _parse_markdown_questions(raw: str, difficulty: str) -> list[AIQuestionGenQuestion]:

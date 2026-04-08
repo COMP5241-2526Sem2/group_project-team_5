@@ -33,19 +33,6 @@ export interface AIQuestionGenPreviewResponseDto {
   questions: AIQuestionGenPreviewQuestionDto[];
 }
 
-export interface AIQuestionGenPreviewJobCreateResponseDto {
-  job_id: string;
-  status: "queued" | "running" | "succeeded" | "failed";
-}
-
-export interface AIQuestionGenPreviewJobStatusResponseDto {
-  job_id: string;
-  status: "queued" | "running" | "succeeded" | "failed";
-  result: AIQuestionGenPreviewResponseDto | null;
-  error: string | null;
-  updated_at: string;
-}
-
 export async function previewGenerateQuestionsApi(
   payload: AIQuestionGenPreviewRequestDto,
 ): Promise<AIQuestionGenPreviewResponseDto> {
@@ -54,31 +41,6 @@ export async function previewGenerateQuestionsApi(
     {
       method: "POST",
       body: JSON.stringify(payload),
-    },
-    "teacher",
-  );
-}
-
-export async function createPreviewGenerateJobApi(
-  payload: AIQuestionGenPreviewRequestDto,
-): Promise<AIQuestionGenPreviewJobCreateResponseDto> {
-  return apiRequest<AIQuestionGenPreviewJobCreateResponseDto>(
-    "/quiz-generation/preview/jobs",
-    {
-      method: "POST",
-      body: JSON.stringify(payload),
-    },
-    "teacher",
-  );
-}
-
-export async function getPreviewGenerateJobStatusApi(
-  jobId: string,
-): Promise<AIQuestionGenPreviewJobStatusResponseDto> {
-  return apiRequest<AIQuestionGenPreviewJobStatusResponseDto>(
-    `/quiz-generation/preview/jobs/${encodeURIComponent(jobId)}`,
-    {
-      method: "GET",
     },
     "teacher",
   );

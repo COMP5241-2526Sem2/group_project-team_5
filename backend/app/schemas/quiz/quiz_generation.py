@@ -94,15 +94,9 @@ class AIQuestionGenPreviewRequest(BaseModel):
     grade: str | None = None
     task_type: Literal["simulation", "error_based"] | None = None
     match_mode: Literal["type", "knowledge"] | None = None
-    difficulty: Difficulty | Literal["solid"]
+    difficulty: Difficulty
     question_count: int = Field(ge=1)
     type_targets: dict[str, int] | None = None
-
-    @model_validator(mode="after")
-    def normalize_preview_difficulty(self) -> "AIQuestionGenPreviewRequest":
-        if self.difficulty == "solid":
-            self.difficulty = "medium"
-        return self
 
 
 class AIQuestionGenPreviewResponse(BaseModel):
@@ -114,19 +108,3 @@ class AIQuestionGenPreviewResponse(BaseModel):
 class AIQuestionGenExtractTextResponse(BaseModel):
     source_text: str
     chars: int
-
-
-PreviewJobStatus = Literal["queued", "running", "succeeded", "failed"]
-
-
-class AIQuestionGenPreviewJobCreateResponse(BaseModel):
-    job_id: str
-    status: PreviewJobStatus
-
-
-class AIQuestionGenPreviewJobStatusResponse(BaseModel):
-    job_id: str
-    status: PreviewJobStatus
-    result: AIQuestionGenPreviewResponse | None = None
-    error: str | None = None
-    updated_at: str

@@ -85,7 +85,6 @@ export async function apiRequest<T>(
     throw new Error(`Network error: ${detail} (url=${url})`);
   }
 
-  
   if (!response.ok) {
     let detail = `HTTP ${response.status}`;
     try {

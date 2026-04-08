@@ -10,10 +10,7 @@ import {
   PenLine, Copy,
 } from 'lucide-react';
 import { CustomSelect, SelectField } from '../../../components/teacher/CustomSelect';
-import {
-  createPreviewGenerateJobApi,
-  getPreviewGenerateJobStatusApi,
-} from '../../../utils/aiQuestionGenApi';
+import { previewGenerateQuestionsApi } from '../../../utils/aiQuestionGenApi';
 import { createPaperApi } from '../../../utils/paperApi';
 import { extractSourceTextApi } from '../../../utils/sourceExtractionApi';
 
@@ -497,7 +494,7 @@ export default function AssessmentGenerate() {
   const [examGenMode, setExamGenMode] = useState<ExamGenMode>('error-questions');
   const [examMatchMode, setExamMatchMode] = useState<'type' | 'knowledge'>('type');
   const [examDifficulty, setExamDifficulty] = useState<'basic' | 'solid' | 'advanced'>('solid');
-  const [examFiles, setExamFiles] = useState<{ name: string; size: number; url: string; file?: File; extractedText?: string }[]>([]);
+  const [examFiles, setExamFiles] = useState<{ name: string; size: number; url: string }[]>([]);
   const [examDragging, setExamDragging] = useState(false);
   const examFileRef = useRef<HTMLInputElement>(null);
   const [bankSearch, setBankSearch] = useState('');
@@ -757,7 +754,6 @@ export default function AssessmentGenerate() {
     if (!files) return;
     const newFiles = Array.from(files).slice(0, Math.max(0, 5 - examFiles.length)).map(f => ({
       name: f.name, size: f.size,
-      file: f,
       url: f.type.startsWith('image/') ? URL.createObjectURL(f) : '',
     }));
     setExamFiles(prev => [...prev, ...newFiles].slice(0, 5));
@@ -818,28 +814,6 @@ export default function AssessmentGenerate() {
         // fallback to filename when extraction fails
       }
     }
-    if (sourceTab === 'exam' && examFiles.length > 0) {
-      const extractedChunks: string[] = [];
-      const nextExamFiles = [...examFiles];
-      for (let i = 0; i < nextExamFiles.length; i += 1) {
-        const ef = nextExamFiles[i];
-        if (!ef.file) continue;
-        try {
-          const extracted = await extractSourceTextApi(ef.file);
-          const txt = (extracted.source_text || '').trim();
-          if (txt) {
-            extractedChunks.push(txt);
-            nextExamFiles[i] = { ...ef, extractedText: txt };
-          }
-        } catch {
-          // keep fallback path by filename if extraction fails
-        }
-      }
-      if (extractedChunks.length > 0) {
-        sourceMaterial = extractedChunks.join('\n\n');
-      }
-      setExamFiles(nextExamFiles);
-    }
     const effectiveDifficulty =
       sourceTab === 'exam' ? examDifficultyToApiDifficulty(examDifficulty) : difficulty;
     const materialKeywords = extractKeywords(sourceMaterial);
@@ -876,7 +850,7 @@ export default function AssessmentGenerate() {
         return '[no extractable text]';
       })();
 
-      const previewPayload: Parameters<typeof createPreviewGenerateJobApi>[0] = {
+      const previewPayload: Parameters<typeof previewGenerateQuestionsApi>[0] = {
         source_text: previewSourceText,
         difficulty: effectiveDifficulty,
         question_count: totalQ(),
@@ -890,38 +864,13 @@ export default function AssessmentGenerate() {
         previewPayload.task_type = examGenMode === 'simulation' ? 'simulation' : 'error_based';
         previewPayload.match_mode = examMatchMode;
       }
-      const created = await createPreviewGenerateJobApi(previewPayload);
-      let preview: { questions: GeneratedQ[] } | null = null;
-      for (let i = 0; i < 40; i += 1) {
-        const status = await getPreviewGenerateJobStatusApi(created.job_id);
-        if (status.status === 'succeeded' && status.result) {
-          preview = {
-            questions: status.result.questions.map((q) => ({
-              id: `gq-${Math.random()}`,
-              type: q.type,
-              prompt: q.prompt,
-              options: q.options.map((opt) => ({ key: opt.key, text: opt.text, correct: opt.correct })),
-              answer: q.answer || undefined,
-              difficulty: q.difficulty,
-              explanation: q.explanation,
-            })),
-          };
-          break;
-        }
-        if (status.status === 'failed') {
-          throw new Error(status.error || 'Preview generation job failed.');
-        }
-        await new Promise((r) => setTimeout(r, 1500));
-      }
-      if (!preview) {
-        throw new Error('Preview generation timed out.');
-      }
+      const preview = await previewGenerateQuestionsApi(previewPayload);
       if (preview.questions.length > 0) {
         qs = preview.questions.map((q, idx) => ({
           id: `gq-${idx + 1}`,
           type: q.type,
           prompt: q.prompt,
-          options: q.options || [],
+          options: q.options.map((opt) => ({ key: opt.key, text: opt.text, correct: opt.correct })),
           answer: q.answer || undefined,
           difficulty: q.difficulty,
           explanation: q.explanation,
