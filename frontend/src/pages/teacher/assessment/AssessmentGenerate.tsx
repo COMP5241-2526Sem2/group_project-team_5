@@ -10,7 +10,7 @@ import {
   PenLine, Copy,
 } from 'lucide-react';
 import { CustomSelect, SelectField } from '../../../components/teacher/CustomSelect';
-import { previewGenerateQuestionsApi } from '../../../utils/aiQuestionGenApi';
+import { generateQuestionIllustrationsApi, previewGenerateQuestionsApi } from '../../../utils/aiQuestionGenApi';
 import { createPaperApi } from '../../../utils/paperApi';
 import { extractSourceTextApi } from '../../../utils/sourceExtractionApi';
 
@@ -26,6 +26,13 @@ interface QTypeCfg {
   key: string; count: number; active: boolean;
 }
 
+<<<<<<< Updated upstream
+=======
+/** Enter Text：至少字数与 canProceedStep1、占位符一致 */
+const TEXT_SOURCE_MIN_CHARS = 5;
+const ILLUSTRATION_BATCH_SIZE = 3;
+
+>>>>>>> Stashed changes
 interface GeneratedQ {
   id: string; type: string; prompt: string;
   options?: { key: string; text: string; correct: boolean }[];
@@ -33,7 +40,16 @@ interface GeneratedQ {
   explanation: string;
   hasImage?: boolean;
   imageStyle?: IllustStyle;
+  imageUrl?: string;
   derivedFrom?: string; // for 以题生题
+}
+
+interface ExamUploadFile {
+  name: string;
+  size: number;
+  url: string;
+  file?: File;
+  extractedText?: string;
 }
 
 // ── Mock generated questions ───────────────────────────────────────────────────
@@ -420,6 +436,73 @@ function optionWithCorrect(topic: string, subjectName: string) {
   ];
 }
 
+<<<<<<< Updated upstream
+=======
+function normalizeIllustrationStyle(input: string): IllustStyle {
+  const allowed: IllustStyle[] = ['auto', 'diagram', 'chart', 'photo', 'scientific'];
+  return allowed.includes(input as IllustStyle) ? (input as IllustStyle) : 'auto';
+}
+
+function canExtractExamFile(fileName: string): boolean {
+  const n = fileName.toLowerCase();
+  return n.endsWith('.pdf') || n.endsWith('.txt') || n.endsWith('.md') || n.endsWith('.docx');
+}
+
+function mapExamDifficultyToPreview(d: 'basic' | 'solid' | 'advanced'): 'easy' | 'medium' | 'hard' {
+  if (d === 'basic') return 'easy';
+  if (d === 'advanced') return 'hard';
+  return 'medium';
+}
+
+function inferStrictExamTypeTargets(sourceText: string, total: number): Record<string, number> | null {
+  const text = sourceText.toLowerCase();
+  const tf = (text.match(/true\s*\/\s*false|true\s+or\s+false|判断题/g) || []).length;
+  const fill = (text.match(/_{3,}|fill\s+in\s+the\s+blank|填空/g) || []).length;
+  const optionSignals = (sourceText.match(/\b[A-D][\.|\)]\s+/g) || []).length;
+  const mcq = Math.floor(optionSignals / 4);
+
+  let mcqCount = Math.max(0, mcq);
+  let tfCount = Math.max(0, tf);
+  let fillCount = Math.max(0, fill);
+  let sum = mcqCount + tfCount + fillCount;
+  if (sum === 0) return null;
+
+  if (sum > total) {
+    const ratio = total / sum;
+    mcqCount = Math.floor(mcqCount * ratio);
+    tfCount = Math.floor(tfCount * ratio);
+    fillCount = Math.floor(fillCount * ratio);
+    sum = mcqCount + tfCount + fillCount;
+  }
+
+  const remainder = Math.max(0, total - sum);
+  mcqCount += remainder;
+
+  const targets: Record<string, number> = {};
+  if (mcqCount > 0) targets.MCQ = mcqCount;
+  if (tfCount > 0) targets['True/False'] = tfCount;
+  if (fillCount > 0) targets['Fill-blank'] = fillCount;
+  return Object.keys(targets).length > 0 ? targets : null;
+}
+
+function collectSeedQuestions(
+  qInputMode: QuestionInputMode,
+  pastedQuestions: string,
+  selectedBankIds: Set<string>,
+): string[] {
+  if (qInputMode === 'paste') {
+    return pastedQuestions
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .slice(0, 12);
+  }
+  return QUESTION_BANK
+    .filter((q) => selectedBankIds.has(q.id))
+    .map((q) => q.prompt)
+    .slice(0, 12);
+}
+>>>>>>> Stashed changes
 // ── Sub-components ─────────────────────────────────────────────────────────────
 function StepDot({ n, label, active, done, onClick }: { n: number; label: string; active: boolean; done: boolean; onClick?: () => void }) {
   return (
@@ -495,10 +578,16 @@ function IllustPlaceholder({ qIndex, style: styleName }: { qIndex: number; style
         padding: '7px 12px', background: '#fafafa',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
+<<<<<<< Updated upstream
         <span style={{ fontSize: '11px', color: '#9ca3af' }}>✨ AI Illustration · {meta.label}</span>
         <button style={{ fontSize: '11px', color: '#3b5bdb', border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
           <RefreshCw size={11} /> Regenerate
         </button>
+=======
+        <span style={{ fontSize: '11px', color: '#9ca3af', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+          <Sparkles size={11} style={{ opacity: 0.65 }} /> AI Illustration · {meta.label}
+        </span>
+>>>>>>> Stashed changes
       </div>
     </div>
   );
@@ -521,7 +610,7 @@ export default function AssessmentGenerate() {
   const [examGenMode, setExamGenMode] = useState<ExamGenMode>('error-questions');
   const [examMatchMode, setExamMatchMode] = useState<'type' | 'knowledge'>('type');
   const [examDifficulty, setExamDifficulty] = useState<'basic' | 'solid' | 'advanced'>('solid');
-  const [examFiles, setExamFiles] = useState<{ name: string; size: number; url: string }[]>([]);
+  const [examFiles, setExamFiles] = useState<ExamUploadFile[]>([]);
   const [examDragging, setExamDragging] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const examFileRef = useRef<HTMLInputElement>(null);
@@ -603,6 +692,10 @@ export default function AssessmentGenerate() {
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [creatingPaper, setCreatingPaper] = useState(false);
   const [generateNonce, setGenerateNonce] = useState(0);
+  const [imageLoadingIds, setImageLoadingIds] = useState<Set<string>>(new Set());
+  const [imageErrors, setImageErrors] = useState<Record<string, string>>({});
+  const [previewMode, setPreviewMode] = useState<'llm' | 'heuristic' | null>(null);
+  const [previewWarning, setPreviewWarning] = useState<string | null>(null);
 
   function inferEffectiveSubject(): string {
     if (sourceTab === 'textbook' && tbSubject) return tbSubject;
@@ -638,8 +731,12 @@ export default function AssessmentGenerate() {
       return [tbPublisher, tbGrade, tbSubject, tbSemester, tbEdition, chosenSections].filter(Boolean).join(' ');
     }
     if (sourceTab === 'exam') {
+      const extracted = examFiles
+        .map((f) => (f.extractedText || '').trim())
+        .filter(Boolean)
+        .join('\n\n');
       const fileNames = examFiles.map((f) => f.name).join(' ');
-      return [fileNames, examGenMode, examMatchMode, examDifficulty].filter(Boolean).join(' ');
+      return [extracted, fileNames, examGenMode, examMatchMode, examDifficulty].filter(Boolean).join('\n');
     }
 
     if (qInputMode === 'paste') {
@@ -688,28 +785,53 @@ export default function AssessmentGenerate() {
           explanation: '',
           hasImage: illustEnabled && illustTypes.has(qt.key),
           imageStyle: illustStyle,
+          imageUrl: undefined,
           derivedFrom: sourceTab === 'questions' ? deriveSource.slice(0, 90) : undefined,
         };
 
         if (qt.key === 'mcq') {
-          base.prompt = sourceTab === 'questions'
-            ? `Based on "${deriveSource.slice(0, 50)}...", which statement about ${topic} is most accurate?`
-            : `${promptLead}, in ${effectiveSubject} which statement best explains ${topic}?`;
+          if (sourceTab === 'questions') {
+            if (deriveMode === 'variation') {
+              base.prompt = `Variation: Based on "${deriveSource.slice(0, 50)}...", which revised statement about ${topic} is most accurate under a changed scenario?`;
+            } else if (deriveMode === 'extension') {
+              base.prompt = `Extension: Which follow-up question best deepens reasoning about ${topic} from "${deriveSource.slice(0, 50)}..."?`;
+            } else {
+              base.prompt = `Contrast: For ${topic}, which option best distinguishes the correct idea from a common misconception implied by "${deriveSource.slice(0, 50)}..."?`;
+            }
+          } else {
+            base.prompt = `${promptLead}, in ${effectiveSubject} which statement best explains ${topic}?`;
+          }
           base.options = optionWithCorrect(topic, effectiveSubject);
-          base.explanation = `${topic} was selected from the uploaded material cues and ${effectiveSubject} topic set; the correct option reflects the most supported definition/mechanism.`;
+          if (sourceTab === 'questions') {
+            base.explanation = deriveMode === 'variation'
+              ? `Variation mode keeps the same concept while changing condition framing around ${topic}.`
+              : deriveMode === 'extension'
+                ? `Extension mode deepens the original prompt with a higher-order follow-up on ${topic}.`
+                : `Contrast mode emphasizes misconception discrimination for ${topic}.`;
+          } else {
+            base.explanation = `${topic} was selected from the uploaded material cues and ${effectiveSubject} topic set; the correct option reflects the most supported definition/mechanism.`;
+          }
         } else if (qt.key === 'tf') {
-          base.prompt = `True or False: a correct understanding of ${topic} in ${effectiveSubject} requires identifying assumptions and boundary conditions.`;
+          base.prompt = sourceTab === 'questions' && deriveMode === 'contrast'
+            ? `True or False: The statement about ${topic} below is a common misconception and should be rejected.`
+            : `True or False: a correct understanding of ${topic} in ${effectiveSubject} requires identifying assumptions and boundary conditions.`;
           base.answer = 'True';
           base.explanation = `Questions on ${topic} often depend on conditions; identifying assumptions prevents overgeneralized conclusions.`;
         } else if (qt.key === 'fill') {
-          base.prompt = `Complete the statement: in ${effectiveSubject} the concept most directly used to analyze ${topic} is _______.`;
+          base.prompt = sourceTab === 'questions' && deriveMode === 'extension'
+            ? `Complete the extension statement: beyond the original item, the key concept needed to further analyze ${topic} is _______.`
+            : `Complete the statement: in ${effectiveSubject} the concept most directly used to analyze ${topic} is _______.`;
           base.answer = topic;
           base.explanation = `${topic} is the intended key term and anchors the analytical framework of the question.`;
         } else if (qt.key === 'sa') {
-          base.prompt = `Use 2-3 sentences to explain ${topic} and provide one source-grounded example in ${effectiveSubject}.`;
+          base.prompt = sourceTab === 'questions' && deriveMode === 'variation'
+            ? `Use 2-3 sentences to explain how ${topic} changes under a new variant condition and give one example.`
+            : `Use 2-3 sentences to explain ${topic} and provide one source-grounded example in ${effectiveSubject}.`;
           base.explanation = `A strong answer defines ${topic}, explains mechanism or logic, and gives a concrete example.`;
         } else {
-          base.prompt = `Write an essay discussing ${topic} in ${effectiveSubject}, including source evidence, argument structure, and one counterexample.`;
+          base.prompt = sourceTab === 'questions' && deriveMode === 'contrast'
+            ? `Write an essay contrasting correct and incorrect reasoning patterns for ${topic}, and justify which is valid.`
+            : `Write an essay discussing ${topic} in ${effectiveSubject}, including source evidence, argument structure, and one counterexample.`;
           base.explanation = `High-quality essays should include precise definitions, evidence-based reasoning, and discussion of limitations.`;
         }
 
@@ -781,13 +903,19 @@ export default function AssessmentGenerate() {
     if (!files) return;
     const newFiles = Array.from(files).slice(0, Math.max(0, 5 - examFiles.length)).map(f => ({
       name: f.name, size: f.size,
+      file: f,
+      extractedText: '',
       url: f.type.startsWith('image/') ? URL.createObjectURL(f) : '',
     }));
     setExamFiles(prev => [...prev, ...newFiles].slice(0, 5));
   }
 
   function removeExamFile(idx: number) {
-    setExamFiles(prev => prev.filter((_, i) => i !== idx));
+    setExamFiles(prev => {
+      const target = prev[idx];
+      if (target?.url) URL.revokeObjectURL(target.url);
+      return prev.filter((_, i) => i !== idx);
+    });
   }
 
   function totalQ() { return qTypes.filter(t => t.active).reduce((s, t) => s + t.count, 0); }
@@ -806,11 +934,110 @@ export default function AssessmentGenerate() {
     return true;
   }
 
+<<<<<<< Updated upstream
+=======
+  function canProceedStep2() {
+    if (sourceTab === 'exam') return true;
+    // Grade/subject 仅在 Textbook 流程的 Step 1 中选择；上传/文本等来源 Step 2 不要求填写
+    return totalQ() > 0;
+  }
+
+  function buildIllustrationPayload(targets: GeneratedQ[]) {
+    return {
+      style: normalizeIllustrationStyle(illustStyle),
+      style_prompt: illustPrompt.trim() ? illustPrompt.trim() : null,
+      questions: targets.map((q) => ({
+        question_id: q.id,
+        prompt: q.prompt,
+        question_type: q.type,
+      })),
+    };
+  }
+
+  async function generateIllustrationsInBatches(targets: GeneratedQ[]) {
+    const urlById = new Map<string, string>();
+    const errorMap: Record<string, string> = {};
+
+    for (let start = 0; start < targets.length; start += ILLUSTRATION_BATCH_SIZE) {
+      const chunk = targets.slice(start, start + ILLUSTRATION_BATCH_SIZE);
+      try {
+        const response = await generateQuestionIllustrationsApi(buildIllustrationPayload(chunk));
+        const returnedIds = new Set<string>();
+        response.images.forEach((img) => {
+          returnedIds.add(img.question_id);
+          if (img.image_url) urlById.set(img.question_id, img.image_url);
+          if (img.used_fallback || img.error) {
+            errorMap[img.question_id] = img.error || 'Illustration provider failed; fallback image was used.';
+          }
+        });
+        chunk.forEach((q) => {
+          if (!returnedIds.has(q.id)) {
+            errorMap[q.id] = 'No illustration returned for this question.';
+          }
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Illustration generation failed';
+        chunk.forEach((q) => {
+          errorMap[q.id] = message;
+        });
+      } finally {
+        setImageLoadingIds((prev) => {
+          const next = new Set(prev);
+          chunk.forEach((q) => next.delete(q.id));
+          return next;
+        });
+        const completed = Math.min(targets.length, start + chunk.length);
+        const progress = Math.min(100, Math.round((completed / targets.length) * 100));
+        setIllustProgress((prev) => Math.max(prev, progress));
+      }
+    }
+
+    return { urlById, errorMap };
+  }
+
+  async function handleRegenerateIllustration(question: GeneratedQ) {
+    if (!question.hasImage) return;
+    setImageLoadingIds((prev) => new Set(prev).add(question.id));
+    setImageErrors((prev) => {
+      const next = { ...prev };
+      delete next[question.id];
+      return next;
+    });
+    try {
+      const response = await generateQuestionIllustrationsApi(buildIllustrationPayload([question]));
+      const matched = response.images.find((img) => img.question_id === question.id);
+      const url = matched?.image_url;
+      if (url) {
+        setQuestions((prev) => prev.map((q) => (q.id === question.id ? { ...q, imageUrl: url } : q)));
+      }
+      if (matched?.used_fallback || matched?.error) {
+        setImageErrors((prev) => ({
+          ...prev,
+          [question.id]: matched.error || 'Illustration provider failed; fallback image was used.',
+        }));
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Illustration generation failed';
+      setImageErrors((prev) => ({ ...prev, [question.id]: message }));
+    } finally {
+      setImageLoadingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(question.id);
+        return next;
+      });
+    }
+  }
+
+>>>>>>> Stashed changes
   async function handleGenerate() {
     const nextNonce = generateNonce + 1;
     setGenerateNonce(nextNonce);
     setGenerating(true); setGenProgress(0); setIllustProgress(0);
     setGenDone(false); setQuestions([]); setGenPhase('questions');
+    setImageLoadingIds(new Set());
+    setImageErrors({});
+    setPreviewMode(null);
+    setPreviewWarning(null);
 
     // Phase 1: generate questions
     const qSteps = [15, 30, 50, 70, 85, 100];
@@ -820,6 +1047,8 @@ export default function AssessmentGenerate() {
     }
     const effectiveSubject = inferEffectiveSubject();
     let sourceMaterial = buildSourceMaterialText();
+    const effectiveDifficulty = sourceTab === 'exam' ? mapExamDifficultyToPreview(examDifficulty) : difficulty;
+
     if (sourceTab === 'upload' && uploadedFile?.file) {
       try {
         const extracted = await extractSourceTextApi(uploadedFile.file);
@@ -829,11 +1058,52 @@ export default function AssessmentGenerate() {
         // fallback to filename when extraction fails
       }
     }
+
+    if (sourceTab === 'exam') {
+      const unsupported = examFiles.filter((f) => !canExtractExamFile(f.name));
+      if (unsupported.length > 0) {
+        window.alert(
+          `Exam Paper mode currently supports text extraction only for PDF/TXT/MD/DOCX. Unsupported: ${unsupported.map((f) => f.name).join(', ')}`,
+        );
+        setGenerating(false);
+        return;
+      }
+
+      const extractedTexts: string[] = [];
+      const failedFiles: string[] = [];
+      for (const f of examFiles) {
+        if ((f.extractedText || '').trim()) {
+          extractedTexts.push((f.extractedText || '').trim());
+          continue;
+        }
+        if (!f.file) {
+          failedFiles.push(`${f.name} (missing file object)`);
+          continue;
+        }
+        try {
+          const extracted = await extractSourceTextApi(f.file);
+          extractedTexts.push(extracted.source_text);
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : 'unknown extraction error';
+          failedFiles.push(`${f.name} (${reason})`);
+        }
+      }
+
+      if (failedFiles.length > 0 || extractedTexts.length === 0) {
+        window.alert(`Cannot generate exam questions because text extraction failed for: ${failedFiles.join('; ')}`);
+        setGenerating(false);
+        return;
+      }
+
+      sourceMaterial = extractedTexts.join('\n\n');
+      setExamFiles((prev) => prev.map((f, idx) => ({ ...f, extractedText: extractedTexts[idx] || f.extractedText })));
+    }
+
     const materialKeywords = extractKeywords(sourceMaterial);
     const subjectDefaults = SUBJECT_TOPICS[effectiveSubject] ?? SUBJECT_TOPICS.Biology;
     const topicPool = uniqueKeepOrder([...materialKeywords, ...subjectDefaults]).slice(0, 20);
-    const seedKey = `${effectiveSubject}|${sourceMaterial}|${difficulty}|${sourceTab}|${nextNonce}`;
-    const typeTargets = qTypes
+    const seedKey = `${effectiveSubject}|${sourceMaterial}|${effectiveDifficulty}|${sourceTab}|${nextNonce}`;
+    const manualTargets = qTypes
       .filter((qt) => qt.active)
       .reduce<Record<string, number>>((acc, qt) => {
         if (qt.key === 'mcq') acc.MCQ = qt.count;
@@ -843,17 +1113,43 @@ export default function AssessmentGenerate() {
         else if (qt.key === 'essay') acc.Essay = qt.count;
         return acc;
       }, {});
+    const inferredExamTargets =
+      sourceTab === 'exam' && examMatchMode === 'type'
+        ? inferStrictExamTypeTargets(sourceMaterial, totalQ())
+        : null;
+    const typeTargets = inferredExamTargets || manualTargets;
 
     let qs = buildGeneratedQuestions(effectiveSubject, topicPool, seedKey);
+    const seedQuestions =
+      sourceTab === 'questions'
+        ? collectSeedQuestions(qInputMode, pastedQuestions, selectedBankIds)
+        : undefined;
     try {
       const preview = await previewGenerateQuestionsApi({
+<<<<<<< Updated upstream
         source_text: sourceMaterial || `${effectiveSubject} ${grade || tbGrade || 'Grade 7'} ${difficulty}`,
         subject: effectiveSubject,
         grade: grade || tbGrade || 'Grade 7',
         difficulty,
+=======
+        source_text: sourceMaterial || `${effectiveSubject} ${tbGrade || 'Grade 7'} ${effectiveDifficulty}`,
+        subject: effectiveSubject,
+        grade: tbGrade || 'Grade 7',
+        difficulty: effectiveDifficulty,
+>>>>>>> Stashed changes
         question_count: totalQ(),
         type_targets: typeTargets,
+        source_mode: sourceTab,
+        exam_generation_mode: sourceTab === 'exam' ? examGenMode : undefined,
+        exam_match_mode: sourceTab === 'exam' ? examMatchMode : undefined,
+        exam_difficulty: sourceTab === 'exam' ? examDifficulty : undefined,
+        source_file_names: sourceTab === 'exam' ? examFiles.map((f) => f.name) : undefined,
+        question_input_mode: sourceTab === 'questions' ? qInputMode : undefined,
+        derive_mode: sourceTab === 'questions' ? deriveMode : undefined,
+        seed_questions: sourceTab === 'questions' ? seedQuestions : undefined,
       });
+      setPreviewMode(preview.generation_mode ?? null);
+      setPreviewWarning(preview.warning ?? null);
       if (preview.questions.length > 0) {
         qs = preview.questions.map((q, idx) => ({
           id: `gq-${idx + 1}`,
@@ -865,10 +1161,13 @@ export default function AssessmentGenerate() {
           explanation: q.explanation,
           hasImage: illustEnabled && illustTypes.has(q.type === 'MCQ' ? 'mcq' : q.type === 'True/False' ? 'tf' : q.type === 'Fill-blank' ? 'fill' : q.type === 'Essay' ? 'essay' : 'sa'),
           imageStyle: illustStyle,
+          imageUrl: undefined,
         }));
       }
     } catch {
       // keep local fallback generation when preview API is unavailable
+      setPreviewMode('heuristic');
+      setPreviewWarning('Preview API unavailable; local fallback generation was used.');
     }
 
     setQuestions(qs);
@@ -877,10 +1176,17 @@ export default function AssessmentGenerate() {
     // Phase 2: generate illustrations (if enabled)
     if (illustEnabled) {
       setGenPhase('illustrations'); setIllustProgress(0);
-      const iSteps = [20, 45, 65, 85, 100];
-      for (const p of iSteps) {
-        await new Promise(r => setTimeout(r, 480));
-        setIllustProgress(p);
+      setImageErrors({});
+      const targets = qs.filter((q) => q.hasImage);
+      if (targets.length > 0) {
+        setImageLoadingIds(new Set(targets.map((q) => q.id)));
+      }
+      if (targets.length > 0) {
+        const { urlById, errorMap } = await generateIllustrationsInBatches(targets);
+        setQuestions((prev) => prev.map((q) => (q.hasImage ? { ...q, imageUrl: urlById.get(q.id) ?? q.imageUrl } : q)));
+        if (Object.keys(errorMap).length > 0) {
+          setImageErrors(errorMap);
+        }
       }
       await new Promise(r => setTimeout(r, 200));
     }
@@ -1619,7 +1925,7 @@ export default function AssessmentGenerate() {
                       <div style={{ fontSize:'15px', fontWeight:700, color:'#0f0f23', marginBottom:'5px' }}>
                         {examDragging ? 'Drop files here' : 'Click to upload or drag & drop'}
                       </div>
-                      <div style={{ fontSize:'12px', color:'#9ca3af', marginBottom:'5px' }}>Supports JPG, PNG, PDF · Max 10 MB per file</div>
+                      <div style={{ fontSize:'12px', color:'#9ca3af', marginBottom:'5px' }}>Supports PDF, TXT, MD, DOCX · Max 10 MB per file</div>
                       <div style={{ fontSize:'11px', color:examFiles.length>0?'#3b5bdb':'#c4b5fd', fontWeight:600 }}>{examFiles.length} / 5 files</div>
                     </div>
 
@@ -2277,6 +2583,19 @@ export default function AssessmentGenerate() {
                   </button>
                 </div>
 
+                {(previewMode || previewWarning) && (
+                  <div style={{ marginBottom: '14px', padding: '10px 14px', borderRadius: '10px', border: `1px solid ${previewWarning ? '#fed7aa' : '#bfdbfe'}`, background: previewWarning ? '#fff7ed' : '#eff6ff' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: previewWarning ? '#9a3412' : '#1d4ed8' }}>
+                      Generation mode: {previewMode || 'unknown'}
+                    </div>
+                    {previewWarning && (
+                      <div style={{ marginTop: '4px', fontSize: '12px', color: '#9a3412' }}>
+                        Warning: {previewWarning}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Question cards */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
                   {questions.map((q, i) => {
@@ -2314,7 +2633,7 @@ export default function AssessmentGenerate() {
                         {isExpanded && (
                           <div style={{ padding: '0 18px 18px', borderTop: '1px solid #f0f2f5' }}>
                             {/* MCQ options */}
-                            {q.options && (
+                            {Array.isArray(q.options) && q.options.length > 0 && (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '14px' }}>
                                 {q.options.map(opt => (
                                   <div key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '8px', background: opt.correct ? '#f0fdf4' : '#f9fafb', border: `1px solid ${opt.correct ? '#bbf7d0' : '#f0f2f5'}` }}>
@@ -2326,14 +2645,41 @@ export default function AssessmentGenerate() {
                               </div>
                             )}
                             {/* TF / Fill answer */}
-                            {q.answer && !q.options && (
+                            {q.answer && (!Array.isArray(q.options) || q.options.length === 0) && (
                               <div style={{ marginTop: '12px', padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '13px', color: '#15803d' }}>
                                 <strong>Answer:</strong> {q.answer}
                               </div>
                             )}
                             {/* Illustration placeholder */}
                             {q.hasImage && (
-                              <IllustPlaceholder qIndex={i} style={q.imageStyle ?? 'auto'} />
+                              <div style={{ marginTop: '12px' }}>
+                                <div style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e8eaed' }}>
+                                  {q.imageUrl ? (
+                                    <img src={q.imageUrl} alt="AI illustration" style={{ width: '100%', display: 'block' }} />
+                                  ) : (
+                                    <IllustPlaceholder qIndex={i} style={q.imageStyle ?? 'auto'} />
+                                  )}
+                                  {imageLoadingIds.has(q.id) && (
+                                    <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', color: '#6b7280', fontWeight: 600 }}>
+                                      Generating illustration...
+                                    </div>
+                                  )}
+                                </div>
+                                {imageErrors[q.id] && (
+                                  <div style={{ marginTop: '8px', padding: '10px 12px', borderRadius: '8px', background: '#fef2f2', border: '1px solid #fecaca', fontSize: '12px', color: '#b91c1c' }}>
+                                    Illustration failed: {imageErrors[q.id]}
+                                  </div>
+                                )}
+                                <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end' }}>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleRegenerateIllustration(q); }}
+                                    disabled={imageLoadingIds.has(q.id)}
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '8px', border: '1px solid #dbeafe', background: '#eff6ff', color: '#1d4ed8', fontSize: '12px', cursor: imageLoadingIds.has(q.id) ? 'not-allowed' : 'pointer' }}
+                                  >
+                                    <RefreshCw size={12} /> Regenerate
+                                  </button>
+                                </div>
+                              </div>
                             )}
                             {/* Explanation */}
                             <div style={{ marginTop: '12px', padding: '12px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px' }}>
