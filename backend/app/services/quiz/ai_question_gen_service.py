@@ -51,6 +51,7 @@ class AIQuestionGenService:
             for attempt in range(1, max_attempts + 1):
                 try:
                     generated = await AIQuestionGenService._llm_generate(payload, type_targets)
+                    generated = AIQuestionGenService._enforce_type_targets(generated, payload, type_targets)
                     if generated:
                         return AIQuestionGenPreviewResponse(
                             questions=generated[: payload.question_count],
@@ -75,6 +76,7 @@ class AIQuestionGenService:
                     await asyncio.sleep(min(0.5 * attempt, 1.5))
 
             fallback = AIQuestionGenService._heuristic_generate(payload, type_targets)
+            fallback = AIQuestionGenService._enforce_type_targets(fallback, payload, type_targets)
             warning = "LLM unavailable or returned empty output; heuristic fallback was used."
             if last_error is not None:
                 warning = f"LLM call failed ({type(last_error).__name__}); heuristic fallback was used."
@@ -88,6 +90,7 @@ class AIQuestionGenService:
         provider_mismatch = provider not in {"openai", "ohmygpt", "heuristic"}
 
         fallback = AIQuestionGenService._heuristic_generate(payload, type_targets)
+        fallback = AIQuestionGenService._enforce_type_targets(fallback, payload, type_targets)
         warning: str | None = None
         if key_missing:
             warning = "LLM provider is enabled but API key is missing; heuristic fallback was used."
@@ -184,7 +187,8 @@ class AIQuestionGenService:
             "Constraints:\n"
             "1) Do not include phrases like 'according to source/provided material/uploaded document'.\n"
             "2) Keep questions answerable standalone.\n"
-            "3) For MCQ provide exactly 4 options A-D and exactly one correct option.\n"
+            "3) For MCQ, options are mandatory JSON structure requirements: provide exactly 4 non-empty options "
+            "A-D with fields {key, text, correct}, and exactly one option where correct=true.\n"
             "4) For True/False provide answer as True or False.\n"
             "5) Reflect concrete concepts from source text.\n"
             "6) Strictly forbid instructional/meta wording in prompt, including but not limited to "
@@ -216,6 +220,9 @@ class AIQuestionGenService:
                 "content": (
                     "You generate high-quality school assessment questions. "
                     "Use the source text as reference but do NOT mention source/document/material in the question wording. "
+                    "You MUST follow the user's requested question type distribution exactly. "
+                    "For MCQ, you MUST provide 'options' as a list of 4 items with 'key', 'text', and 'correct' fields. "
+                    "A Multiple Choice Question (MCQ) without options is invalid and forbidden. "
                     "Return JSON only with key questions. "
                     "Each question: type, prompt, options(optional), answer(optional), difficulty, explanation."
                 ),
@@ -302,6 +309,40 @@ class AIQuestionGenService:
                 )
             )
         return mapped
+
+    @staticmethod
+    def _normalize_type_targets(type_targets: dict[str, int]) -> dict[str, int]:
+        normalized: dict[str, int] = {}
+        for raw_type, count in type_targets.items():
+            if int(count) <= 0:
+                continue
+            key = AIQuestionGenService._normalize_type_key(raw_type)
+            normalized[key] = normalized.get(key, 0) + int(count)
+        return normalized
+
+    @staticmethod
+    def _enforce_type_targets(
+        generated: list[AIQuestionGenQuestion],
+        payload: AIQuestionGenPreviewRequest,
+        type_targets: dict[str, int],
+    ) -> list[AIQuestionGenQuestion]:
+        target = AIQuestionGenService._normalize_type_targets(type_targets)
+        if not target:
+            return generated
+
+        # Keep only requested types and cap count per type.
+        selected: list[AIQuestionGenQuestion] = []
+        used: dict[str, int] = {k: 0 for k in target}
+        for q in generated:
+            qtype = AIQuestionGenService._normalize_type_key(str(q.type))
+            if qtype not in target:
+                continue
+            if used[qtype] >= target[qtype]:
+                continue
+            selected.append(q)
+            used[qtype] += 1
+
+        return selected
 
     @staticmethod
     def _parse_json_object(raw: str) -> dict | None:
