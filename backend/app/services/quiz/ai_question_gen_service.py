@@ -200,6 +200,35 @@ class AIQuestionGenService:
         return await AIQuestionGenService._llm_generate_text_mode(payload, type_targets)
 
     @staticmethod
+    def _format_preview_user_prompt(payload: AIQuestionGenPreviewRequest, type_targets: dict[str, int]) -> str:
+        subj = (payload.subject or "").strip()
+        grade = (payload.grade or "").strip()
+        meta_lines: list[str] = []
+        if subj:
+            meta_lines.append(f"subject={subj}")
+        if grade:
+            meta_lines.append(f"grade={grade}")
+        if not subj and not grade:
+            meta_lines.append(
+                "subject and grade: infer only from source_text; do not assume a default subject or grade."
+            )
+        meta_block = "\n".join(meta_lines)
+        return (
+            f"{meta_block}\n"
+            f"difficulty={payload.difficulty}\n"
+            f"question_count={payload.question_count}\n"
+            f"type_targets={json.dumps(type_targets, ensure_ascii=True)}\n"
+            "Constraints:\n"
+            "1) Do not include phrases like 'according to source/provided material/uploaded document'.\n"
+            "2) Keep questions answerable standalone.\n"
+            "3) For MCQ provide exactly 4 options A-D and exactly one correct option.\n"
+            "4) For True/False provide answer as True or False.\n"
+            "5) Reflect concrete concepts from source text.\n"
+            "source_text:\n"
+            f"{payload.source_text[:7000]}"
+        )
+
+    @staticmethod
     def _build_messages(payload: AIQuestionGenPreviewRequest, type_targets: dict[str, int]) -> list[dict[str, str]]:
         return [
             {
@@ -213,21 +242,7 @@ class AIQuestionGenService:
             },
             {
                 "role": "user",
-                "content": (
-                    f"subject={payload.subject}\n"
-                    f"grade={payload.grade}\n"
-                    f"difficulty={payload.difficulty}\n"
-                    f"question_count={payload.question_count}\n"
-                    f"type_targets={json.dumps(type_targets, ensure_ascii=True)}\n"
-                    "Constraints:\n"
-                    "1) Do not include phrases like 'according to source/provided material/uploaded document'.\n"
-                    "2) Keep questions answerable standalone.\n"
-                    "3) For MCQ provide exactly 4 options A-D and exactly one correct option.\n"
-                    "4) For True/False provide answer as True or False.\n"
-                    "5) Reflect concrete concepts from source text.\n"
-                    "source_text:\n"
-                    f"{payload.source_text[:7000]}"
-                ),
+                "content": AIQuestionGenService._format_preview_user_prompt(payload, type_targets),
             },
         ]
 
@@ -517,8 +532,9 @@ class AIQuestionGenService:
     @staticmethod
     def _heuristic_generate(payload: AIQuestionGenPreviewRequest, type_targets: dict[str, int]) -> list[AIQuestionGenQuestion]:
         keywords = AIQuestionGenService._extract_keywords(payload.source_text)
+        subject_label = (payload.subject or "").strip() or "the topic"
         if not keywords:
-            keywords = [payload.subject, "core concept", "application"]
+            keywords = [subject_label, "core concept", "application"] if subject_label != "the topic" else ["core concept", "application"]
 
         queue: list[_DraftQuestion] = []
         index = 0
@@ -535,7 +551,7 @@ class AIQuestionGenService:
                     queue.append(
                         _DraftQuestion(
                             qtype="MCQ",
-                            prompt=f"In {payload.subject}, which statement best explains {topic}?",
+                            prompt=f"Regarding {subject_label}, which statement best explains {topic}?",
                             options=[
                                 AIQuestionGenOption(key="A", text=f"A common misconception about {topic}", correct=False),
                                 AIQuestionGenOption(key="B", text=f"A correct explanation of {topic}", correct=True),
@@ -550,7 +566,7 @@ class AIQuestionGenService:
                     queue.append(
                         _DraftQuestion(
                             qtype="True/False",
-                            prompt=f"True or False: {topic} in {payload.subject} should be analyzed with assumptions and boundary conditions.",
+                            prompt=f"True or False: {topic} in {subject_label} should be analyzed with assumptions and boundary conditions.",
                             options=[],
                             answer="True",
                             explanation="This checks whether students avoid overgeneralized claims.",
@@ -570,7 +586,7 @@ class AIQuestionGenService:
                     queue.append(
                         _DraftQuestion(
                             qtype="Essay",
-                            prompt=f"Write an essay explaining {topic} in {payload.subject}, including method, example, and limitations.",
+                            prompt=f"Write an essay explaining {topic} in {subject_label}, including method, example, and limitations.",
                             options=[],
                             answer=None,
                             explanation="The essay expects concept definition, method, and evaluative discussion.",
@@ -580,7 +596,7 @@ class AIQuestionGenService:
                     queue.append(
                         _DraftQuestion(
                             qtype="Short Answer",
-                            prompt=f"Use 2-3 sentences to explain {topic} and provide one example in {payload.subject}.",
+                            prompt=f"Use 2-3 sentences to explain {topic} and provide one example in {subject_label}.",
                             options=[],
                             answer=None,
                             explanation="A strong answer includes both concept and example.",

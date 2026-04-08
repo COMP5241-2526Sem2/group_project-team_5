@@ -144,9 +144,9 @@ function QualityBar({ score }: { score: number }) {
 }
 
 const EXPORT_OPTIONS: { id: PaperExportFormat; title: string; desc: string }[] = [
-  { id: 'html', title: 'HTML 试卷', desc: '可在浏览器中打开、打印（版式与页面一致）' },
-  { id: 'pdf', title: 'PDF', desc: '无原始PDF时将按HTML样式渲染生成（可能为图片型PDF）' },
-  { id: 'txt', title: '纯文本 (.txt)', desc: '便于复制或二次编辑' },
+  { id: 'html', title: 'HTML Exam Paper', desc: 'Open and print in browser (layout matches page rendering)' },
+  { id: 'pdf', title: 'PDF', desc: 'If source PDF is missing, it will be rendered from HTML (may become image-based PDF)' },
+  { id: 'txt', title: 'Plain Text (.txt)', desc: 'Easy to copy and edit further' },
 ];
 
 function DownloadFormatModal({
@@ -197,7 +197,7 @@ function DownloadFormatModal({
       }
       onClose();
     } catch (e) {
-      alert(e instanceof Error ? e.message : '下载失败');
+      alert(e instanceof Error ? e.message : 'Download failed');
     } finally {
       setBusy(false);
       setProgress(null);
@@ -228,7 +228,7 @@ function DownloadFormatModal({
         }}
       >
         <h3 id="export-dialog-title" style={{ margin: '0 0 6px', fontSize: '17px', fontWeight: 700, color: '#0f0f23' }}>
-          选择下载格式
+          Select Download Format
         </h3>
         <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#6b7280', lineHeight: 1.5 }}>
           {paper.title}
@@ -272,8 +272,8 @@ function DownloadFormatModal({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <span style={{ fontSize: '12px', color: '#6b7280' }}>
                 {progress.percent != null
-                  ? (format === 'pdf' && !paper.hasSourcePdf && progress.percent >= 100 ? '生成 PDF…' : `下载中 ${progress.percent}%`)
-                  : '下载中…'}
+                  ? (format === 'pdf' && !paper.hasSourcePdf && progress.percent >= 100 ? 'Generating PDF…' : `Downloading ${progress.percent}%`)
+                  : 'Downloading…'}
               </span>
               <span style={{ fontSize: '12px', color: '#9ca3af' }}>
                 {(progress.loaded / 1024).toFixed(1)} KB
@@ -303,7 +303,7 @@ function DownloadFormatModal({
               background: '#fff', fontSize: '13px', color: '#374151', cursor: busy ? 'not-allowed' : 'pointer',
             }}
           >
-            取消
+            Cancel
           </button>
           <button
             type="button"
@@ -315,7 +315,7 @@ function DownloadFormatModal({
               color: '#fff', cursor: busy ? 'wait' : 'pointer',
             }}
           >
-            {busy ? '下载中…' : '下载'}
+            {busy ? 'Downloading…' : 'Download'}
           </button>
         </div>
       </div>
@@ -588,7 +588,7 @@ export default function AssessmentPapers() {
       await publishPaperApi(Number(paper.id));
       await refreshList();
     } catch (e) {
-      alert(e instanceof Error ? e.message : '发布失败');
+      alert(e instanceof Error ? e.message : 'Publish failed');
     } finally {
       setPublishingId(null);
     }
@@ -616,7 +616,7 @@ export default function AssessmentPapers() {
       await refreshList();
       setManagePaper(null);
     } catch (e) {
-      alert(e instanceof Error ? e.message : '回滚失败');
+      alert(e instanceof Error ? e.message : 'Rollback failed');
     } finally {
       setBusyManage(false);
     }
@@ -631,7 +631,7 @@ export default function AssessmentPapers() {
       setConfirmDeletePaper(null);
       setManagePaper(null);
     } catch (e) {
-      alert(e instanceof Error ? e.message : '删除失败');
+      alert(e instanceof Error ? e.message : 'Delete failed');
     } finally {
       setBusyManage(false);
     }

@@ -17,8 +17,9 @@ export interface AIQuestionGenPreviewQuestionDto {
 
 export interface AIQuestionGenPreviewRequestDto {
   source_text: string;
-  subject: string;
-  grade: string;
+  /** Omitted when user provides free-form text only (e.g. Enter Text source). */
+  subject?: string;
+  grade?: string;
   difficulty: "easy" | "medium" | "hard";
   question_count: number;
   type_targets?: Record<string, number>;

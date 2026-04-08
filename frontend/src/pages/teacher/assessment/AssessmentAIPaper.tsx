@@ -413,7 +413,7 @@ export default function AssessmentAIPaper() {
     setPaper([]);
     setGenerating(false);
     setGenDone(true);
-    setErrorMsg('暂未接入试卷生成接口，请使用“Generate”页生成并保存为试卷。');
+    setErrorMsg('Exam paper generation API is not connected yet. Please generate in the "Generate" page and save as an exam paper.');
   }
 
   function handleSaveDraft() {

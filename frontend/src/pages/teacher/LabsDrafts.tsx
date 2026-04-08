@@ -691,7 +691,7 @@ export default function LabsDrafts() {
                       type="button"
                       disabled={savingToServer || selectedEntry.def.status === 'published'}
                       onClick={() => void handleSaveSelectedToServer()}
-                      title="将当前草稿同步到服务器（生成后本地已可预览，点此持久化）"
+                      title="Sync current draft to server (already previewable locally after generation; click to persist)"
                       style={{
                         display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 14px',
                         border: '1px solid #cbd5e1', borderRadius: '7px',
@@ -701,7 +701,7 @@ export default function LabsDrafts() {
                         cursor: selectedEntry.def.status === 'published' || savingToServer ? 'not-allowed' : 'pointer',
                       }}
                     >
-                      <Save size={12} /> {savingToServer ? '保存中…' : '保存到服务器'}
+                      <Save size={12} /> {savingToServer ? 'Saving…' : 'Save to Server'}
                     </button>
                     <button
                       type="button"
@@ -801,7 +801,7 @@ export default function LabsDrafts() {
         intent={pendingDraftSelectKey === PENDING_DESELECT ? 'deselect' : 'switch_lab'}
         targetTitle={
           pendingDraftSelectKey === PENDING_DESELECT
-            ? (selectedEntry?.def.title ?? '当前实验')
+            ? (selectedEntry?.def.title ?? 'Current Lab')
             : (pendingDraftSelectKey
               ? (filtered.find(e => e.def.registryKey === pendingDraftSelectKey)?.def.title
                 ?? pendingDraftSelectKey)

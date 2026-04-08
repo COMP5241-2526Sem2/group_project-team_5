@@ -604,7 +604,7 @@ export default function LabsManagement() {
         intent={pendingCatalogDeselect ? 'deselect' : 'switch_lab'}
         targetTitle={
           pendingCatalogDeselect
-            ? (selected?.label ?? '当前实验')
+            ? (selected?.label ?? 'Current Lab')
             : (pendingCatalogSelect?.label ?? '')
         }
         onCancel={() => {

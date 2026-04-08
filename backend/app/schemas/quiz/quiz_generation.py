@@ -90,8 +90,8 @@ class AIQuestionGenQuestion(BaseModel):
 
 class AIQuestionGenPreviewRequest(BaseModel):
     source_text: str = Field(min_length=1)
-    subject: str = Field(min_length=1)
-    grade: str = Field(min_length=1)
+    subject: str | None = None
+    grade: str | None = None
     difficulty: Difficulty
     question_count: int = Field(ge=1)
     type_targets: dict[str, int] | None = None
