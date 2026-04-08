@@ -39,6 +39,7 @@ from app.services.lab.lab_service import (
     build_session_messages,
     normalize_drive_commands_for_frontend,
     parse_assistant_raw_response,
+    parse_drive_response,
     enforce_generate_base_definition,
     signature_from_orm_lab,
     signature_from_save_payload,
@@ -444,20 +445,32 @@ async def stream_chat(
 
                 full_text = "".join(full_content)
 
-                parsed_text, commands, definitions = parse_assistant_raw_response(
-                    full_text
-                )
+                session_mode_str = session.mode if isinstance(session.mode, str) else session.mode.value
+
+                # Drive 与 Generate 分流：Drive 只解析控制命令，不把输出当作实验定义
+                if session_mode_str == "drive":
+                    parsed_text, commands = parse_drive_response(full_text)
+                    definitions = None
+                else:
+                    parsed_text, commands, definitions = parse_assistant_raw_response(
+                        full_text
+                    )
 
                 # ── Stage 2: Parsing ────────────────────────────────────────
                 yield _sse_event("status", json.dumps({
                     "stage": "parsing",
-                    "message": f"解析完成，发现 {len(definitions) if definitions else 0} 个实验定义",
+                    "message": (
+                        "解析驱动命令完成"
+                        if session_mode_str == "drive"
+                        else f"解析完成，发现 {len(definitions) if definitions else 0} 个实验定义"
+                    ),
                     "progress": 30,
                 }))
                 logger.info(
-                    "[SSE] Parsed stream session_id=%s definitions_count=%s "
+                    "[SSE] Parsed stream session_id=%s mode=%s definitions_count=%s "
                     "registry_keys=%s narrative_len=%d raw_len=%d",
                     session_id,
+                    session_mode_str,
                     len(definitions) if definitions else 0,
                     [d.get("registry_key") for d in (definitions or [])],
                     len(parsed_text),
@@ -475,11 +488,10 @@ async def stream_chat(
                         json.dumps(commands_to_persist, ensure_ascii=False),
                     )
 
-                # ── Stage 3: Reflection ─────────────────────────────────────
+                # ── Stage 3: Reflection（仅 Generate：Drive 不跑 render_code 反思） ──
                 reflection_results: list[dict | None] = []
-                session_mode_str = session.mode if isinstance(session.mode, str) else session.mode.value
 
-                if definitions:
+                if definitions and session_mode_str != "drive":
                     for _d in definitions:
                         normalize_lab_definition_dict(_d)
 
@@ -695,18 +707,25 @@ async def stream_chat(
                     )
                 else:
                     reflection_results = []
-                    _has_rc = "render_code" in full_text
-                    _rc_start = full_text.index("render_code") if _has_rc else -1
-                    _rc_snippet = full_text[_rc_start : _rc_start + 300] if _has_rc else ""
-                    logger.warning(
-                        "[SSE] No definition extracted from AI response for session %s. "
-                        "Full response length=%d, commands=%s, has_render_code=%s, rc_snippet=%s",
-                        session_id,
-                        len(full_text),
-                        commands_to_persist is not None,
-                        _has_rc,
-                        _rc_snippet[:200],
-                    )
+                    if session_mode_str != "drive":
+                        _has_rc = "render_code" in full_text
+                        _rc_start = full_text.index("render_code") if _has_rc else -1
+                        _rc_snippet = full_text[_rc_start : _rc_start + 300] if _has_rc else ""
+                        logger.warning(
+                            "[SSE] No definition extracted from AI response for session %s. "
+                            "Full response length=%d, commands=%s, has_render_code=%s, rc_snippet=%s",
+                            session_id,
+                            len(full_text),
+                            commands_to_persist is not None,
+                            _has_rc,
+                            _rc_snippet[:200],
+                        )
+                    else:
+                        logger.info(
+                            "[SSE] Drive session %s: skipped definition/reflection; commands=%s",
+                            session_id,
+                            commands_to_persist is not None,
+                        )
 
                 # ── Stage 4: Finalizing ────────────────────────────────────
                 yield _sse_event("status", json.dumps({

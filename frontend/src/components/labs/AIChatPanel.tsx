@@ -227,8 +227,9 @@ function AIChatPanelInner({
       let pendingCommands: LabCommand[] = [];
 
       es.addEventListener('generating', () => {
+        const placeholder = effectiveMode === 'drive_lab' ? 'Controlling…' : 'Generating…';
         setMessages(prev =>
-          prev.map(m => m.id === asstId ? { ...m, content: 'Generating…', streaming: true } : m)
+          prev.map(m => m.id === asstId ? { ...m, content: placeholder, streaming: true } : m)
         );
       });
 

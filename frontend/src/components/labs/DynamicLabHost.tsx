@@ -37,7 +37,8 @@ function RenderCodeLabBranch({
   onStateChange,
   readonly,
   height,
-}: LabWidgetProps & { definition: LabComponentDefinition }) {
+  driveRemountEpoch = 0,
+}: LabWidgetProps & { definition: LabComponentDefinition; driveRemountEpoch?: number }) {
   const renderCode = isUsableRenderCode(definition.renderCode) ? definition.renderCode! : '';
   const [t, setT] = useState(0);
   const tRef = useRef(0);
@@ -78,12 +79,20 @@ function RenderCodeLabBranch({
         onStateChange={onStateChange}
         readonly={readonly}
         t={t}
+        driveRemountEpoch={driveRemountEpoch}
       />
     </div>
   );
 }
 
-export default function DynamicLabHost({ state, onStateChange, readonly, height, definition }: LabWidgetProps & { definition: LabComponentDefinition }) {
+export default function DynamicLabHost({
+  state,
+  onStateChange,
+  readonly,
+  height,
+  definition,
+  driveRemountEpoch = 0,
+}: LabWidgetProps & { definition: LabComponentDefinition; driveRemountEpoch?: number }) {
   if (!isUsableRenderCode(definition.renderCode)) {
     return <MissingRenderCodePlaceholder height={height} />;
   }
@@ -95,6 +104,7 @@ export default function DynamicLabHost({ state, onStateChange, readonly, height,
       onStateChange={onStateChange}
       readonly={readonly}
       height={height}
+      driveRemountEpoch={driveRemountEpoch}
     />
   );
 }
