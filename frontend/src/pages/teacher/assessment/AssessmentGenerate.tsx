@@ -1348,9 +1348,7 @@ export default function AssessmentGenerate() {
                         id: 'error-questions' as ExamGenMode,
                         Icon: PenLine,
                         label: 'Error-Based Questions',
-                        labelEn: 'Error-Based Questions',
                         desc: 'Generate targeted review questions from mistakes in graded exam papers',
-                        descEn: 'Generate targeted review questions from a graded exam with marked mistakes',
                         color: '#dc2626',
                         activeBorder: '#fca5a5',
                         activeBg: '#fff5f5',
@@ -1360,9 +1358,7 @@ export default function AssessmentGenerate() {
                         id: 'simulation' as ExamGenMode,
                         Icon: Copy,
                         label: 'Question Simulation',
-                        labelEn: 'Question Simulation',
                         desc: 'Generate similar questions based on the structure of a blank exam paper',
-                        descEn: 'Generate similar questions mirroring the structure of a blank exam paper',
                         color: '#0891b2',
                         activeBorder: '#67e8f9',
                         activeBg: '#ecfeff',
@@ -1396,9 +1392,6 @@ export default function AssessmentGenerate() {
                               <div style={{ fontSize: '14px', fontWeight: 700, color: active ? m.color : '#374151', lineHeight: 1.25 }}>
                                 {m.label}
                               </div>
-                              <div style={{ fontSize: '11px', color: active ? m.color : '#9ca3af', fontWeight: 500 }}>
-                                {m.labelEn}
-                              </div>
                             </div>
                             {active && (
                               <div style={{
@@ -1411,11 +1404,8 @@ export default function AssessmentGenerate() {
                             )}
                           </div>
                           <div style={{ paddingLeft: '46px' }}>
-                            <p style={{ margin: '0 0 2px', fontSize: '12px', color: active ? m.color : '#6b7280', lineHeight: 1.5, opacity: active ? 0.85 : 1 }}>
+                            <p style={{ margin: 0, fontSize: '12px', color: active ? m.color : '#6b7280', lineHeight: 1.5, opacity: active ? 0.85 : 1 }}>
                               {m.desc}
-                            </p>
-                            <p style={{ margin: 0, fontSize: '11px', color: '#9ca3af', lineHeight: 1.4 }}>
-                              {m.descEn}
                             </p>
                           </div>
                         </button>
