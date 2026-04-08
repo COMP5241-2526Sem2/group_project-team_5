@@ -63,6 +63,11 @@ function formatDate(value: string): string {
   return date.toLocaleDateString('en-US');
 }
 
+function hasKnownGrade(grade: string): boolean {
+  const g = (grade || '').trim().toLowerCase();
+  return g.length > 0 && g !== 'unspecified' && g !== 'n/a' && g !== '-';
+}
+
 function mapListItemToPaper(item: PaperListItemDto): Paper {
   return {
     id: String(item.paper_id),
@@ -391,7 +396,7 @@ function PaperDetailPanel({
           {/* Meta bar */}
           <div style={{ display: 'flex', gap: '18px', flexWrap: 'wrap' }}>
             {[
-              { icon: <FileText size={12} />, text: `${paper.subject} · ${paper.grade}` },
+              { icon: <FileText size={12} />, text: hasKnownGrade(paper.grade) ? `${paper.subject} · ${paper.grade}` : paper.subject },
               { icon: <BookOpen size={12} />, text: `Textbook: ${paper.textbook}` },
               { icon: <Target size={12} />, text: `Score: ${paper.totalScore} pts` },
               { icon: <Clock size={12} />, text: `${paper.durationMin} min` },
@@ -549,7 +554,7 @@ export default function AssessmentPapers() {
     [papers],
   );
   const allGrades = useMemo(
-    () => ['All Grades', ...Array.from(new Set(papers.map(p => p.grade)))],
+    () => ['All Grades', ...Array.from(new Set(papers.map(p => p.grade).filter(hasKnownGrade)))],
     [papers],
   );
   const allSemesters = useMemo(
@@ -898,7 +903,7 @@ function PaperCard({
 
         {/* Subtitle breadcrumb */}
         <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '12px', lineHeight: 1.5 }}>
-          {paper.publisher}&nbsp;·&nbsp;{paper.grade}&nbsp;{paper.subject}&nbsp;·&nbsp;{paper.type}
+          {`${paper.publisher}${hasKnownGrade(paper.grade) ? ` · ${paper.grade}` : ''} ${paper.subject} · ${paper.type}`}
         </div>
 
         {/* Stats table */}

@@ -703,10 +703,13 @@ export default function AssessmentGenerate() {
         ? (tbSemester.includes('Vol.2') ? 'Vol.2' : tbSemester.includes('Vol.1') ? 'Vol.1' : null)
         : null;
 
+      const effectiveSubject = inferEffectiveSubject();
+      const resolvedGrade = sourceTab === 'textbook' && tbGrade ? tbGrade : 'Unspecified';
+
       const response = await createPaperApi({
-        title: `AI Generated ${inferEffectiveSubject()} Paper ${new Date().toISOString().slice(0, 10)}`,
-        grade: tbGrade || 'Grade 7',
-        subject: inferEffectiveSubject(),
+        title: `AI Generated ${effectiveSubject} Paper ${new Date().toISOString().slice(0, 10)}`,
+        grade: resolvedGrade,
+        subject: effectiveSubject,
         semester: resolvedSemester,
         exam_type: sourceTab === 'exam' ? 'simulation' : 'ai_generated',
         duration_min: 45,
