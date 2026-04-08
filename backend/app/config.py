@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     quiz_generation_timeout_sec: float = 25.0
     quiz_generation_max_tokens: int = 800
     quiz_generation_llm_max_retries: int = 2
+    redis_url: str = ""
+    quiz_preview_job_ttl_sec: int = 900
+    quiz_preview_job_lock_sec: int = 180
     quiz_audio_max_bytes: int = 8 * 1024 * 1024
 
     # PDF import: optional LLM structured parse when heuristics return no questions

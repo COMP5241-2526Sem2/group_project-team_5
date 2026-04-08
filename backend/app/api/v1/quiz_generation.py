@@ -6,13 +6,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.schemas.quiz.quiz_generation import (
     AIQuestionGenExtractTextResponse,
+    AIQuestionGenPreviewJobCreateResponse,
     AIQuestionGenPreviewRequest,
     AIQuestionGenPreviewResponse,
+    AIQuestionGenPreviewJobStatusResponse,
     QuizGenerateRequest,
     QuizGenerateResponse,
 )
 from app.services.paper.common.source_text_extraction_service import SourceTextExtractionService
 from app.services.quiz.ai_question_gen_service import AIQuestionGenService, LLMGenerationError
+from app.services.quiz.quiz_preview_job_service import QuizPreviewJobService
 from app.services.quiz.quiz_generation_service import QuizGenerationService
 
 router = APIRouter(prefix="/quiz-generation", tags=["quiz-generation"])
@@ -58,6 +61,28 @@ async def preview_generate_questions(
                 "message": "LLM generation failed; placeholder/heuristic questions are disabled.",
             },
         )
+
+
+@router.post("/preview/jobs", response_model=AIQuestionGenPreviewJobCreateResponse)
+async def create_preview_job(
+    payload: AIQuestionGenPreviewRequest,
+    _db: AsyncSession = Depends(get_db),
+    x_user_id: int | None = Header(default=None, alias="X-User-Id"),
+) -> AIQuestionGenPreviewJobCreateResponse:
+    if x_user_id is None:
+        raise HTTPException(status_code=400, detail="X-User-Id header is required")
+    return await QuizPreviewJobService.create_job(payload=payload, user_id=x_user_id)
+
+
+@router.get("/preview/jobs/{job_id}", response_model=AIQuestionGenPreviewJobStatusResponse)
+async def get_preview_job_status(
+    job_id: str,
+    _db: AsyncSession = Depends(get_db),
+    x_user_id: int | None = Header(default=None, alias="X-User-Id"),
+) -> AIQuestionGenPreviewJobStatusResponse:
+    if x_user_id is None:
+        raise HTTPException(status_code=400, detail="X-User-Id header is required")
+    return await QuizPreviewJobService.get_status(job_id=job_id, user_id=x_user_id)
 
 
 @router.post("/extract-text", response_model=AIQuestionGenExtractTextResponse)

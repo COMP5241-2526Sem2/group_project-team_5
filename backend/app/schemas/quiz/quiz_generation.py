@@ -114,3 +114,19 @@ class AIQuestionGenPreviewResponse(BaseModel):
 class AIQuestionGenExtractTextResponse(BaseModel):
     source_text: str
     chars: int
+
+
+PreviewJobStatus = Literal["queued", "running", "succeeded", "failed"]
+
+
+class AIQuestionGenPreviewJobCreateResponse(BaseModel):
+    job_id: str
+    status: PreviewJobStatus
+
+
+class AIQuestionGenPreviewJobStatusResponse(BaseModel):
+    job_id: str
+    status: PreviewJobStatus
+    result: AIQuestionGenPreviewResponse | None = None
+    error: str | None = None
+    updated_at: str

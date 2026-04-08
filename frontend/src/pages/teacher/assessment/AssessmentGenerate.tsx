@@ -10,7 +10,10 @@ import {
   PenLine, Copy,
 } from 'lucide-react';
 import { CustomSelect, SelectField } from '../../../components/teacher/CustomSelect';
-import { previewGenerateQuestionsApi } from '../../../utils/aiQuestionGenApi';
+import {
+  createPreviewGenerateJobApi,
+  getPreviewGenerateJobStatusApi,
+} from '../../../utils/aiQuestionGenApi';
 import { createPaperApi } from '../../../utils/paperApi';
 import { extractSourceTextApi } from '../../../utils/sourceExtractionApi';
 
@@ -873,7 +876,7 @@ export default function AssessmentGenerate() {
         return '[no extractable text]';
       })();
 
-      const previewPayload: Parameters<typeof previewGenerateQuestionsApi>[0] = {
+      const previewPayload: Parameters<typeof createPreviewGenerateJobApi>[0] = {
         source_text: previewSourceText,
         difficulty: effectiveDifficulty,
         question_count: totalQ(),
@@ -887,13 +890,38 @@ export default function AssessmentGenerate() {
         previewPayload.task_type = examGenMode === 'simulation' ? 'simulation' : 'error_based';
         previewPayload.match_mode = examMatchMode;
       }
-      const preview = await previewGenerateQuestionsApi(previewPayload);
+      const created = await createPreviewGenerateJobApi(previewPayload);
+      let preview: { questions: GeneratedQ[] } | null = null;
+      for (let i = 0; i < 40; i += 1) {
+        const status = await getPreviewGenerateJobStatusApi(created.job_id);
+        if (status.status === 'succeeded' && status.result) {
+          preview = {
+            questions: status.result.questions.map((q) => ({
+              id: `gq-${Math.random()}`,
+              type: q.type,
+              prompt: q.prompt,
+              options: q.options.map((opt) => ({ key: opt.key, text: opt.text, correct: opt.correct })),
+              answer: q.answer || undefined,
+              difficulty: q.difficulty,
+              explanation: q.explanation,
+            })),
+          };
+          break;
+        }
+        if (status.status === 'failed') {
+          throw new Error(status.error || 'Preview generation job failed.');
+        }
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+      if (!preview) {
+        throw new Error('Preview generation timed out.');
+      }
       if (preview.questions.length > 0) {
         qs = preview.questions.map((q, idx) => ({
           id: `gq-${idx + 1}`,
           type: q.type,
           prompt: q.prompt,
-          options: q.options.map((opt) => ({ key: opt.key, text: opt.text, correct: opt.correct })),
+          options: q.options || [],
           answer: q.answer || undefined,
           difficulty: q.difficulty,
           explanation: q.explanation,
