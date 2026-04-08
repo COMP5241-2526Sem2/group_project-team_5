@@ -10,7 +10,7 @@ from app.schemas.quiz.quiz_generation import (
     QuizGenerateResponse,
 )
 from app.services.paper.common.source_text_extraction_service import SourceTextExtractionService
-from app.services.quiz.ai_question_gen_service import AIQuestionGenService
+from app.services.quiz.ai_question_gen_service import AIQuestionGenService, LLMGenerationError
 from app.services.quiz.quiz_generation_service import QuizGenerationService
 
 router = APIRouter(prefix="/quiz-generation", tags=["quiz-generation"])
@@ -35,7 +35,16 @@ async def preview_generate_questions(
 ) -> AIQuestionGenPreviewResponse:
     if x_user_id is None:
         raise HTTPException(status_code=400, detail="X-User-Id header is required")
-    return await AIQuestionGenService.preview_generate(payload)
+    try:
+        return await AIQuestionGenService.preview_generate(payload)
+    except LLMGenerationError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "warning": str(exc),
+                "message": "LLM generation failed; placeholder/heuristic questions are disabled.",
+            },
+        )
 
 
 @router.post("/extract-text", response_model=AIQuestionGenExtractTextResponse)

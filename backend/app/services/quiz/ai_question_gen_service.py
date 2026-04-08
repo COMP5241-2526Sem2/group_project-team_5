@@ -20,6 +20,10 @@ from app.schemas.quiz.quiz_generation import (
 logger = logging.getLogger(__name__)
 
 
+class LLMGenerationError(RuntimeError):
+    """Raised when LLM generation should fail fast without heuristic fallback."""
+
+
 @dataclass(slots=True)
 class _DraftQuestion:
     qtype: str
@@ -31,6 +35,7 @@ class _DraftQuestion:
 
 class AIQuestionGenService:
     _client: AsyncOpenAI | None = None
+    _max_source_chars = 5000
     _stopwords = {
         "the", "and", "for", "with", "that", "this", "from", "your", "into", "about", "paper", "chapter",
         "notes", "exercise", "exam", "test", "question", "questions", "grade", "unit", "file", "upload", "document",
@@ -62,74 +67,48 @@ class AIQuestionGenService:
                 effective_payload = payload.model_copy(update={"source_text": enhanced_source})
 
         provider = settings.quiz_generation_provider.strip().lower()
-        if AIQuestionGenService._llm_enabled():
-            max_attempts = max(1, settings.quiz_generation_llm_max_retries)
-            last_error: Exception | None = None
-            for attempt in range(1, max_attempts + 1):
-                try:
-                    generated = await AIQuestionGenService._llm_generate(effective_payload, effective_type_targets)
-                    generated = AIQuestionGenService._enforce_type_targets(
-                        generated,
-                        effective_payload,
-                        effective_type_targets,
-                    )
-                    if generated:
-                        return AIQuestionGenPreviewResponse(
-                            questions=generated[: effective_payload.question_count],
-                            generation_mode="llm",
-                        )
-                    logger.warning(
-                        "AI question preview got empty LLM output (attempt=%s/%s, provider=%s)",
-                        attempt,
-                        max_attempts,
-                        provider,
-                    )
-                except Exception as exc:
-                    last_error = exc
-                    logger.warning(
-                        "AI question preview LLM call failed (attempt=%s/%s, provider=%s, error=%s)",
-                        attempt,
-                        max_attempts,
-                        provider,
-                        repr(exc),
-                    )
-                if attempt < max_attempts:
-                    await asyncio.sleep(min(0.5 * attempt, 1.5))
+        if not AIQuestionGenService._llm_enabled():
+            if provider in {"openai", "ohmygpt"} and not settings.ohmygpt_api_key.strip():
+                raise LLMGenerationError("LLM preview generation failed: API key is missing.")
+            raise LLMGenerationError(f"LLM preview generation failed: unsupported provider '{provider}'.")
 
-            fallback = AIQuestionGenService._heuristic_generate(effective_payload, effective_type_targets)
-            fallback = AIQuestionGenService._enforce_type_targets(
-                fallback,
-                effective_payload,
-                effective_type_targets,
-            )
-            warning = "LLM unavailable or returned empty output; heuristic fallback was used."
-            if last_error is not None:
-                warning = f"LLM call failed ({type(last_error).__name__}); heuristic fallback was used."
-            return AIQuestionGenPreviewResponse(
-                questions=fallback[: effective_payload.question_count],
-                generation_mode="heuristic",
-                warning=warning,
-            )
+        max_attempts = max(1, settings.quiz_generation_llm_max_retries)
+        last_error: Exception | None = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                generated = await AIQuestionGenService._llm_generate(effective_payload, effective_type_targets)
+                generated = AIQuestionGenService._enforce_type_targets(
+                    generated,
+                    effective_payload,
+                    effective_type_targets,
+                )
+                if generated:
+                    return AIQuestionGenPreviewResponse(
+                        questions=generated[: effective_payload.question_count],
+                        generation_mode="llm",
+                    )
+                logger.warning(
+                    "AI question preview got empty LLM output (attempt=%s/%s, provider=%s)",
+                    attempt,
+                    max_attempts,
+                    provider,
+                )
+            except Exception as exc:
+                last_error = exc
+                logger.warning(
+                    "AI question preview LLM call failed (attempt=%s/%s, provider=%s, error=%s)",
+                    attempt,
+                    max_attempts,
+                    provider,
+                    repr(exc),
+                )
+            if attempt < max_attempts:
+                await asyncio.sleep(min(1.2 * attempt, 3.0))
 
-        key_missing = provider in {"openai", "ohmygpt"} and not settings.ohmygpt_api_key.strip()
-        provider_mismatch = provider not in {"openai", "ohmygpt", "heuristic"}
-
-        fallback = AIQuestionGenService._heuristic_generate(effective_payload, effective_type_targets)
-        fallback = AIQuestionGenService._enforce_type_targets(
-            fallback,
-            effective_payload,
-            effective_type_targets,
-        )
-        warning: str | None = None
-        if key_missing:
-            warning = "LLM provider is enabled but API key is missing; heuristic fallback was used."
-        elif provider_mismatch:
-            warning = f"Unknown provider '{provider}'; heuristic fallback was used."
-        return AIQuestionGenPreviewResponse(
-            questions=fallback[: effective_payload.question_count],
-            generation_mode="heuristic",
-            warning=warning,
-        )
+        msg = "LLM preview generation returned empty output after retries; no heuristic fallback is allowed."
+        if last_error is not None:
+            msg = f"LLM preview generation failed after retries ({type(last_error).__name__}); no heuristic fallback is allowed."
+        raise LLMGenerationError(msg)
 
     @staticmethod
     async def _analyze_exam_source(
@@ -137,7 +116,8 @@ class AIQuestionGenService:
         requested_type_targets: dict[str, int],
     ) -> tuple[dict[str, int], str]:
         """Two-stage simulation: infer source exam structure before generation."""
-        if not payload.source_text.strip():
+        prepared_source = AIQuestionGenService._prepare_source_text(payload.source_text)
+        if not prepared_source.strip():
             return requested_type_targets, ""
 
         client = AIQuestionGenService._get_client()
@@ -171,7 +151,7 @@ class AIQuestionGenService:
                         "3) type_targets should be close to inferred structure and sum to question_count.\n"
                         "4) source_outline should contain concise question intent lines.\n"
                         "source_text:\n"
-                        f"{payload.source_text[:12000]}"
+                        f"{prepared_source}"
                     ),
                 },
             ],
@@ -324,6 +304,7 @@ class AIQuestionGenService:
                 "error_based mode: generate targeted remediation questions based on likely mistakes in source material."
             )
         meta_block = "\n".join(meta_lines)
+        prepared_source = AIQuestionGenService._prepare_source_text(payload.source_text)
         return (
             f"{meta_block}\n"
             f"difficulty={payload.difficulty}\n"
@@ -344,8 +325,39 @@ class AIQuestionGenService:
             "7) Each item must contain exactly ONE question in prompt; do not concatenate multiple questions.\n"
             "8) prompt must be student-facing only. Do not include authoring instructions, counts, or process notes.\n"
             "source_text:\n"
-            f"{payload.source_text[:7000]}"
+            f"{prepared_source}"
         )
+
+    @staticmethod
+    def _prepare_source_text(source_text: str) -> str:
+        text = (source_text or "").replace("\r\n", "\n").replace("\r", "\n")
+        cleaned: list[str] = []
+        noise_patterns = [
+            r"^\s*page\s*\d+(\s*\/\s*\d+)?\s*$",
+            r"^\s*\d+\s*\/\s*\d+\s*$",
+            r"^\s*考生须知[:：]?\s*$",
+            r"^\s*注意事项[:：]?\s*$",
+            r"^\s*exam instructions[:：]?\s*$",
+            r"^\s*read the following instructions.*$",
+            r"^\s*姓名[:：].*$",
+            r"^\s*班级[:：].*$",
+            r"^\s*学号[:：].*$",
+            r"^\s*student\s*id[:：].*$",
+            r"^\s*name[:：].*$",
+            r"^\s*class[:：].*$",
+        ]
+        compiled = [re.compile(p, flags=re.IGNORECASE) for p in noise_patterns]
+        for line in text.split("\n"):
+            ln = line.strip()
+            if not ln:
+                continue
+            if any(p.match(ln) for p in compiled):
+                continue
+            cleaned.append(ln)
+        normalized = "\n".join(cleaned).strip()
+        if len(normalized) > AIQuestionGenService._max_source_chars:
+            normalized = normalized[: AIQuestionGenService._max_source_chars]
+        return normalized
 
     @staticmethod
     def _is_meta_instruction_prompt(prompt: str) -> bool:

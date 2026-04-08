@@ -94,9 +94,15 @@ class AIQuestionGenPreviewRequest(BaseModel):
     grade: str | None = None
     task_type: Literal["simulation", "error_based"] | None = None
     match_mode: Literal["type", "knowledge"] | None = None
-    difficulty: Difficulty
+    difficulty: Difficulty | Literal["solid"]
     question_count: int = Field(ge=1)
     type_targets: dict[str, int] | None = None
+
+    @model_validator(mode="after")
+    def normalize_preview_difficulty(self) -> "AIQuestionGenPreviewRequest":
+        if self.difficulty == "solid":
+            self.difficulty = "medium"
+        return self
 
 
 class AIQuestionGenPreviewResponse(BaseModel):
