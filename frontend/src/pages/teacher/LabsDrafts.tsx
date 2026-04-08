@@ -670,22 +670,6 @@ export default function LabsDrafts() {
                     </button>
                     <button
                       type="button"
-                      disabled={savingToServer || selectedEntry.def.status === 'published'}
-                      onClick={() => void handleSaveSelectedToServer()}
-                      title="Sync current draft to server (already previewable locally after generation; click to persist)"
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 14px',
-                        border: '1px solid #cbd5e1', borderRadius: '7px',
-                        background: selectedEntry.def.status === 'published' ? '#f3f4f6' : '#fff',
-                        color: selectedEntry.def.status === 'published' ? '#9ca3af' : '#334155',
-                        fontSize: '12px', fontWeight: 600,
-                        cursor: selectedEntry.def.status === 'published' || savingToServer ? 'not-allowed' : 'pointer',
-                      }}
-                    >
-                      <Save size={12} /> {savingToServer ? 'Saving…' : 'Save to Server'}
-                    </button>
-                    <button
-                      type="button"
                       disabled={selectedEntry.def.status === 'published'}
                       onClick={() => void handlePublish(selectedEntry.def.registryKey)}
                       style={{
