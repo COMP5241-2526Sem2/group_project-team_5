@@ -85,7 +85,7 @@ const ChatContext = createContext<ChatContextValue | null>(null);
 function buildAnchoredLabWelcome(title: string, registryKey: string, mode: ChatMode): string {
   const body =
     mode === 'drive_lab'
-      ? '当前 **Drive** 会通过自然语言理解你的意图，并向该实验下发运行时指令以更新中间预览区；本模式不修改 `render_code` 或草稿内容。'
+      ? '当前 **Drive（控制模式）** 只负责根据自然语言**调整已有实验的可交互状态**（与中间预览绑定的参数）；**不会**像 Generate 那样生成/迭代实验定义或 `render_code`。'
       : '当前 **Generate** 会围绕该实验迭代：可说明希望调整的可视化、交互参数、说明文字或 `render_code`；在不大改实验主题时，请保持同一 `registry_key` 以便覆盖草稿。';
   return (
     `**已选中实验：**「${title}」  \`registry_key\`: \`${registryKey}\`\n\n` +

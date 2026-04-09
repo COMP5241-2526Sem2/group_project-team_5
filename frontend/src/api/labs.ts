@@ -1,4 +1,5 @@
 import type { LabComponentDefinition, RendererProfile } from '@/components/labs/types';
+import { apiRequest } from '@/utils/apiClient';
 
 /** 后端 / LLM 可能写入前端 RendererProfile 联合类型之外的别名 */
 const API_RENDERER_PROFILE_ALIASES: Record<string, RendererProfile> = {
@@ -88,6 +89,11 @@ function toBackend(def: LabComponentDefinition): BackendLabDefinition {
 
 /** 开发环境下 EventSource 经 Vite 代理常不稳定，SSE 直连后端（需 CORS） */
 function sseOrigin(): string {
+  const raw = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+  if (raw) {
+    const noSlash = raw.replace(/\/+$/, '');
+    return noSlash.endsWith('/api/v1') ? noSlash.slice(0, -7) : noSlash;
+  }
   if (import.meta.env.DEV) {
     const o = import.meta.env.VITE_SSE_ORIGIN as string | undefined;
     return (o && o.replace(/\/$/, '')) || 'http://127.0.0.1:8000';
@@ -154,34 +160,20 @@ function labsListQueryString(params?: LabListParams): string {
 
 export const labsApi = {
   list: (params?: LabListParams) =>
-    fetch(`/api/v1/labs/${labsListQueryString(params)}`).then(r => r.json()),
+    apiRequest<Record<string, unknown>>(`/labs/${labsListQueryString(params)}`, {}, 'teacher'),
 
   get: (registryKey: string): Promise<Record<string, unknown>> =>
-    fetch(`/api/v1/labs/${registryKey}`).then(r => {
-      if (!r.ok) throw new Error(`Lab not found: ${registryKey}`);
-      return r.json();
-    }),
+    apiRequest<Record<string, unknown>>(`/labs/${registryKey}`, {}, 'teacher'),
 
   createSession: async (mode: 'drive' | 'generate', registryKey?: string) => {
-    const r = await fetch('/api/v1/labs/sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode, registry_key: registryKey }),
-    });
-    // Backend may return plain text/HTML on 5xx; read text first to avoid JSON parse errors.
-    const rawText = await r.text().catch(() => '');
-    let data: Record<string, unknown> = {};
-    if (rawText) {
-      try {
-        data = JSON.parse(rawText) as Record<string, unknown>;
-      } catch {
-        data = { detail: rawText };
-      }
-    }
-    if (!r.ok) {
-      const detail = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail ?? data);
-      throw new Error(detail || `createSession failed: ${r.status}`);
-    }
+    const data = await apiRequest<Record<string, unknown>>(
+      '/labs/sessions',
+      {
+        method: 'POST',
+        body: JSON.stringify({ mode, registry_key: registryKey }),
+      },
+      'teacher',
+    );
     if (typeof data.id !== 'number') {
       throw new Error('createSession: invalid response (missing id)');
     }
@@ -189,7 +181,7 @@ export const labsApi = {
   },
 
   getMessages: (sessionId: number) =>
-    fetch(`/api/v1/labs/sessions/${sessionId}/messages`).then(r => r.json()),
+    apiRequest<Record<string, unknown>>(`/labs/sessions/${sessionId}/messages`, {}, 'teacher'),
 
   streamChat: (sessionId: number, message: string): EventSource => {
     const base = sseOrigin();
@@ -198,14 +190,14 @@ export const labsApi = {
   },
 
   confirmLabDefinition: (def: LabComponentDefinition) =>
-    fetch('/api/v1/labs/definitions/confirm', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(toBackend(def)),
-    }).then(r => {
-      if (!r.ok) throw new Error(`Failed to save lab: ${r.statusText}`);
-      return r.json();
-    }),
+    apiRequest<Record<string, unknown>>(
+      '/labs/definitions/confirm',
+      {
+        method: 'POST',
+        body: JSON.stringify(toBackend(def)),
+      },
+      'teacher',
+    ),
 
   /**
    * 保存草稿或发布：与库中内容比较（草稿）；发布时写入并置 published。
@@ -215,31 +207,31 @@ export const labsApi = {
     action: 'save_draft' | 'publish'
   ): Promise<{ contentUnchanged: boolean; raw: Record<string, unknown> }> => {
     const status = action === 'save_draft' ? 'draft' : 'published';
-    const r = await fetch('/api/v1/labs/definitions/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...toBackend({ ...def, status }), action }),
-    });
-    const raw = (await r.json().catch(() => ({}))) as Record<string, unknown>;
-    if (!r.ok) {
-      const detail =
-        typeof raw.detail === 'string'
-          ? raw.detail
-          : JSON.stringify(raw.detail ?? raw);
-      throw new Error(detail || `保存失败: ${r.status}`);
-    }
+    const raw = await apiRequest<Record<string, unknown>>(
+      '/labs/definitions/save',
+      {
+        method: 'POST',
+        body: JSON.stringify({ ...toBackend({ ...def, status }), action }),
+      },
+      'teacher',
+    );
     return { contentUnchanged: raw.content_unchanged === true, raw };
   },
 
   updateStatus: (labId: number, status: 'draft' | 'published' | 'deprecated') =>
-    fetch(`/api/v1/labs/definitions/${labId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    }).then(r => r.json()),
+    apiRequest<Record<string, unknown>>(
+      `/labs/definitions/${labId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      },
+      'teacher',
+    ),
 
   delete: (labId: number) =>
-    fetch(`/api/v1/labs/definitions/${labId}`, { method: 'DELETE' }).then(r => {
-      if (!r.ok && r.status !== 204) throw new Error(`Delete failed: ${r.statusText}`);
-    }),
+    apiRequest<Record<string, unknown>>(
+      `/labs/definitions/${labId}`,
+      { method: 'DELETE' },
+      'teacher',
+    ).then(() => undefined),
 };

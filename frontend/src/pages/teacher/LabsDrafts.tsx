@@ -766,7 +766,7 @@ export default function LabsDrafts() {
         intent={pendingDraftSelectKey === PENDING_DESELECT ? 'deselect' : 'switch_lab'}
         targetTitle={
           pendingDraftSelectKey === PENDING_DESELECT
-            ? (selectedEntry?.def.title ?? 'Current lab')
+            ? (selectedEntry?.def.title ?? 'Current Lab')
             : (pendingDraftSelectKey
               ? (filtered.find(e => e.def.registryKey === pendingDraftSelectKey)?.def.title
                 ?? pendingDraftSelectKey)

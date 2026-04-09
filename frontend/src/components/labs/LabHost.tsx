@@ -135,6 +135,8 @@ export default function LabHost({
 
   const baseState = initialState ?? staticMeta?.defaultState ?? dynamicDef?.initialState ?? {};
   const [state, setState] = useState<LabState>(baseState);
+  /** LLM render_code 常用 useState(initial_state) 只初始化一次；Drive 更新父 state 时需强制重挂 AILabRuntime 内层组件 */
+  const [driveRemountEpoch, setDriveRemountEpoch] = useState(0);
 
   /** 同一 registryKey 下迭代生成（render_code / initialState 变化）时需重置运行时 state，否则预览仍用旧参数 */
   const dynamicRevision = useMemo(() => {
@@ -148,12 +150,24 @@ export default function LabHost({
     setState(initialState ?? staticMeta?.defaultState ?? dynamicDef.initialState ?? {});
   }, [dynamicRevision, widgetType, activeType, dynamicDef, initialState, staticMeta]);
 
+  /** Drive 规范化用的键集合：合并运行时 state + base + 定义里的 initial_state，避免只认英文键名时丢字段 */
+  const driveNormalizeKeys = useMemo(() => {
+    const dynInit = dynamicDef?.initialState;
+    const dynObj =
+      dynInit && typeof dynInit === 'object' && !Array.isArray(dynInit)
+        ? (dynInit as Record<string, unknown>)
+        : {};
+    const baseObj = baseState as Record<string, unknown>;
+    const st = state as Record<string, unknown>;
+    return [...new Set([...Object.keys(st), ...Object.keys(baseObj), ...Object.keys(dynObj)])];
+  }, [state, baseState, dynamicDef]);
+
   // Apply AI commands from ChatContext（含 LLM 非标准 JSON 的兜底规范化）
   useEffect(() => {
     if (!pendingCommands?.length || readonly) return;
     const normalized = normalizeDriveCommandsForLabHost(
       pendingCommands as unknown[],
-      Object.keys(state),
+      driveNormalizeKeys,
     );
     if (normalized.length === 0) {
       onConsumeCommands?.();
@@ -175,9 +189,10 @@ export default function LabHost({
       }
       return next;
     });
+    setDriveRemountEpoch(e => e + 1);
     onConsumeCommands?.();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingCommands]);
+  }, [pendingCommands, driveNormalizeKeys, readonly]);
 
   const onStateChange = useCallback((patch: Partial<LabState>) => {
     if (readonly) return;
@@ -195,7 +210,11 @@ export default function LabHost({
       case 'chem.molecule':      return <MoleculeViewer {...props} />;
       case 'bio.cell':           return <CellViewer {...props} />;
       default:
-        if (dynamicDef) return <DynamicLabHost {...props} definition={dynamicDef} />;
+        if (dynamicDef) {
+          return (
+            <DynamicLabHost {...props} definition={dynamicDef} driveRemountEpoch={driveRemountEpoch} />
+          );
+        }
         return (
           <div style={{ background: '#0b1120', borderRadius: '10px', padding: '48px', textAlign: 'center', color: '#6b7280' }}>
             <div style={{ fontSize: '32px', marginBottom: '12px' }}>❓</div>

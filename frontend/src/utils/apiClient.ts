@@ -1,5 +1,13 @@
 type UserRole = "student" | "teacher" | "admin";
 
+function normalizeApiBaseUrl(raw: string | null | undefined): string | null {
+  const value = (raw || "").trim();
+  if (!value) return null;
+  const base = value.replace(/\/+$/, "");
+  if (base.endsWith("/api/v1")) return base;
+  return `${base}/api/v1`;
+}
+
 function inferCodespacesApiBaseUrl(): string | null {
   if (typeof window === "undefined") {
     return null;
@@ -15,9 +23,9 @@ function inferCodespacesApiBaseUrl(): string | null {
 }
 
 const API_BASE_URL =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() ||
+  normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL as string | undefined) ||
   (import.meta.env.DEV ? "/api/v1" : null) ||
-  inferCodespacesApiBaseUrl() ||
+  normalizeApiBaseUrl(inferCodespacesApiBaseUrl()) ||
   "http://127.0.0.1:8000/api/v1";
 
 function toNumber(value: string | null | undefined): number | null {

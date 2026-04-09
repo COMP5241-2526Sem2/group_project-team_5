@@ -324,16 +324,15 @@ class LabService:
 4. **不要生成新的实验定义**
 
 ## 命令格式
-只输出 JSON 数组，每个命令格式：
+只输出 JSON 数组，每个命令格式（**SET_PARAM 的 key 必须与下方 initial_state 的 JSON 键名完全一致**，含大小写；不要用中文键名）：
 ```json
 [
-  {{"type": "SET_PARAM", "payload": {{"key": "电压", "value": 12}}}},
-  {{"type": "TOGGLE_SWITCH", "payload": {{"switch_id": "S1", "closed": true}}}}
+  {{"type": "SET_PARAM", "payload": {{"key": "voltage", "value": 12}}}}
 ]
 ```
 
 ## 重要约束
-- 只能修改 initial_state 中已有的键
+- `SET_PARAM.payload.key` 必须是 **initial_state 里已有的英文字段名**（例如 `water`、`light`、`co2`），与数据库中一致
 - 命令类型必须与实验类型匹配
 - 不要输出任何非命令的内容（不要有解释性文字）
 """
@@ -971,45 +970,42 @@ async def build_session_messages(
         if lab is None:
             raise ValueError(f"Lab definition {session.lab_definition_id} not found")
 
-        # 构建 Drive 模式系统提示
+        # Drive：与 Generate 完全区分 — 只产出「控制现有实验状态」的 JSON，不生成实验定义、不写 render_code
+        init = lab.initial_state if isinstance(lab.initial_state, dict) else {}
+        allowed_keys = list(init.keys())
+        keys_block = (
+            "\n".join(f"- `{k}`" for k in allowed_keys)
+            if allowed_keys
+            else "- （当前 initial_state 为空；请勿臆造键名）"
+        )
         system_prompt = f"""\
-你是一个物理实验交互助手，专注于**驱动**现有的实验。
+你是「实验控制台」助手。**本对话不是生成实验（Generate）**，不要输出 lab_definition、不要输出 render_code、不要输出 ```tsx 代码块。
 
-## 当前实验信息
+## 实验
 - 标题: {lab.title}
-- registry_key: {lab.registry_key}
-- renderer_profile: {lab.renderer_profile}
-- 实验类型: {lab.subject_lab}
+- registry_key: `{lab.registry_key}`
+- 学科: {lab.subject_lab}
 
-## 当前状态 (initial_state)
+## 当前可交互状态（initial_state）
+下列 **键名必须与之一字不差**（含大小写）；用户用中文描述滑块/参数时，你要映射到这些键之一。
 ```json
-{json.dumps(lab.initial_state or {}, ensure_ascii=False, indent=2)}
+{json.dumps(init, ensure_ascii=False, indent=2)}
 ```
 
-## 视觉配置 (visual_hint)
+## 允许改动的键（只能使用这些 key）
+{keys_block}
+
+## 你必须输出的格式（仅此一种）
+只输出 **一个** Markdown 代码块，语言标记为 `json`，内容为 **JSON 数组**，元素只能是：
 ```json
-{json.dumps(lab.visual_hint or {}, ensure_ascii=False, indent=2)}
+[{{"type": "SET_PARAM", "payload": {{"key": "<上表中的某一个键>", "value": <数字或布尔>}}}}]
 ```
+- `type` 请使用 `SET_PARAM`（不要发明 TOGGLE_* 等未约定的类型，除非用户实验里真有该约定）。
+- `value` 类型与 initial_state 中该键的含义一致（多为 0–100 的数）。
+- **禁止**在代码块外写任何文字；不要重复用户问题；不要加「好的」「完成」等叙述。
 
-## 你的职责
-1. 理解用户的自然语言请求
-2. 生成对应的命令 (LabCommand) 来调整实验参数
-3. 解释实验现象和物理原理
-4. **不要生成新的实验定义**
-
-## 命令格式
-只输出 JSON 数组，每个命令格式：
-```json
-[
-  {{"type": "SET_PARAM", "payload": {{"key": "voltage", "value": 12}}}},
-  {{"type": "TOGGLE_SWITCH", "payload": {{"switch_id": "S1", "closed": true}}}}
-]
-```
-
-## 重要约束
-- 只能修改 initial_state 中已有的键
-- 命令类型必须与实验类型匹配
-- 不要输出任何非命令的内容（不要有解释性文字）
+## 映射示例
+用户说「把光照调到 20」→ 若上表中键为 `light` 或 `光照强度`，则 payload.key 必须写该确切字符串。
 """
         messages.append({"role": "system", "content": system_prompt})
 
@@ -1253,6 +1249,47 @@ def parse_assistant_raw_response(full_text: str) -> tuple[str, list[dict] | None
     parsed_text = parsed_text.strip()
 
     return parsed_text, commands, definitions
+
+
+def parse_drive_response(full_text: str) -> tuple[str, list[dict] | None]:
+    """
+    Drive 专用解析：只提取「命令数组」，与 Generate 的 lab_definition 解析分离。
+
+    依次尝试：标准围栏解析 → 纯 JSON 数组 → 截取首 [ 至末 ] 的子串。
+    """
+    parsed_text, commands, _definitions = parse_assistant_raw_response(full_text)
+    if commands:
+        return (parsed_text.strip() or "已更新实验参数。"), commands
+
+    t = (full_text or "").strip()
+    if t.startswith("["):
+        try:
+            parsed = json.loads(t)
+            if isinstance(parsed, list) and parsed and all(
+                isinstance(item, dict) and "type" in item for item in parsed
+            ):
+                return "已更新实验参数。", parsed
+        except json.JSONDecodeError:
+            pass
+
+    l_idx = t.find("[")
+    r_idx = t.rfind("]")
+    if l_idx != -1 and r_idx != -1 and r_idx > l_idx:
+        fragment = t[l_idx : r_idx + 1]
+        try:
+            parsed = json.loads(fragment)
+            if isinstance(parsed, list) and parsed and all(
+                isinstance(item, dict) and "type" in item for item in parsed
+            ):
+                return "已更新实验参数。", parsed
+        except json.JSONDecodeError:
+            pass
+
+    return (
+        parsed_text.strip()
+        or "未能从回复中解析出驱动命令。请仅输出一个 ```json 代码块，内含 SET_PARAM 数组。",
+        None,
+    )
 
 
 def normalize_drive_commands_for_frontend(

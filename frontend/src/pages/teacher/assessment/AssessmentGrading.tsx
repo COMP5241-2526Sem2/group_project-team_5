@@ -5,6 +5,7 @@ import {
   fetchPaperListApi,
   fetchPaperDetailApi,
   type PaperDetailDto,
+  type PaperListItemDto,
 } from '../../../utils/paperApi';
 import {
   fetchTaskListApi,
@@ -47,14 +48,25 @@ interface LibQ {
   id: string; type: QType; diff: Diff;
   subject: string; grade: string; chapter: string;
   prompt: string; options?: string[]; answer?: string;
+  imageUrl?: string;
   source?: string;
 }
 interface SectionQ {
   uid: string; libId: string; prompt: string;
   type: QType; diff: Diff; pts: number;
-  options?: string[]; answer?: string;
+  options?: string[]; answer?: string; imageUrl?: string;
 }
-interface Section { id: string; label: string; type: QType; ptsEach: number; qs: SectionQ[]; }
+interface Section {
+  id: string;
+  label: string;
+  type: QType;
+  ptsEach: number;
+  qs: SectionQ[];
+  /** One import batch from Exam Papers; sections sharing this id clear together. */
+  importId?: string;
+  sourcePaperId?: string;
+  sourcePaperTitle?: string;
+}
 interface Paper {
   id: string; title: string; kind: PaperKind;
   grade: string; subject: string; status: PaperStatus;
@@ -146,6 +158,7 @@ function flattenQuestionBankSetsToLibQ(sets: QuestionBankSetDto[]): LibQ[] {
         grade: s.grade,
         chapter: s.chapter,
         prompt: q.prompt,
+        imageUrl: q.image_url ?? undefined,
         options: q.options && q.options.length > 0 ? q.options : undefined,
         answer: q.answer ?? undefined,
         source: s.source,
@@ -182,6 +195,8 @@ const ALL_CLASSES = ['Grade 9-A','Grade 9-B','Grade 10-A','Grade 10-B','Grade 10
 const GRADES   = ['Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'];
 const SUBJECTS = ['Biology','Physics','Chemistry','Math','English','History'];
 const Q_TYPES: QType[] = ['MCQ','True/False','Fill-blank','Short Answer','Essay'];
+const EXAM_PAPER_LIST_PAGE_SIZE = 8;
+const QUESTION_BANK_PAGE_SIZE = 12;
 const ROMAN = ['I','II','III','IV','V','VI','VII','VIII'];
 
 function snapshotToQType(snap: Record<string, unknown>): QType | null {
@@ -258,6 +273,7 @@ function taskDetailToCanvas(detail: TaskDetailDto): {
       diff: normDiffFromApi(typeof snap.difficulty === 'string' ? snap.difficulty : null),
       pts: Math.max(1, Math.round(it.score)),
       prompt: typeof snap.prompt === 'string' ? snap.prompt : '',
+      imageUrl: typeof snap.image_url === 'string' ? snap.image_url : undefined,
       options: Array.isArray(snap.options) ? (snap.options as string[]) : undefined,
       answer: typeof snap.answer === 'string' ? snap.answer : undefined,
     });
@@ -288,6 +304,7 @@ function buildTaskPayload(
         difficulty: q.diff,
         uiType: q.type,
       };
+      if (q.imageUrl) snap.image_url = q.imageUrl;
       if (q.options && q.options.length > 0) snap.options = q.options;
       if (q.answer) snap.answer = q.answer;
 
@@ -444,6 +461,7 @@ function QuestionBankBrowser({
   const [debouncedQ, setDebouncedQ] = useState('');
   const [typeFilters, setTypeFilters] = useState<QType[]>([]);
   const [typeDropOpen, setTypeDropOpen] = useState(false);
+  const [bankListPage, setBankListPage] = useState(1);
   const typeRef = useRef<HTMLDivElement>(null);
 
   const qbParams = useMemo(
@@ -499,8 +517,22 @@ function QuestionBankBrowser({
     ),
     [bankRows, typeFilters],
   );
+  const filteredTotal = filtered.length;
+  const bankTotalPages = Math.max(1, Math.ceil(filteredTotal / QUESTION_BANK_PAGE_SIZE));
+  const pagedQuestions = useMemo(() => {
+    const start = (bankListPage - 1) * QUESTION_BANK_PAGE_SIZE;
+    return filtered.slice(start, start + QUESTION_BANK_PAGE_SIZE);
+  }, [filtered, bankListPage]);
   const byType: Partial<Record<QType, LibQ[]>> = {};
-  filtered.forEach((q) => { (byType[q.type] ??= []).push(q); });
+  pagedQuestions.forEach((q) => { (byType[q.type] ??= []).push(q); });
+
+  useEffect(() => {
+    setBankListPage(1);
+  }, [grade, subject, debouncedQ, typeFilters]);
+
+  useEffect(() => {
+    setBankListPage((p) => Math.min(p, bankTotalPages));
+  }, [bankTotalPages]);
 
   function toggleType(t: QType) { setTypeFilters(prev=>prev.includes(t)?prev.filter(x=>x!==t):[...prev,t]); }
   const typeLabel = typeFilters.length===0 ? 'All Types'
@@ -593,43 +625,110 @@ function QuestionBankBrowser({
               <div style={{ fontSize:'12px' }}>No questions for this grade and subject</div>
             </div>
           )
-        ) : Q_TYPES.map(t=>{
-          const qs=byType[t]; if(!qs?.length) return null;
-          const tc=TYPE_C[t];
-          return (
-            <div key={t} style={{ marginBottom:'11px' }}>
-              <div style={{ fontSize:'10px', fontWeight:700, color:'#374151', marginBottom:'5px', display:'flex', alignItems:'center', gap:'5px' }}>
-                <span>{tc.emoji}</span><span>{t}</span><span style={{ color:'#9ca3af', fontWeight:400 }}>({qs.length})</span>
-              </div>
-              {qs.map(q=>{
-                const already=addedIds.has(q.id);
-                const isReplace=replaceMode && replaceTargetType===q.type;
-                return (
-                  <div key={q.id} onClick={()=>{ if(isReplace&&!already) onReplace(q); }}
-                    style={{ display:'flex', alignItems:'flex-start', gap:'7px', padding:'7px 8px', borderRadius:'8px', marginBottom:'3px',
-                      background:already?'#f0fdf4':isReplace?'#fffbeb':'#f9fafb',
-                      border:`1px solid ${already?'#bbf7d0':isReplace?'#fde68a':'transparent'}`,
-                      cursor:isReplace&&!already?'pointer':'default' }}>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:'11px', color:'#374151', lineHeight:1.5, marginBottom:'3px' }}>{clamp(q.prompt,70)}</div>
-                      <DiffBadge d={q.diff}/>
-                    </div>
-                    {isReplace ? (
-                      <div style={{ flexShrink:0, width:'22px', height:'22px', borderRadius:'6px', background:'#fef9c3', border:'1px solid #fde68a', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                        <ArrowLeftRight size={11} style={{ color:'#d97706' }}/>
-                      </div>
-                    ) : (
-                      <button onClick={e=>{ e.stopPropagation(); if(!already) onAdd(q); }}
-                        style={{ flexShrink:0, width:'22px', height:'22px', borderRadius:'6px', border:'none', cursor:already?'default':'pointer', background:already?'#d1fae5':'#3b5bdb', color:already?'#15803d':'#fff', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                        {already ? <Check size={11}/> : <Plus size={11}/>}
-                      </button>
-                    )}
+        ) : (
+          <>
+            {Q_TYPES.map(t=>{
+              const qs=byType[t]; if(!qs?.length) return null;
+              const tc=TYPE_C[t];
+              return (
+                <div key={t} style={{ marginBottom:'11px' }}>
+                  <div style={{ fontSize:'10px', fontWeight:700, color:'#374151', marginBottom:'5px', display:'flex', alignItems:'center', gap:'5px' }}>
+                    <span>{tc.emoji}</span><span>{t}</span><span style={{ color:'#9ca3af', fontWeight:400 }}>({qs.length})</span>
                   </div>
-                );
-              })}
+                  {qs.map(q=>{
+                    const already=addedIds.has(q.id);
+                    const isReplace=replaceMode && replaceTargetType===q.type;
+                    return (
+                      <div key={q.id} onClick={()=>{ if(isReplace&&!already) onReplace(q); }}
+                        style={{ display:'flex', alignItems:'flex-start', gap:'7px', padding:'7px 8px', borderRadius:'8px', marginBottom:'3px',
+                          background:already?'#f0fdf4':isReplace?'#fffbeb':'#f9fafb',
+                          border:`1px solid ${already?'#bbf7d0':isReplace?'#fde68a':'transparent'}`,
+                          cursor:isReplace&&!already?'pointer':'default' }}>
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontSize:'11px', color:'#374151', lineHeight:1.5, marginBottom:'3px' }}>{clamp(q.prompt,70)}</div>
+                          <DiffBadge d={q.diff}/>
+                        </div>
+                        {isReplace ? (
+                          <div style={{ flexShrink:0, width:'22px', height:'22px', borderRadius:'6px', background:'#fef9c3', border:'1px solid #fde68a', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                            <ArrowLeftRight size={11} style={{ color:'#d97706' }}/>
+                          </div>
+                        ) : (
+                          <button onClick={e=>{ e.stopPropagation(); if(!already) onAdd(q); }}
+                            style={{ flexShrink:0, width:'22px', height:'22px', borderRadius:'6px', border:'none', cursor:already?'default':'pointer', background:already?'#d1fae5':'#3b5bdb', color:already?'#15803d':'#fff', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                            {already ? <Check size={11}/> : <Plus size={11}/>}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                padding: '6px 4px 2px',
+                flexShrink: 0,
+              }}
+            >
+              <button
+                type="button"
+                aria-label="Previous page"
+                disabled={bankListPage <= 1 || loading}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setBankListPage((p) => Math.max(1, p - 1));
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '30px',
+                  height: '30px',
+                  borderRadius: '8px',
+                  border: '1px solid #e8eaed',
+                  background: bankListPage <= 1 ? '#f3f4f6' : '#fff',
+                  color: bankListPage <= 1 ? '#d1d5db' : '#374151',
+                  cursor: bankListPage <= 1 ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, minWidth: '120px', textAlign: 'center' }}>
+                Page {bankListPage} / {bankTotalPages}
+                <span style={{ display: 'block', fontWeight: 400, color: '#9ca3af', marginTop: '2px' }}>
+                  {filteredTotal} question{filteredTotal === 1 ? '' : 's'} total
+                </span>
+              </span>
+              <button
+                type="button"
+                aria-label="Next page"
+                disabled={bankListPage >= bankTotalPages || loading}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setBankListPage((p) => Math.min(bankTotalPages, p + 1));
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '30px',
+                  height: '30px',
+                  borderRadius: '8px',
+                  border: '1px solid #e8eaed',
+                  background: bankListPage >= bankTotalPages ? '#f3f4f6' : '#fff',
+                  color: bankListPage >= bankTotalPages ? '#d1d5db' : '#374151',
+                  cursor: bankListPage >= bankTotalPages ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <ChevronRight size={16} />
+              </button>
             </div>
-          );
-        })}
+          </>
+        )}
       </div>
     </div>
   );
@@ -642,19 +741,19 @@ interface PaperPickerProps {
   grade: string;
   subject: string;
   onLoad: (ep: ExamPaperEntry) => void;
-  canvasHasContent: boolean;
-  loadedPaperId: string | null;
+  /** Distinct imports on canvas (same paper may appear more than once). */
+  canvasPaperBatches: { importId: string; paperId: string }[];
 }
-function ExamPaperPicker({ grade, subject, onLoad, canvasHasContent, loadedPaperId }: PaperPickerProps) {
+
+function ExamPaperPicker({ grade, subject, onLoad, canvasPaperBatches }: PaperPickerProps) {
   const queryClient = useQueryClient();
   const [expandId, setExpandId] = useState<string | null>(null);
-  const [confirmId, setConfirmId] = useState<string | null>(null);
-  const [pendingEp, setPendingEp] = useState<ExamPaperEntry | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [listPage, setListPage] = useState(1);
 
   const listParams = useMemo(
-    () => ({ grade, subject, page: 1, page_size: 50 }),
-    [grade, subject],
+    () => ({ grade, subject, page: listPage, page_size: EXAM_PAPER_LIST_PAGE_SIZE }),
+    [grade, subject, listPage],
   );
   const {
     data: listRes,
@@ -663,10 +762,13 @@ function ExamPaperPicker({ grade, subject, onLoad, canvasHasContent, loadedPaper
     error: listErr,
   } = useQuery({
     queryKey: teacherKeys.paperList(listParams),
-    queryFn: () => fetchPaperListApi({ grade, subject, page: 1, page_size: 50 }),
+    queryFn: () =>
+      fetchPaperListApi({ grade, subject, page: listPage, page_size: EXAM_PAPER_LIST_PAGE_SIZE }),
     placeholderData: keepPreviousData,
   });
   const papers = listRes?.items ?? [];
+  const listTotal = listRes?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(listTotal / EXAM_PAPER_LIST_PAGE_SIZE));
   const listError = listErrFlag
     ? (listErr instanceof Error ? listErr.message : 'Failed to load papers')
     : null;
@@ -681,7 +783,12 @@ function ExamPaperPicker({ grade, subject, onLoad, canvasHasContent, loadedPaper
 
   useEffect(() => {
     setExpandId(null);
+    setListPage(1);
   }, [grade, subject]);
+
+  useEffect(() => {
+    setExpandId(null);
+  }, [listPage]);
 
   function qByType(ep: ExamPaperEntry) {
     const m: Partial<Record<QType, number>> = {};
@@ -699,11 +806,6 @@ function ExamPaperPicker({ grade, subject, onLoad, canvasHasContent, loadedPaper
         staleTime: TEACHER_STALE_MS,
       });
       const ep = mapDetailToExamPaperEntry(d);
-      if (canvasHasContent && loadedPaperId !== ep.id) {
-        setConfirmId(ep.id);
-        setPendingEp(ep);
-        return;
-      }
       onLoad(ep);
       setExpandId(sid);
     } finally {
@@ -715,7 +817,7 @@ function ExamPaperPicker({ grade, subject, onLoad, canvasHasContent, loadedPaper
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={{ padding: '10px 11px 8px', flexShrink: 0 }}>
         <p style={{ margin: 0, fontSize: '11px', color: '#6b7280', lineHeight: 1.6, padding: '9px 11px', background: '#f8f9fb', borderRadius: '8px', border: '1px solid #f0f2f5' }}>
-          Pick an existing exam paper to load it into the canvas, then freely edit, reorder, or swap questions. List is scoped to Grade / Subject above (all statuses).
+          Import an exam paper into the canvas, then edit, reorder, or swap questions. Imported papers are marked below; remove them from the Task Canvas header if needed. List is scoped to Grade / Subject above (all statuses).
         </p>
       </div>
       {listError && (
@@ -734,12 +836,12 @@ function ExamPaperPicker({ grade, subject, onLoad, canvasHasContent, loadedPaper
             {listError ? '' : 'No exam papers for this grade and subject'}
           </div>
         ) : (
-          papers.map((meta) => {
+          <>
+          {papers.map((meta) => {
             const sid = String(meta.paper_id);
-            const isLoaded = loadedPaperId === sid;
+            const isLoaded = canvasPaperBatches.some((b) => b.paperId === sid);
             const isExpanded = expandId === sid;
             const ep = isExpanded ? epExpanded : undefined;
-            const confirming = confirmId === sid;
             const qmap = ep ? qByType(ep) : {};
             const loadingDetail = isExpanded && detailLoadingExpand && !ep;
             return (
@@ -750,7 +852,7 @@ function ExamPaperPicker({ grade, subject, onLoad, canvasHasContent, loadedPaper
                   borderRadius: '10px',
                   border: `1.5px solid ${isLoaded ? '#3b5bdb' : '#e8eaed'}`,
                   background: isLoaded ? '#f0f4ff' : '#fff',
-                  overflow: 'hidden',
+                  overflow: isExpanded ? 'visible' : 'hidden',
                   cursor: 'pointer',
                   boxShadow: isLoaded ? '0 0 0 3px rgba(59,91,219,0.09)' : 'none',
                   transition: 'border-color 0.15s, box-shadow 0.15s',
@@ -779,14 +881,24 @@ function ExamPaperPicker({ grade, subject, onLoad, canvasHasContent, loadedPaper
                   <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
                     {isLoaded && (
                       <span style={{ fontSize: '9px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: '#3b5bdb', color: '#fff' }}>
-                        Loaded
+                        Imported
                       </span>
                     )}
                     <ChevronDown size={13} style={{ color: '#9ca3af', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s' }} />
                   </div>
                 </div>
                 {isExpanded && (
-                  <div style={{ borderTop: '1px solid #e8eaed', padding: '9px 11px' }} onClick={(e) => e.stopPropagation()}>
+                  <div
+                    style={{
+                      borderTop: '1px solid #e8eaed',
+                      padding: '9px 11px 11px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '9px',
+                      minHeight: 0,
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     {loadingDetail ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 0', color: '#9ca3af', fontSize: '11px' }}>
                         <Loader2 size={16} style={{ animation: 'spin 0.8s linear infinite' }} />
@@ -794,7 +906,7 @@ function ExamPaperPicker({ grade, subject, onLoad, canvasHasContent, loadedPaper
                       </div>
                     ) : ep ? (
                       <>
-                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '9px' }}>
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                           {Q_TYPES.map((t) => {
                             const c = qmap[t];
                             if (!c) return null;
@@ -809,92 +921,171 @@ function ExamPaperPicker({ grade, subject, onLoad, canvasHasContent, loadedPaper
                             );
                           })}
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', maxHeight: '130px', overflowY: 'auto', marginBottom: '10px' }}>
-                          {ep.questions.map((q, i) => {
-                            const tc = TYPE_C[q.type];
-                            return (
-                              <div key={q.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', padding: '4px 7px', borderRadius: '6px', background: '#f9fafb' }}>
-                                <span style={{ fontSize: '9px', fontWeight: 700, color: '#9ca3af', flexShrink: 0, marginTop: '1px' }}>Q{i + 1}</span>
-                                <span style={{ fontSize: '10px', padding: '1px 5px', borderRadius: '4px', background: tc.bg, color: tc.color, fontWeight: 600, flexShrink: 0 }}>{tc.short}</span>
-                                <span style={{ fontSize: '10px', color: '#374151', lineHeight: 1.4, flex: 1 }}>{clamp(q.prompt, 55)}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
+                        {ep.questions.length > 0 ? (
+                          <div
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '3px',
+                              maxHeight: '130px',
+                              overflowY: 'auto',
+                              flexShrink: 1,
+                              minHeight: 0,
+                            }}
+                          >
+                            {ep.questions.map((q, i) => {
+                              const tc = TYPE_C[q.type];
+                              return (
+                                <div key={q.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', padding: '4px 7px', borderRadius: '6px', background: '#f9fafb' }}>
+                                  <span style={{ fontSize: '9px', fontWeight: 700, color: '#9ca3af', flexShrink: 0, marginTop: '1px' }}>Q{i + 1}</span>
+                                  <span style={{ fontSize: '10px', padding: '1px 5px', borderRadius: '4px', background: tc.bg, color: tc.color, fontWeight: 600, flexShrink: 0 }}>{tc.short}</span>
+                                  <span style={{ fontSize: '10px', color: '#374151', lineHeight: 1.4, flex: 1 }}>{clamp(q.prompt, 55)}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: '11px', color: '#9ca3af', lineHeight: 1.4 }}>No questions in this paper.</div>
+                        )}
                       </>
                     ) : (
                       <div style={{ fontSize: '11px', color: '#9ca3af', padding: '8px 0' }}>Could not load preview.</div>
                     )}
-                    {confirming && pendingEp && pendingEp.id === sid ? (
-                      <div style={{ padding: '9px 11px', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fde68a' }}>
-                        <div style={{ fontSize: '11px', color: '#92400e', fontWeight: 600, marginBottom: '7px' }}>⚠️ This will replace current canvas content.</div>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onLoad(pendingEp);
-                              setConfirmId(null);
-                              setPendingEp(null);
-                              setExpandId(sid);
-                            }}
-                            style={{ flex: 1, padding: '7px', borderRadius: '7px', border: 'none', cursor: 'pointer', background: '#ef4444', color: '#fff', fontSize: '11px', fontWeight: 700 }}
-                          >
-                            Replace & Load
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setConfirmId(null);
-                              setPendingEp(null);
-                            }}
-                            style={{ padding: '7px 11px', borderRadius: '7px', border: '1px solid #e8eaed', cursor: 'pointer', background: '#fff', color: '#374151', fontSize: '11px' }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={actionLoadingId === sid}
-                        onClick={() => void tryLoad(meta)}
+                    {actionLoadingId === sid ? (
+                      <div
                         style={{
                           width: '100%',
                           padding: '9px',
                           borderRadius: '8px',
-                          border: 'none',
-                          cursor: actionLoadingId === sid ? 'wait' : 'pointer',
-                          background: isLoaded ? '#dcfce7' : '#3b5bdb',
-                          color: isLoaded ? '#15803d' : '#fff',
+                          background: '#f3f4f6',
+                          color: '#6b7280',
                           fontSize: '12px',
                           fontWeight: 700,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '7px',
-                          opacity: actionLoadingId === sid ? 0.85 : 1,
+                          flexShrink: 0,
+                          boxSizing: 'border-box',
                         }}
                       >
-                        {actionLoadingId === sid ? (
-                          <>
-                            <Loader2 size={13} style={{ animation: 'spin 0.8s linear infinite' }} /> Loading…
-                          </>
-                        ) : isLoaded ? (
-                          <>
-                            <CheckCircle2 size={13} /> Already Loaded
-                          </>
-                        ) : (
-                          <>
-                            <RotateCcw size={13} /> Load into Canvas
-                          </>
-                        )}
+                        <Loader2 size={13} style={{ animation: 'spin 0.8s linear infinite' }} /> Loading…
+                      </div>
+                    ) : isLoaded ? (
+                      <div
+                        style={{
+                          width: '100%',
+                          padding: '9px',
+                          borderRadius: '8px',
+                          border: '1px solid #bbf7d0',
+                          background: '#f0fdf4',
+                          color: '#15803d',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '7px',
+                          flexShrink: 0,
+                          boxSizing: 'border-box',
+                        }}
+                      >
+                        <CheckCircle2 size={13} /> Imported
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void tryLoad(meta)}
+                        style={{
+                          width: '100%',
+                          padding: '9px',
+                          borderRadius: '8px',
+                          border: 'none',
+                          cursor: 'pointer',
+                          background: '#3b5bdb',
+                          color: '#fff',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '7px',
+                          flexShrink: 0,
+                          boxSizing: 'border-box',
+                        }}
+                      >
+                        <RotateCcw size={13} /> Import into canvas
                       </button>
                     )}
                   </div>
                 )}
               </div>
             );
-          })
+          })}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              padding: '6px 4px 2px',
+              flexShrink: 0,
+            }}
+          >
+            <button
+              type="button"
+              aria-label="Previous page"
+              disabled={listPage <= 1 || listLoading}
+              onClick={(e) => {
+                e.stopPropagation();
+                setListPage((p) => Math.max(1, p - 1));
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '30px',
+                height: '30px',
+                borderRadius: '8px',
+                border: '1px solid #e8eaed',
+                background: listPage <= 1 ? '#f3f4f6' : '#fff',
+                color: listPage <= 1 ? '#d1d5db' : '#374151',
+                cursor: listPage <= 1 ? 'not-allowed' : 'pointer',
+              }}
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, minWidth: '120px', textAlign: 'center' }}>
+              Page {listPage} / {totalPages}
+              <span style={{ display: 'block', fontWeight: 400, color: '#9ca3af', marginTop: '2px' }}>
+                {listTotal} paper{listTotal === 1 ? '' : 's'} total
+              </span>
+            </span>
+            <button
+              type="button"
+              aria-label="Next page"
+              disabled={listPage >= totalPages || listLoading}
+              onClick={(e) => {
+                e.stopPropagation();
+                setListPage((p) => Math.min(totalPages, p + 1));
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '30px',
+                height: '30px',
+                borderRadius: '8px',
+                border: '1px solid #e8eaed',
+                background: listPage >= totalPages ? '#f3f4f6' : '#fff',
+                color: listPage >= totalPages ? '#d1d5db' : '#374151',
+                cursor: listPage >= totalPages ? 'not-allowed' : 'pointer',
+              }}
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+          </>
         )}
       </div>
     </div>
@@ -1007,9 +1198,9 @@ function AssembleView({
 
   // Canvas starts empty: only shows content after importing questions or loading an existing paper.
   const [sections, setSections] = useState<Section[]>([]);
+  const sectionsRef = useRef<Section[]>([]);
+  sectionsRef.current = sections;
 
-  const [loadedPaperId, setLoadedPaperId] = useState<string|null>(null);
-  const [loadedPaperTitle, setLoadedPaperTitle] = useState<string|null>(null);
   const [addSecOpen,    setAddSecOpen]    = useState(false);
   const [newSecType,    setNewSecType]    = useState<QType>('MCQ');
   const [saved,         setSaved]         = useState(false);
@@ -1031,8 +1222,6 @@ function AssembleView({
         setTitle(c.title);
         setKind(c.kind);
         setDur(c.dur);
-        setLoadedPaperId(null);
-        setLoadedPaperTitle(null);
         setEditingId(null);
         setReplaceTarget(null);
       } catch (e) {
@@ -1046,8 +1235,6 @@ function AssembleView({
     if (editingTaskId !== null) return;
     setSections([]);
     setTitle('');
-    setLoadedPaperId(null);
-    setLoadedPaperTitle(null);
     setEditingId(null);
     setReplaceTarget(null);
   }, [editingTaskId]);
@@ -1055,40 +1242,127 @@ function AssembleView({
   const addedIds = new Set<string>(sections.flatMap(s => s.qs.map(q => q.libId)));
   const canvasHasContent = sections.some(s=>s.qs.length>0);
 
-  // Load an entire exam paper into canvas
-  function loadPaper(ep: ExamPaperEntry) {
-    const secMap: Partial<Record<QType,Section>> = {};
-    ep.questions.forEach(q=>{
-      if (!secMap[q.type]) {
-        const idx = Object.keys(secMap).length;
-        secMap[q.type] = { id:nid(), label:`Section ${ROMAN[idx]??idx+1}: ${q.type}`, type:q.type, ptsEach:defaultPts(q.type), qs:[] };
+  const paperImportBatches = useMemo(() => {
+    const m = new Map<string, { importId: string; paperId: string; title: string }>();
+    for (const s of sections) {
+      if (s.importId && s.sourcePaperId) {
+        const t = s.sourcePaperTitle ?? '';
+        if (!m.has(s.importId)) {
+          m.set(s.importId, { importId: s.importId, paperId: s.sourcePaperId, title: t });
+        }
       }
-      secMap[q.type]!.qs.push({ uid:nid(), libId:q.id, type:q.type, diff:q.diff, pts:defaultPts(q.type), prompt:q.prompt, options:q.options, answer:q.answer });
+    }
+    return [...m.values()];
+  }, [sections]);
+
+  const canvasPaperBatchesForPicker = useMemo(
+    () => paperImportBatches.map(({ importId, paperId }) => ({ importId, paperId })),
+    [paperImportBatches],
+  );
+
+  // Append one exam paper as a new import batch (sections tagged with importId).
+  function loadPaper(ep: ExamPaperEntry) {
+    if (sectionsRef.current.some((s) => s.sourcePaperId === ep.id)) return;
+    const importId = nid();
+    if (sectionsRef.current.length === 0) {
+      setGrade(ep.grade);
+      setSubject(ep.subject);
+      setDur(ep.durationMin);
+      setTitle(`${ep.title} (edited)`);
+    }
+    setSections((prev) => {
+      if (ep.questions.length === 0) {
+        const globalIdx = prev.length;
+        const placeholderType: QType = 'MCQ';
+        return [
+          ...prev,
+          {
+            id: nid(),
+            label: `Section ${ROMAN[globalIdx] ?? globalIdx + 1}: ${placeholderType} (no questions in paper)`,
+            type: placeholderType,
+            ptsEach: defaultPts(placeholderType),
+            qs: [],
+            importId,
+            sourcePaperId: ep.id,
+            sourcePaperTitle: ep.title,
+          },
+        ];
+      }
+      let batchSecIdx = 0;
+      const secMap: Partial<Record<QType, Section>> = {};
+      ep.questions.forEach((q) => {
+        if (!secMap[q.type]) {
+          const globalIdx = prev.length + batchSecIdx;
+          batchSecIdx += 1;
+          secMap[q.type] = {
+            id: nid(),
+            label: `Section ${ROMAN[globalIdx] ?? globalIdx + 1}: ${q.type}`,
+            type: q.type,
+            ptsEach: defaultPts(q.type),
+            qs: [],
+            importId,
+            sourcePaperId: ep.id,
+            sourcePaperTitle: ep.title,
+          };
+        }
+        secMap[q.type]!.qs.push({
+          uid: nid(),
+          libId: q.id,
+          type: q.type,
+          diff: q.diff,
+          pts: defaultPts(q.type),
+          prompt: q.prompt,
+          options: q.options,
+          answer: q.answer,
+        });
+      });
+      const newSecs = Object.values(secMap) as Section[];
+      return [...prev, ...newSecs];
     });
-    setSections(Object.values(secMap) as Section[]);
-    setLoadedPaperId(ep.id);
-    setLoadedPaperTitle(ep.title);
-    setGrade(ep.grade); setSubject(ep.subject); setDur(ep.durationMin);
-    setTitle(ep.title + ' (edited)');
-    setEditingId(null); setReplaceTarget(null);
+    setEditingId(null);
+    setReplaceTarget(null);
+  }
+
+  function clearImport(importId: string) {
+    if (readOnly) return;
+    if (!window.confirm('Remove all sections from this paper import?')) return;
+    setSections((prev) => {
+      const removedUids = new Set(
+        prev.filter((s) => s.importId === importId).flatMap((s) => s.qs.map((q) => q.uid)),
+      );
+      setEditingId((eid) => (eid && removedUids.has(eid) ? null : eid));
+      setReplaceTarget((rt) => (rt && removedUids.has(rt.uid) ? null : rt));
+      return prev.filter((s) => s.importId !== importId);
+    });
+  }
+
+  function clearCanvas() {
+    if (readOnly) return;
+    if (sections.length === 0) return;
+    if (!window.confirm('Clear the task canvas? All sections and questions will be removed.')) return;
+    setSections([]);
+    setTitle('');
+    setEditingId(null);
+    setReplaceTarget(null);
+    setAddSecOpen(false);
   }
 
   function addQ(lq: LibQ) {
-    const existing = sections.find(s=>s.type===lq.type);
+    const existing = sections.find((s) => s.type === lq.type && !s.importId) ?? sections.find((s) => s.type === lq.type);
     const pts = defaultPts(lq.type);
     if (existing) {
       setSections(prev=>prev.map(s=>s.id===existing.id
-        ? {...s, qs:[...s.qs, { uid:nid(), libId:lq.id, type:lq.type, diff:lq.diff, pts:s.ptsEach, prompt:lq.prompt, options:lq.options, answer:lq.answer }]}
+        ? {...s, qs:[...s.qs, { uid:nid(), libId:lq.id, type:lq.type, diff:lq.diff, pts:s.ptsEach, prompt:lq.prompt, imageUrl:lq.imageUrl, options:lq.options, answer:lq.answer }]}
         : s));
     } else {
       const idx = sections.length;
-      setSections(prev=>[...prev, { id:nid(), label:`Section ${ROMAN[idx]??idx+1}: ${lq.type}`, type:lq.type, ptsEach:pts, qs:[{ uid:nid(), libId:lq.id, type:lq.type, diff:lq.diff, pts, prompt:lq.prompt, options:lq.options, answer:lq.answer }] }]);
+      setSections(prev=>[...prev, { id:nid(), label:`Section ${ROMAN[idx]??idx+1}: ${lq.type}`, type:lq.type, ptsEach:pts, qs:[{ uid:nid(), libId:lq.id, type:lq.type, diff:lq.diff, pts, prompt:lq.prompt, imageUrl:lq.imageUrl, options:lq.options, answer:lq.answer }] }]);
     }
   }
   function replaceQ(lq: LibQ) {
     if (!replaceTarget) return;
     setSections(prev=>prev.map(s=>s.id===replaceTarget.secId
-      ? {...s, qs:s.qs.map(q=>q.uid===replaceTarget.uid ? {...q, libId:lq.id, prompt:lq.prompt, options:lq.options, answer:lq.answer, diff:lq.diff} : q)}
+      ? {...s, qs:s.qs.map(q=>q.uid===replaceTarget.uid ? {...q, libId:lq.id, prompt:lq.prompt, imageUrl:lq.imageUrl, options:lq.options, answer:lq.answer, diff:lq.diff} : q)}
       : s));
     setReplaceTarget(null);
   }
@@ -1216,8 +1490,7 @@ function AssembleView({
               grade={grade}
               subject={subject}
               onLoad={loadPaper}
-              canvasHasContent={canvasHasContent}
-              loadedPaperId={loadedPaperId}
+              canvasPaperBatches={canvasPaperBatchesForPicker}
             />
           </div>
         </div>
@@ -1225,17 +1498,84 @@ function AssembleView({
 
         {/* RIGHT — Canvas */}
         <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', background:'#f7f8fb', minWidth:0 }}>
-          <div style={{ padding:'8px 18px', borderBottom:'1px solid #e8eaed', background:'#fff', display:'flex', alignItems:'center', gap:'10px', flexShrink:0 }}>
+          <div style={{ padding:'8px 18px', borderBottom:'1px solid #e8eaed', background:'#fff', display:'flex', alignItems:'center', gap:'10px', flexShrink:0, flexWrap:'wrap' }}>
             <span style={{ fontSize:'12px', fontWeight:700, color:'#0f0f23' }}>Task Canvas</span>
             <span style={{ fontSize:'11px', color:'#9ca3af' }}>{totalQ}q · {totalPts}pts · {dur}min</span>
-            {loadedPaperId && loadedPaperTitle && (
-              <span style={{ fontSize:'10px', padding:'2px 8px', borderRadius:'20px', background:'#f0f4ff', color:'#3b5bdb', fontWeight:600 }}>
-                based on {loadedPaperTitle.split('—')[0].trim()}
-              </span>
+            {paperImportBatches.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', maxWidth: '100%' }}>
+                {paperImportBatches.map((b, bi) => (
+                  <span
+                    key={b.importId}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      fontSize: '10px',
+                      padding: '2px 4px 2px 8px',
+                      borderRadius: '20px',
+                      background: '#f0f4ff',
+                      color: '#3b5bdb',
+                      fontWeight: 600,
+                      maxWidth: '220px',
+                    }}
+                    title={b.title}
+                  >
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      Paper{paperImportBatches.length > 1 ? ` ${bi + 1}: ` : ': '}
+                      {b.title.split('—')[0].trim().slice(0, 36)}
+                      {b.title.length > 36 ? '…' : ''}
+                    </span>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        aria-label="Remove this import"
+                        onClick={() => clearImport(b.importId)}
+                        style={{
+                          width: '20px',
+                          height: '20px',
+                          borderRadius: '50%',
+                          border: 'none',
+                          cursor: 'pointer',
+                          background: '#e0e7ff',
+                          color: '#4338ca',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <X size={11} />
+                      </button>
+                    )}
+                  </span>
+                ))}
+              </div>
+            )}
+            <div style={{ flex: 1, minWidth: 8 }} />
+            {!readOnly && sections.length > 0 && (
+              <button
+                type="button"
+                onClick={clearCanvas}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '4px 11px',
+                  borderRadius: '6px',
+                  border: '1px solid #fecaca',
+                  background: '#fff',
+                  color: '#b91c1c',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                <Trash2 size={11} /> Clear canvas
+              </button>
             )}
             {replaceTarget && !readOnly && (
               <button onClick={()=>setReplaceTarget(null)}
-                style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:'5px', padding:'4px 11px', borderRadius:'6px', border:'1px solid #fde68a', background:'#fef9c3', color:'#92400e', fontSize:'11px', cursor:'pointer' }}>
+                style={{ display:'flex', alignItems:'center', gap:'5px', padding:'4px 11px', borderRadius:'6px', border:'1px solid #fde68a', background:'#fef9c3', color:'#92400e', fontSize:'11px', cursor:'pointer' }}>
                 <X size={10}/> Cancel Replace
               </button>
             )}

@@ -6,7 +6,7 @@ type UserType = 'student' | 'teacher' | 'admin';
 
 export default function Login() {
   const navigate = useNavigate();
-  const [userType, setUserType] = useState<UserType>('student');
+  const [userType, setUserType] = useState<UserType>('teacher');
   const [accountId, setAccountId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -20,20 +20,11 @@ export default function Login() {
     setIsLoading(true);
     await new Promise(r => setTimeout(r, 600));
     setIsLoading(false);
-    const isStudent = /^\d{8,12}$/.test(accountId);
-    if (userType === 'student') {
-      if (!isStudent) {
-        setError('Student ID should be 8-12 digits.');
-        return;
-      }
-      navigate('/student/home');
+    if (userType !== 'teacher') {
+      setError('Student/Admin login is under development. Please use Teacher login.');
       return;
     }
-    if (userType === 'teacher') {
-      navigate('/teacher/lessons');
-      return;
-    }
-    navigate('/admin/users');
+    navigate('/teacher/lessons');
   };
 
   return (
@@ -104,22 +95,27 @@ export default function Login() {
             {(['student', 'teacher', 'admin'] as UserType[]).map(type => (
               <button
                 key={type}
-                onClick={() => setUserType(type)}
+                onClick={() => {
+                  if (type === 'teacher') setUserType('teacher');
+                }}
+                disabled={type !== 'teacher'}
                 style={{
                   flex: 1,
                   padding: '8px',
                   borderRadius: '6px',
                   border: 'none',
-                  cursor: 'pointer',
+                  cursor: type === 'teacher' ? 'pointer' : 'not-allowed',
                   fontSize: '14px',
                   fontWeight: userType === type ? 600 : 400,
                   background: userType === type ? '#ffffff' : 'transparent',
-                  color: userType === type ? '#0f0f23' : '#6b7280',
+                  color: type === 'teacher' ? (userType === type ? '#0f0f23' : '#6b7280') : '#9ca3af',
+                  opacity: type === 'teacher' ? 1 : 0.75,
                   boxShadow: userType === type ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
                   transition: 'all 0.15s',
                 }}
               >
                 {type === 'student' ? 'Student' : type === 'teacher' ? 'Teacher' : 'Admin'}
+                {type !== 'teacher' ? ' (Coming soon)' : ''}
               </button>
             ))}
           </div>
@@ -128,19 +124,13 @@ export default function Login() {
           <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
               <label style={{ fontSize: '14px', fontWeight: 500, color: '#374151', display: 'block', marginBottom: '7px' }}>
-                {userType === 'student' ? 'Student ID' : userType === 'teacher' ? 'Teacher ID / Account' : 'Admin Account'}
+                Teacher ID / Account
               </label>
               <input
                 type="text"
                 value={accountId}
                 onChange={e => setAccountId(e.target.value)}
-                placeholder={
-                  userType === 'student'
-                    ? 'Enter your student ID'
-                    : userType === 'teacher'
-                      ? 'Enter teacher ID or account'
-                      : 'Enter admin account'
-                }
+                placeholder="Enter teacher ID or account"
                 style={{
                   width: '100%',
                   padding: '10px 13px',

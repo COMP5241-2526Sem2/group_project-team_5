@@ -154,6 +154,10 @@ export interface AILabRuntimeProps {
   readonly?: boolean;
   /** 动画时间（秒），由 DynamicLabHost 递增传入 */
   t?: number;
+  /**
+   * Drive 模式注入新 state 时递增；用于强制重挂生成组件（多数 render_code 用 useState(initial_state) 仅初始化一次）。
+   */
+  driveRemountEpoch?: number;
 }
 
 interface LabRendererProps {
@@ -578,6 +582,7 @@ export default function AILabRuntime({
   onStateChange,
   readonly = false,
   t: externalT = 0,
+  driveRemountEpoch = 0,
 }: AILabRuntimeProps) {
   const [error, setError] = useState<string | null>(null);
   const [Compiled, setCompiled] = useState<ComponentType<LabRendererProps> | null>(null);
@@ -629,6 +634,7 @@ export default function AILabRuntime({
   return (
     <div style={{ display: 'inline-block', verticalAlign: 'top', width: 'fit-content', maxWidth: '100%' }}>
       <Compiled
+        key={`ailab-drive-${driveRemountEpoch}`}
         state={stateObj}
         initial_state={stateObj}
         initialState={stateObj}
