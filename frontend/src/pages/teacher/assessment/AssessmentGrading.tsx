@@ -55,6 +55,9 @@ interface SectionQ {
   uid: string; libId: string; prompt: string;
   type: QType; diff: Diff; pts: number;
   options?: string[]; answer?: string; imageUrl?: string;
+  importId?: string;
+  sourcePaperId?: string;
+  sourcePaperTitle?: string;
 }
 interface Section {
   id: string;
@@ -360,6 +363,59 @@ function nid() { return Math.random().toString(36).slice(2,9); }
 function fmtDate(iso: string) { return new Date(iso).toLocaleDateString('en-US',{ month:'short', day:'numeric', year:'numeric' }); }
 function clamp(s: string, n: number) { return s.length > n ? s.slice(0,n)+'…' : s; }
 function defaultPts(t: QType) { return t==='Essay' ? 15 : t==='Short Answer' ? 6 : t==='Fill-blank' ? 3 : 2; }
+
+function sectionLabelAt(index: number, type: QType): string {
+  return `Section ${ROMAN[index] ?? index + 1}: ${type}`;
+}
+
+function dedupQuestionKey(type: QType, prompt: string): string {
+  return `${type}::${prompt.replace(/\s+/g, ' ').trim().toLowerCase()}`;
+}
+
+function normalizeCanvasSections(input: Section[]): Section[] {
+  const merged = new Map<QType, Section>();
+
+  for (const sec of input) {
+    const existing = merged.get(sec.type);
+    if (!existing) {
+      merged.set(sec.type, {
+        id: sec.id,
+        label: sec.label,
+        type: sec.type,
+        ptsEach: Math.max(1, sec.ptsEach || defaultPts(sec.type)),
+        qs: [],
+      });
+    }
+    const target = merged.get(sec.type)!;
+    for (const q of sec.qs) {
+      target.qs.push({
+        ...q,
+        type: sec.type,
+        pts: target.ptsEach,
+      });
+    }
+  }
+
+  const ordered: Section[] = [];
+  for (const t of Q_TYPES) {
+    const sec = merged.get(t);
+    if (!sec) continue;
+    const seen = new Set<string>();
+    const qs: SectionQ[] = [];
+    for (const q of sec.qs) {
+      const key = dedupQuestionKey(q.type, q.prompt);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      qs.push({ ...q, uid: q.uid || nid(), type: t, pts: sec.ptsEach });
+    }
+    ordered.push({ ...sec, qs });
+  }
+
+  return ordered.map((sec, idx) => ({
+    ...sec,
+    label: sectionLabelAt(idx, sec.type),
+  }));
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SHARED UI
@@ -1161,7 +1217,32 @@ function CanvasQCard({ q, globalIdx, isEditing, isReplaceTarget, readOnly, onEdi
             </div>
           </>
         ) : (
-          <span style={{ fontSize:'11px', color:'#374151', lineHeight:1.55 }}>{q.prompt}</span>
+          <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
+            <span style={{ fontSize:'11px', color:'#374151', lineHeight:1.55 }}>{q.prompt || 'No prompt content.'}</span>
+            {q.imageUrl && (
+              <div style={{ border:'1px solid #e8eaed', borderRadius:'8px', overflow:'hidden', background:'#fff' }}>
+                <img
+                  src={q.imageUrl}
+                  alt="question illustration"
+                  style={{ width:'100%', maxHeight:'300px', objectFit:'contain', display:'block', background:'#f8fafc' }}
+                />
+              </div>
+            )}
+            {q.options && q.options.length > 0 && (
+              <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
+                {q.options.map(opt=>(
+                  <div key={opt} style={{ fontSize:'10px', color:'#4b5563', padding:'3px 7px', borderRadius:'5px', border:'1px solid #e8eaed', background:'#fff' }}>
+                    {opt}
+                  </div>
+                ))}
+              </div>
+            )}
+            {q.answer && (
+              <div style={{ fontSize:'10px', color:'#065f46', background:'#ecfdf5', border:'1px solid #a7f3d0', borderRadius:'5px', padding:'3px 7px' }}>
+                Answer: {q.answer}
+              </div>
+            )}
+          </div>
         )}
       </div>
       {isReplaceTarget && !isEditing && (
@@ -1216,7 +1297,7 @@ function AssembleView({
         const d = await fetchTaskDetailApi(editingTaskId);
         if (cancelled) return;
         const c = taskDetailToCanvas(d);
-        setSections(c.sections);
+        setSections(normalizeCanvasSections(c.sections));
         setGrade(c.grade);
         setSubject(c.subject);
         setTitle(c.title);
@@ -1245,10 +1326,13 @@ function AssembleView({
   const paperImportBatches = useMemo(() => {
     const m = new Map<string, { importId: string; paperId: string; title: string }>();
     for (const s of sections) {
-      if (s.importId && s.sourcePaperId) {
-        const t = s.sourcePaperTitle ?? '';
-        if (!m.has(s.importId)) {
-          m.set(s.importId, { importId: s.importId, paperId: s.sourcePaperId, title: t });
+      for (const q of s.qs) {
+        if (q.importId && q.sourcePaperId && !m.has(q.importId)) {
+          m.set(q.importId, {
+            importId: q.importId,
+            paperId: q.sourcePaperId,
+            title: q.sourcePaperTitle ?? '',
+          });
         }
       }
     }
@@ -1260,11 +1344,11 @@ function AssembleView({
     [paperImportBatches],
   );
 
-  // Append one exam paper as a new import batch (sections tagged with importId).
+  // Append one exam paper; questions are merged into existing same-type sections.
   function loadPaper(ep: ExamPaperEntry) {
-    if (sectionsRef.current.some((s) => s.sourcePaperId === ep.id)) return;
+    if (sectionsRef.current.some((s) => s.qs.some((q) => q.sourcePaperId === ep.id))) return;
     const importId = nid();
-    if (sectionsRef.current.length === 0) {
+    if (!sectionsRef.current.some((s) => s.qs.length > 0)) {
       setGrade(ep.grade);
       setSubject(ep.subject);
       setDur(ep.durationMin);
@@ -1272,52 +1356,58 @@ function AssembleView({
     }
     setSections((prev) => {
       if (ep.questions.length === 0) {
-        const globalIdx = prev.length;
-        const placeholderType: QType = 'MCQ';
-        return [
-          ...prev,
-          {
-            id: nid(),
-            label: `Section ${ROMAN[globalIdx] ?? globalIdx + 1}: ${placeholderType} (no questions in paper)`,
-            type: placeholderType,
-            ptsEach: defaultPts(placeholderType),
-            qs: [],
-            importId,
-            sourcePaperId: ep.id,
-            sourcePaperTitle: ep.title,
-          },
-        ];
+        return prev;
       }
-      let batchSecIdx = 0;
-      const secMap: Partial<Record<QType, Section>> = {};
+      const next = prev.map((s) => ({ ...s, qs: [...s.qs] }));
+      let importedCount = 0;
+      let skippedDupCount = 0;
       ep.questions.forEach((q) => {
-        if (!secMap[q.type]) {
-          const globalIdx = prev.length + batchSecIdx;
-          batchSecIdx += 1;
-          secMap[q.type] = {
+        const dupKey = dedupQuestionKey(q.type, q.prompt);
+        const exists = next.some(
+          (sec) => sec.type === q.type && sec.qs.some((item) => dedupQuestionKey(item.type, item.prompt) === dupKey),
+        );
+        if (exists) {
+          skippedDupCount += 1;
+          return;
+        }
+
+        let target = next.find((sec) => sec.type === q.type);
+        if (!target) {
+          target = {
             id: nid(),
-            label: `Section ${ROMAN[globalIdx] ?? globalIdx + 1}: ${q.type}`,
+            label: '',
             type: q.type,
             ptsEach: defaultPts(q.type),
             qs: [],
-            importId,
-            sourcePaperId: ep.id,
-            sourcePaperTitle: ep.title,
           };
+          next.push(target);
         }
-        secMap[q.type]!.qs.push({
+
+        target.qs.push({
           uid: nid(),
           libId: q.id,
           type: q.type,
           diff: q.diff,
-          pts: defaultPts(q.type),
+          pts: target.ptsEach,
           prompt: q.prompt,
+          imageUrl: q.imageUrl,
           options: q.options,
           answer: q.answer,
+          importId,
+          sourcePaperId: ep.id,
+          sourcePaperTitle: ep.title,
         });
+        importedCount += 1;
       });
-      const newSecs = Object.values(secMap) as Section[];
-      return [...prev, ...newSecs];
+
+      if (skippedDupCount > 0) {
+        toast.info(`Skipped ${skippedDupCount} duplicate question${skippedDupCount > 1 ? 's' : ''} from ${ep.title}`);
+      }
+      if (importedCount === 0) {
+        toast.info(`No new questions imported from ${ep.title}`);
+        return prev;
+      }
+      return normalizeCanvasSections(next);
     });
     setEditingId(null);
     setReplaceTarget(null);
@@ -1328,11 +1418,15 @@ function AssembleView({
     if (!window.confirm('Remove all sections from this paper import?')) return;
     setSections((prev) => {
       const removedUids = new Set(
-        prev.filter((s) => s.importId === importId).flatMap((s) => s.qs.map((q) => q.uid)),
+        prev.flatMap((s) => s.qs.filter((q) => q.importId === importId).map((q) => q.uid)),
       );
       setEditingId((eid) => (eid && removedUids.has(eid) ? null : eid));
       setReplaceTarget((rt) => (rt && removedUids.has(rt.uid) ? null : rt));
-      return prev.filter((s) => s.importId !== importId);
+      const next = prev.map((s) => ({
+        ...s,
+        qs: s.qs.filter((q) => q.importId !== importId),
+      }));
+      return normalizeCanvasSections(next);
     });
   }
 
@@ -1348,40 +1442,68 @@ function AssembleView({
   }
 
   function addQ(lq: LibQ) {
-    const existing = sections.find((s) => s.type === lq.type && !s.importId) ?? sections.find((s) => s.type === lq.type);
-    const pts = defaultPts(lq.type);
-    if (existing) {
-      setSections(prev=>prev.map(s=>s.id===existing.id
-        ? {...s, qs:[...s.qs, { uid:nid(), libId:lq.id, type:lq.type, diff:lq.diff, pts:s.ptsEach, prompt:lq.prompt, imageUrl:lq.imageUrl, options:lq.options, answer:lq.answer }]}
-        : s));
-    } else {
-      const idx = sections.length;
-      setSections(prev=>[...prev, { id:nid(), label:`Section ${ROMAN[idx]??idx+1}: ${lq.type}`, type:lq.type, ptsEach:pts, qs:[{ uid:nid(), libId:lq.id, type:lq.type, diff:lq.diff, pts, prompt:lq.prompt, imageUrl:lq.imageUrl, options:lq.options, answer:lq.answer }] }]);
+    let skipped = false;
+    setSections((prev) => {
+      const key = dedupQuestionKey(lq.type, lq.prompt);
+      const duplicate = prev.some(
+        (s) => s.type === lq.type && s.qs.some((q) => dedupQuestionKey(q.type, q.prompt) === key),
+      );
+      if (duplicate) {
+        skipped = true;
+        return prev;
+      }
+
+      const next = prev.map((s) => ({ ...s, qs: [...s.qs] }));
+      let target = next.find((s) => s.type === lq.type);
+      if (!target) {
+        target = {
+          id: nid(),
+          label: '',
+          type: lq.type,
+          ptsEach: defaultPts(lq.type),
+          qs: [],
+        };
+        next.push(target);
+      }
+      target.qs.push({
+        uid: nid(),
+        libId: lq.id,
+        type: lq.type,
+        diff: lq.diff,
+        pts: target.ptsEach,
+        prompt: lq.prompt,
+        imageUrl: lq.imageUrl,
+        options: lq.options,
+        answer: lq.answer,
+      });
+      return normalizeCanvasSections(next);
+    });
+    if (skipped) {
+      toast.info('Duplicate question skipped in canvas');
     }
   }
   function replaceQ(lq: LibQ) {
     if (!replaceTarget) return;
-    setSections(prev=>prev.map(s=>s.id===replaceTarget.secId
+    setSections(prev=>normalizeCanvasSections(prev.map(s=>s.id===replaceTarget.secId
       ? {...s, qs:s.qs.map(q=>q.uid===replaceTarget.uid ? {...q, libId:lq.id, prompt:lq.prompt, imageUrl:lq.imageUrl, options:lq.options, answer:lq.answer, diff:lq.diff} : q)}
-      : s));
+      : s)));
     setReplaceTarget(null);
   }
   function saveEdit(secId: string, uid: string, newPrompt: string) {
-    setSections(prev=>prev.map(s=>s.id===secId ? {...s, qs:s.qs.map(q=>q.uid===uid ? {...q, prompt:newPrompt} : q)} : s));
+    setSections(prev=>normalizeCanvasSections(prev.map(s=>s.id===secId ? {...s, qs:s.qs.map(q=>q.uid===uid ? {...q, prompt:newPrompt} : q)} : s)));
     setEditingId(null);
   }
   function removeQ(secId: string, uid: string) {
     if (editingId===uid) setEditingId(null);
     if (replaceTarget?.uid===uid) setReplaceTarget(null);
-    setSections(prev=>prev.map(s=>s.id===secId ? {...s, qs:s.qs.filter(q=>q.uid!==uid)} : s));
+    setSections(prev=>normalizeCanvasSections(prev.map(s=>s.id===secId ? {...s, qs:s.qs.filter(q=>q.uid!==uid)} : s)));
   }
-  function removeSec(id: string) { setSections(prev=>prev.filter(s=>s.id!==id)); }
+  function removeSec(id: string) { setSections(prev=>normalizeCanvasSections(prev.filter(s=>s.id!==id))); }
   function updatePtsEach(secId: string, v: number) {
-    setSections(prev=>prev.map(s=>s.id===secId ? {...s, ptsEach:v, qs:s.qs.map(q=>({...q, pts:v}))} : s));
+    setSections(prev=>normalizeCanvasSections(prev.map(s=>s.id===secId ? {...s, ptsEach:v, qs:s.qs.map(q=>({...q, pts:v}))} : s)));
   }
   function addSection() {
-    const idx = sections.length;
-    setSections(prev=>[...prev, { id:nid(), label:`Section ${ROMAN[idx]??idx+1}: ${newSecType}`, type:newSecType, ptsEach:defaultPts(newSecType), qs:[] }]);
+    setSections(prev=>normalizeCanvasSections([...prev, { id:nid(), label:'', type:newSecType, ptsEach:defaultPts(newSecType), qs:[] }]));
     setAddSecOpen(false);
   }
 
@@ -1591,7 +1713,7 @@ function AssembleView({
             ) : sections.map((sec,si)=>{
               const tc=TYPE_C[sec.type]; const secTotal=sec.qs.length*sec.ptsEach;
               return (
-                <div key={sec.id} style={{ background:'#fff', border:'1px solid #e8eaed', borderRadius:'12px', overflow:'hidden' }}>
+                <div key={sec.id} style={{ background:'#fff', border:'1px solid #e8eaed', borderRadius:'12px', overflow:'hidden', flexShrink:0 }}>
                   <div style={{ display:'flex', alignItems:'center', gap:'9px', padding:'9px 12px', background:'#f8f9fb', borderBottom:'1px solid #f0f2f5' }}>
                     <div style={{ width:'6px', height:'6px', borderRadius:'50%', background:tc.color, flexShrink:0 }}/>
                     <span style={{ fontSize:'12px', fontWeight:700, color:'#0f0f23', flex:1 }}>{sec.label}</span>
