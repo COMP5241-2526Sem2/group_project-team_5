@@ -690,6 +690,46 @@ export default function AssessmentGenerate() {
     return result;
   }
 
+  function extractAnswerKey(answer?: string | null): string | null {
+    if (!answer) return null;
+    const raw = String(answer).trim().toUpperCase();
+    if (/^[A-D]$/.test(raw)) return raw;
+    const m = raw.match(/\b([A-D])\b/);
+    return m ? m[1] : null;
+  }
+
+  function normalizeMcqOptions(
+    options?: { key: string; text: string; correct: boolean }[],
+    answer?: string | null,
+  ): { key: string; text: string; correct: boolean }[] | undefined {
+    if (!options || options.length === 0) return undefined;
+
+    const normalized = options
+      .map((opt, idx) => {
+        const key = (opt.key || '').trim().toUpperCase();
+        return {
+          key: /^[A-D]$/.test(key) ? key : 'ABCD'[idx] || 'A',
+          text: (opt.text || '').trim(),
+          correct: !!opt.correct,
+        };
+      })
+      .filter((opt) => !!opt.text)
+      .slice(0, 4);
+
+    if (normalized.length === 0) return undefined;
+
+    const answerKey = extractAnswerKey(answer);
+    if (answerKey) {
+      normalized.forEach((opt) => {
+        if (opt.key === answerKey) opt.correct = true;
+      });
+    }
+    if (!normalized.some((opt) => opt.correct)) {
+      normalized[0].correct = true;
+    }
+    return normalized;
+  }
+
   async function handleCreateExamPaper() {
     const selected = (savedIds.size > 0 ? questions.filter((q) => savedIds.has(q.id)) : questions);
     if (selected.length === 0) {
@@ -829,17 +869,26 @@ export default function AssessmentGenerate() {
         type_targets: typeTargets,
       });
       if (preview.questions.length > 0) {
-        qs = preview.questions.map((q, idx) => ({
-          id: `gq-${idx + 1}`,
-          type: q.type,
-          prompt: q.prompt,
-          options: q.options.map((opt) => ({ key: opt.key, text: opt.text, correct: opt.correct })),
-          answer: q.answer || undefined,
-          difficulty: q.difficulty,
-          explanation: q.explanation,
-          hasImage: illustEnabled && illustTypes.has(q.type === 'MCQ' ? 'mcq' : q.type === 'True/False' ? 'tf' : q.type === 'Fill-blank' ? 'fill' : q.type === 'Essay' ? 'essay' : 'sa'),
-          imageStyle: illustStyle,
-        }));
+        qs = preview.questions.map((q, idx) => {
+          const isMcq = (q.type || '').toLowerCase().includes('mcq');
+          const fallbackTopic = topicPool[idx % Math.max(1, topicPool.length)] || getTopic(effectiveSubject, idx);
+          const normalizedOptions = isMcq ? normalizeMcqOptions(q.options, q.answer) : undefined;
+          return {
+            id: `gq-${idx + 1}`,
+            type: q.type,
+            prompt: q.prompt,
+            options: isMcq
+              ? (normalizedOptions && normalizedOptions.length >= 2 ? normalizedOptions : optionWithCorrect(fallbackTopic, effectiveSubject))
+              : (q.options && q.options.length > 0
+                ? q.options.map((opt) => ({ key: opt.key, text: opt.text, correct: opt.correct }))
+                : undefined),
+            answer: isMcq ? undefined : (q.answer || undefined),
+            difficulty: q.difficulty,
+            explanation: q.explanation,
+            hasImage: illustEnabled && illustTypes.has(q.type === 'MCQ' ? 'mcq' : q.type === 'True/False' ? 'tf' : q.type === 'Fill-blank' ? 'fill' : q.type === 'Essay' ? 'essay' : 'sa'),
+            imageStyle: illustStyle,
+          };
+        });
       }
     } catch {
       // keep local fallback generation when preview API is unavailable
@@ -2104,7 +2153,7 @@ export default function AssessmentGenerate() {
                         {isExpanded && (
                           <div style={{ padding: '0 18px 18px', borderTop: '1px solid #f0f2f5' }}>
                             {/* MCQ options */}
-                            {q.options && (
+                            {q.options && q.options.length > 0 && (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '14px' }}>
                                 {q.options.map(opt => (
                                   <div key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '8px', background: opt.correct ? '#f0fdf4' : '#f9fafb', border: `1px solid ${opt.correct ? '#bbf7d0' : '#f0f2f5'}` }}>
@@ -2116,7 +2165,7 @@ export default function AssessmentGenerate() {
                               </div>
                             )}
                             {/* TF / Fill answer */}
-                            {q.answer && !q.options && (
+                            {q.answer && (!q.options || q.options.length === 0) && (
                               <div style={{ marginTop: '12px', padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '13px', color: '#15803d' }}>
                                 <strong>Answer:</strong> {q.answer}
                               </div>
