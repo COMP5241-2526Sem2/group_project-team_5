@@ -10,7 +10,7 @@ import {
   PenLine, Copy,
 } from 'lucide-react';
 import { CustomSelect, SelectField } from '../../../components/teacher/CustomSelect';
-import { previewGenerateQuestionsApi, previewGenerateQuestionsMultimodalApi } from '../../../utils/aiQuestionGenApi';
+import { generateQuestionIllustrationsApi, previewGenerateQuestionsApi, previewGenerateQuestionsMultimodalApi } from '../../../utils/aiQuestionGenApi';
 import { createPaperApi } from '../../../utils/paperApi';
 import { extractSourceTextApi } from '../../../utils/sourceExtractionApi';
 
@@ -35,6 +35,7 @@ interface GeneratedQ {
   explanation: string;
   hasImage?: boolean;
   imageStyle?: IllustStyle;
+  imageUrl?: string;
   derivedFrom?: string; // for 以题生题
 }
 
@@ -376,6 +377,102 @@ function uniqueKeepOrder(items: string[]): string[] {
   return out;
 }
 
+function svgEscape(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function mapQTypeToIllustKey(type: string): string {
+  if (type === 'MCQ') return 'mcq';
+  if (type === 'True/False') return 'tf';
+  if (type === 'Fill-blank') return 'fill';
+  if (type === 'Essay') return 'essay';
+  return 'sa';
+}
+
+function styleShapeSvg(styleName: IllustStyle, seed: number, color: string): string {
+  const rand = mulberry32(seed || 1);
+  if (styleName === 'chart') {
+    const bars = Array.from({ length: 5 }).map((_, i) => {
+      const h = 30 + Math.floor(rand() * 40);
+      const x = 26 + i * 20;
+      return `<rect x="${x}" y="${102 - h}" width="12" height="${h}" rx="3" fill="${color}" opacity="${0.55 + i * 0.08}"/>`;
+    }).join('');
+    return `${bars}<line x1="20" y1="102" x2="132" y2="102" stroke="${color}" stroke-width="2" opacity="0.45"/>`;
+  }
+  if (styleName === 'diagram') {
+    return [
+      `<circle cx="36" cy="66" r="13" fill="none" stroke="${color}" stroke-width="2" opacity="0.65"/>`,
+      `<circle cx="76" cy="52" r="12" fill="none" stroke="${color}" stroke-width="2" opacity="0.65"/>`,
+      `<circle cx="110" cy="76" r="12" fill="none" stroke="${color}" stroke-width="2" opacity="0.65"/>`,
+      `<path d="M48 61 L64 56" stroke="${color}" stroke-width="2" opacity="0.55"/>`,
+      `<path d="M86 58 L99 69" stroke="${color}" stroke-width="2" opacity="0.55"/>`,
+    ].join('');
+  }
+  if (styleName === 'scientific') {
+    return [
+      `<path d="M48 38 L48 72 C48 86, 92 86, 92 72 L92 38" fill="none" stroke="${color}" stroke-width="2" opacity="0.7"/>`,
+      `<line x1="48" y1="45" x2="92" y2="45" stroke="${color}" stroke-width="2" opacity="0.4"/>`,
+      `<circle cx="62" cy="63" r="3" fill="${color}" opacity="0.6"/>`,
+      `<circle cx="70" cy="68" r="2" fill="${color}" opacity="0.5"/>`,
+      `<circle cx="80" cy="62" r="2.5" fill="${color}" opacity="0.65"/>`,
+    ].join('');
+  }
+  if (styleName === 'photo') {
+    return [
+      `<rect x="24" y="34" width="106" height="68" rx="8" fill="none" stroke="${color}" stroke-width="2" opacity="0.65"/>`,
+      `<circle cx="54" cy="56" r="10" fill="none" stroke="${color}" stroke-width="2" opacity="0.55"/>`,
+      `<path d="M34 92 L58 68 L76 84 L94 70 L120 92" fill="none" stroke="${color}" stroke-width="2" opacity="0.55"/>`,
+    ].join('');
+  }
+
+  return [
+    `<circle cx="52" cy="62" r="18" fill="none" stroke="${color}" stroke-width="2" opacity="0.6"/>`,
+    `<path d="M78 76 C96 62, 108 50, 124 62" fill="none" stroke="${color}" stroke-width="2" opacity="0.55"/>`,
+    `<rect x="26" y="86" width="96" height="8" rx="4" fill="${color}" opacity="0.2"/>`,
+  ].join('');
+}
+
+function makeInlineIllustrationDataUrl({
+  prompt,
+  qType,
+  styleName,
+  subject,
+  seed,
+}: {
+  prompt: string;
+  qType: string;
+  styleName: IllustStyle;
+  subject: string;
+  seed: number;
+}): string {
+  const styleMeta = ILLUST_STYLES.find((s) => s.id === styleName) ?? ILLUST_STYLES[0];
+  const topic = extractKeywords(prompt)[0] || prompt.slice(0, 36) || 'Core Concept';
+  const title = `${subject} · ${qType}`;
+  const shape = styleShapeSvg(styleName, hashString(`${prompt}|${seed}`), styleMeta.color);
+  const safeTitle = svgEscape(title);
+  const safeTopic = svgEscape(topic);
+  const safeStyle = svgEscape(styleMeta.label);
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="360" viewBox="0 0 960 360" role="img" aria-label="AI illustration"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#f8fafc"/><stop offset="100%" stop-color="#e2e8f0"/></linearGradient><linearGradient id="panel" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${styleMeta.color}" stop-opacity="0.12"/><stop offset="100%" stop-color="${styleMeta.color}" stop-opacity="0.02"/></linearGradient></defs><rect width="960" height="360" fill="url(#bg)"/><rect x="36" y="34" width="888" height="292" rx="22" fill="url(#panel)" stroke="${styleMeta.color}" stroke-opacity="0.25"/><g transform="translate(88 92)">${shape}</g><text x="312" y="128" fill="#0f172a" font-family="Inter, Segoe UI, Arial" font-size="28" font-weight="700">${safeTitle}</text><text x="312" y="172" fill="#334155" font-family="Inter, Segoe UI, Arial" font-size="22" font-weight="500">${safeTopic}</text><rect x="312" y="204" width="138" height="36" rx="18" fill="${styleMeta.color}" fill-opacity="0.14"/><text x="381" y="228" text-anchor="middle" fill="${styleMeta.color}" font-family="Inter, Segoe UI, Arial" font-size="16" font-weight="700">${safeStyle}</text></svg>`;
+
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+function buildQuestionIllustrationUrl(q: GeneratedQ, subject: string, seed: number): string {
+  return makeInlineIllustrationDataUrl({
+    prompt: q.prompt,
+    qType: q.type,
+    styleName: q.imageStyle ?? 'auto',
+    subject,
+    seed,
+  });
+}
+
 const SUBJECT_KEYWORDS: Array<{ subject: string; keywords: string[] }> = [
   { subject: 'Economics', keywords: ['economics', 'econ', 'market', 'demand', 'supply', 'gdp', 'inflation', 'macro', 'micro'] },
   { subject: 'Biology', keywords: ['biology', 'photosynthesis', 'cell', 'dna', 'ecosystem', 'mitochondria'] },
@@ -445,7 +542,19 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 }
 
 // Image placeholder card
-function IllustPlaceholder({ qIndex, style: styleName }: { qIndex: number; style: IllustStyle }) {
+function IllustPlaceholder({
+  qIndex,
+  style: styleName,
+  url,
+  onRegenerate,
+  regenerating,
+}: {
+  qIndex: number;
+  style: IllustStyle;
+  url?: string;
+  onRegenerate?: () => void;
+  regenerating?: boolean;
+}) {
   const grad = MOCK_ILLUST_COLORS[qIndex % MOCK_ILLUST_COLORS.length];
   const meta = ILLUST_STYLES.find(s => s.id === styleName) ?? ILLUST_STYLES[0];
   const Icon = meta.icon;
@@ -454,15 +563,40 @@ function IllustPlaceholder({ qIndex, style: styleName }: { qIndex: number; style
       marginTop: '12px', borderRadius: '10px', overflow: 'hidden',
       border: '1px solid #e8eaed',
     }}>
-      <div style={{
-        height: '120px', background: grad,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px',
-      }}>
-        <Icon size={28} style={{ color: 'rgba(0,0,0,0.2)' }} />
-        <span style={{ fontSize: '12px', color: 'rgba(0,0,0,0.3)', fontWeight: 500 }}>
-          AI-generated {meta.label.toLowerCase()} illustration
-        </span>
-      </div>
+      {url ? (
+        <div style={{
+          background: '#f8fafc',
+          padding: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '220px',
+        }}>
+          <img
+            src={url}
+            alt={`AI-generated ${meta.label.toLowerCase()} illustration`}
+            style={{
+              width: '100%',
+              maxHeight: '420px',
+              height: 'auto',
+              objectFit: 'contain',
+              display: 'block',
+              background: '#ffffff',
+              borderRadius: '8px',
+            }}
+          />
+        </div>
+      ) : (
+        <div style={{
+          height: '120px', background: grad,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px',
+        }}>
+          <Icon size={28} style={{ color: 'rgba(0,0,0,0.2)' }} />
+          <span style={{ fontSize: '12px', color: 'rgba(0,0,0,0.3)', fontWeight: 500 }}>
+            AI-generated {meta.label.toLowerCase()} illustration
+          </span>
+        </div>
+      )}
       <div style={{
         padding: '7px 12px', background: '#fafafa',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -470,8 +604,11 @@ function IllustPlaceholder({ qIndex, style: styleName }: { qIndex: number; style
         <span style={{ fontSize: '11px', color: '#9ca3af', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
           <Sparkles size={11} style={{ opacity: 0.65 }} /> AI Illustration · {meta.label}
         </span>
-        <button style={{ fontSize: '11px', color: '#3b5bdb', border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <RefreshCw size={11} /> Regenerate
+        <button
+          onClick={onRegenerate}
+          disabled={regenerating}
+          style={{ fontSize: '11px', color: regenerating ? '#9ca3af' : '#3b5bdb', border: 'none', background: 'none', cursor: regenerating ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <RefreshCw size={11} /> {regenerating ? 'Regenerating…' : 'Regenerate'}
         </button>
       </div>
     </div>
@@ -571,6 +708,7 @@ export default function AssessmentGenerate() {
   const [questions, setQuestions] = useState<GeneratedQ[]>([]);
   const [expandedQ, setExpandedQ] = useState<string | null>(null);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [regeneratingIllustIds, setRegeneratingIllustIds] = useState<Set<string>>(new Set());
   const [creatingPaper, setCreatingPaper] = useState(false);
   const [generateNonce, setGenerateNonce] = useState(0);
   const hasGeneratedQuestions = genDone && questions.length > 0;
@@ -714,6 +852,10 @@ export default function AssessmentGenerate() {
           imageStyle: illustStyle,
           derivedFrom: sourceTab === 'questions' ? deriveSource.slice(0, 90) : undefined,
         };
+
+        if (base.hasImage) {
+          base.imageUrl = buildQuestionIllustrationUrl(base, effectiveSubject, hashString(`${seedKey}|${idx}`));
+        }
 
         if (qt.key === 'mcq') {
           base.prompt = sourceTab === 'questions'
@@ -901,6 +1043,57 @@ export default function AssessmentGenerate() {
     return totalQ() > 0;
   }
 
+  function buildIllustrationPayload(chunk: GeneratedQ[]) {
+    return {
+      style: illustStyle,
+      style_prompt: illustPrompt.trim() ? illustPrompt.trim() : null,
+      questions: chunk
+        .filter((q) => q.hasImage)
+        .map((q) => ({
+          question_id: q.id,
+          prompt: q.prompt,
+          question_type: q.type,
+        })),
+    };
+  }
+
+  async function requestIllustrationMap(
+    list: GeneratedQ[],
+    effectiveSubject: string,
+    seedBase: number,
+  ): Promise<Map<string, string>> {
+    const targets = list.filter((q) => q.hasImage);
+    const map = new Map<string, string>();
+    if (targets.length === 0) return map;
+
+    const chunkSize = 4;
+    let processed = 0;
+    for (let i = 0; i < targets.length; i += chunkSize) {
+      const chunk = targets.slice(i, i + chunkSize);
+      try {
+        const response = await generateQuestionIllustrationsApi(buildIllustrationPayload(chunk));
+        (response.images || []).forEach((item) => {
+          if (item.question_id && item.image_url) {
+            map.set(item.question_id, item.image_url);
+          }
+        });
+      } catch {
+        // keep fallback for failed chunk
+      }
+
+      chunk.forEach((q, offset) => {
+        if (!map.has(q.id)) {
+          map.set(q.id, buildQuestionIllustrationUrl(q, effectiveSubject, seedBase + i + offset));
+        }
+      });
+
+      processed += chunk.length;
+      setIllustProgress(Math.min(100, Math.round((processed / targets.length) * 100)));
+    }
+
+    return map;
+  }
+
   async function handleGenerate() {
     const nextNonce = generateNonce + 1;
     setGenerateNonce(nextNonce);
@@ -985,6 +1178,7 @@ export default function AssessmentGenerate() {
 
       const previewPayload: Parameters<typeof previewGenerateQuestionsApi>[0] = {
         source_text: previewSourceText,
+        source_mode: sourceTab,
         difficulty: effectiveDifficulty,
         question_count: totalQ(),
         type_targets: typeTargets,
@@ -993,9 +1187,34 @@ export default function AssessmentGenerate() {
         previewPayload.subject = effectiveSubject;
         previewPayload.grade = tbGrade || 'Grade 7';
       }
+      if (sourceTab !== 'textbook') {
+        previewPayload.subject = effectiveSubject;
+        previewPayload.grade = tbGrade || 'Grade 7';
+      }
       if (sourceTab === 'exam') {
         previewPayload.task_type = examGenMode === 'simulation' ? 'simulation' : 'error_based';
         previewPayload.match_mode = examMatchMode;
+        previewPayload.exam_generation_mode = examGenMode;
+        previewPayload.exam_match_mode = examMatchMode;
+        previewPayload.exam_difficulty = examDifficulty;
+        previewPayload.source_file_names = examFiles.map((f) => f.name);
+      }
+      if (sourceTab === 'upload' && uploadedFile?.name) {
+        previewPayload.source_file_names = [uploadedFile.name];
+      }
+      if (sourceTab === 'questions') {
+        previewPayload.question_input_mode = qInputMode;
+        previewPayload.derive_mode = deriveMode;
+        previewPayload.seed_questions = qInputMode === 'paste'
+          ? pastedQuestions
+              .split('\n')
+              .map((s) => s.trim())
+              .filter(Boolean)
+              .slice(0, 20)
+          : QUESTION_BANK
+              .filter((q) => selectedBankIds.has(q.id))
+              .map((q) => q.prompt)
+              .slice(0, 20);
       }
       const examBinaryFiles =
         sourceTab === 'exam'
@@ -1024,8 +1243,17 @@ export default function AssessmentGenerate() {
             answer: isMcq ? undefined : (q.answer || undefined),
             difficulty: q.difficulty,
             explanation: q.explanation,
-            hasImage: illustEnabled && illustTypes.has(q.type === 'MCQ' ? 'mcq' : q.type === 'True/False' ? 'tf' : q.type === 'Fill-blank' ? 'fill' : q.type === 'Essay' ? 'essay' : 'sa'),
+            hasImage: illustEnabled && illustTypes.has(mapQTypeToIllustKey(q.type)),
             imageStyle: illustStyle,
+            imageUrl: illustEnabled && illustTypes.has(mapQTypeToIllustKey(q.type))
+              ? makeInlineIllustrationDataUrl({
+                  prompt: q.prompt,
+                  qType: q.type,
+                  styleName: illustStyle,
+                  subject: effectiveSubject,
+                  seed: hashString(`${q.prompt}|${idx}|${nextNonce}`),
+                })
+              : undefined,
           };
         });
       }
@@ -1038,12 +1266,18 @@ export default function AssessmentGenerate() {
 
     // Phase 2: generate illustrations (if enabled)
     if (illustEnabled) {
-      setGenPhase('illustrations'); setIllustProgress(0);
-      const iSteps = [20, 45, 65, 85, 100];
-      for (const p of iSteps) {
-        await new Promise(r => setTimeout(r, 480));
-        setIllustProgress(p);
-      }
+      setGenPhase('illustrations');
+      setIllustProgress(0);
+      const urlById = await requestIllustrationMap(qs, effectiveSubject, hashString(`${nextNonce}|illustration`));
+      qs = qs.map((q, idx) => {
+        if (!q.hasImage) return q;
+        return {
+          ...q,
+          imageUrl: urlById.get(q.id) || buildQuestionIllustrationUrl(q, effectiveSubject, hashString(`${q.id}|${idx}|${nextNonce}`)),
+        };
+      });
+      setQuestions(qs);
+      setIllustProgress(100);
       await new Promise(r => setTimeout(r, 200));
     }
 
@@ -1052,6 +1286,36 @@ export default function AssessmentGenerate() {
 
   function setQTypeCount(key: string, val: number) {
     setQTypes(prev => prev.map(t => t.key === key ? { ...t, count: Math.max(1, val) } : t));
+  }
+
+  async function regenerateQuestionIllustration(questionId: string, qIndex: number) {
+    const target = questions.find((q) => q.id === questionId);
+    if (!target || !target.hasImage) return;
+
+    setRegeneratingIllustIds((prev) => {
+      const next = new Set(prev);
+      next.add(questionId);
+      return next;
+    });
+
+    const effectiveSubject = inferEffectiveSubject();
+    let nextUrl = buildQuestionIllustrationUrl(target, effectiveSubject, Date.now() + qIndex);
+    try {
+      const response = await generateQuestionIllustrationsApi(buildIllustrationPayload([target]));
+      const item = (response.images || []).find((img) => img.question_id === questionId);
+      if (item?.image_url) {
+        nextUrl = item.image_url;
+      }
+    } catch {
+      // keep fallback URL
+    }
+
+    setQuestions((prev) => prev.map((q) => (q.id === questionId ? { ...q, imageUrl: nextUrl } : q)));
+    setRegeneratingIllustIds((prev) => {
+      const next = new Set(prev);
+      next.delete(questionId);
+      return next;
+    });
   }
 
   function toggleQType(key: string) {
@@ -2310,7 +2574,13 @@ export default function AssessmentGenerate() {
                             )}
                             {/* Illustration placeholder */}
                             {q.hasImage && (
-                              <IllustPlaceholder qIndex={i} style={q.imageStyle ?? 'auto'} />
+                              <IllustPlaceholder
+                                qIndex={i}
+                                style={q.imageStyle ?? 'auto'}
+                                url={q.imageUrl}
+                                regenerating={regeneratingIllustIds.has(q.id)}
+                                onRegenerate={() => { void regenerateQuestionIllustration(q.id, i); }}
+                              />
                             )}
                             {/* Explanation */}
                             <div style={{ marginTop: '12px', padding: '12px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px' }}>

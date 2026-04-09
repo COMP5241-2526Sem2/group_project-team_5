@@ -94,6 +94,14 @@ class AIQuestionGenPreviewRequest(BaseModel):
     grade: str | None = None
     task_type: Literal["simulation", "error_based"] | None = None
     match_mode: Literal["type", "knowledge"] | None = None
+    source_mode: Literal["upload", "text", "textbook", "exam", "questions"] | None = None
+    exam_generation_mode: Literal["error-questions", "simulation"] | None = None
+    exam_match_mode: Literal["type", "knowledge"] | None = None
+    exam_difficulty: Literal["basic", "solid", "advanced"] | None = None
+    source_file_names: list[str] | None = None
+    question_input_mode: Literal["paste", "bank"] | None = None
+    derive_mode: Literal["variation", "extension", "contrast"] | None = None
+    seed_questions: list[str] | None = None
     difficulty: Difficulty
     question_count: int = Field(ge=1)
     type_targets: dict[str, int] | None = None
@@ -108,3 +116,26 @@ class AIQuestionGenPreviewResponse(BaseModel):
 class AIQuestionGenExtractTextResponse(BaseModel):
     source_text: str
     chars: int
+
+
+class AIQuestionGenIllustrationRequestItem(BaseModel):
+    question_id: str = Field(min_length=1)
+    prompt: str = Field(min_length=1)
+    question_type: str = Field(min_length=1)
+
+
+class AIQuestionGenIllustrationRequest(BaseModel):
+    style: Literal["auto", "diagram", "chart", "photo", "scientific"] = "auto"
+    style_prompt: str | None = None
+    questions: list[AIQuestionGenIllustrationRequestItem] = Field(min_length=1, max_length=30)
+
+
+class AIQuestionGenIllustrationResult(BaseModel):
+    question_id: str
+    image_url: str
+    used_fallback: bool = False
+    error: str | None = None
+
+
+class AIQuestionGenIllustrationResponse(BaseModel):
+    images: list[AIQuestionGenIllustrationResult]

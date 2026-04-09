@@ -47,6 +47,15 @@ class Settings(BaseSettings):
     quiz_generation_llm_max_retries: int = 2
     quiz_audio_max_bytes: int = 8 * 1024 * 1024
 
+    # Illustration generation (AI Question Gen)
+    illustration_provider: str = "openai"
+    illustration_model: str = "gpt-image-1"
+    illustration_size: str = "1024x1024"
+    illustration_base_url: str = ""
+    illustration_request_timeout_sec: float = 45.0
+    illustration_max_retries: int = 2
+    illustration_concurrency: int = 3
+
     # PDF import: optional LLM structured parse when heuristics return no questions
     paper_pdf_import_llm_enabled: bool = True
     paper_pdf_import_model: str = ""
